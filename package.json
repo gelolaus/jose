@@ -1,0 +1,24 @@
+{
+  "name": "jose",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:web": "turbo run dev --filter=@jose/web",
+    "dev:api": "turbo run dev --filter=@jose/api",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4",
+    "typescript": "^5.8.3"
+  },
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": ">=20"
+  }
+}

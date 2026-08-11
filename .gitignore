@@ -1,0 +1,28 @@
+# Dependencies
+node_modules
+.turbo
+
+# Builds
+dist
+.next
+out
+build
+
+# Env
+.env
+.env.local
+.env.*.local
+apps/web/.env.local
+
+# Logs / OS
+*.log
+.DS_Store
+Thumbs.db
+
+# Test / coverage
+coverage
+*.tsbuildinfo
+
+# IDE
+.idea
+.vscode
