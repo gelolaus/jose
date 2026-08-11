@@ -1,28 +1,44 @@
 import { AppShell } from "@/components/learning-shell";
-import { IconBubble } from "@/components/top-bar";
-import { UserRound } from "lucide-react";
+import { ProfileShowcase } from "@/components/profile-showcase";
+import { fetchDemoPath } from "@/lib/path-api";
+import type { Metadata } from "next";
 import Link from "next/link";
 
-export default function ProfilePage() {
+export const metadata: Metadata = {
+  title: "Profile",
+};
+
+export default async function ProfilePage() {
+  const result = await fetchDemoPath();
+
+  if (!result.ok) {
+    return (
+      <AppShell>
+        <div className="mx-auto flex min-h-full max-w-2xl flex-col items-center justify-center gap-4 px-6 py-16 text-center">
+          <p className="font-display text-3xl font-semibold text-slate-800 md:text-4xl">
+            Profile is napping
+          </p>
+          <p className="text-base font-semibold text-slate-600">{result.error}</p>
+          <p className="text-sm text-slate-500">
+            Start the API with{" "}
+            <code className="rounded bg-slate-100 px-1.5 py-0.5">
+              npm run dev:api
+            </code>
+          </p>
+          <Link
+            href="/profile"
+            className="rounded-full bg-violet-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-md"
+          >
+            Retry
+          </Link>
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell>
-      <main className="mx-auto flex min-h-full w-full max-w-3xl flex-col items-center justify-center gap-5 px-6 py-16 text-center">
-        <IconBubble className="bg-rose-50 text-rose-600">
-          <UserRound className="size-12 md:size-14" strokeWidth={2.25} aria-hidden />
-        </IconBubble>
-        <h1 className="font-display text-4xl font-semibold tracking-tight text-slate-800 md:text-5xl">
-          Profile
-        </h1>
-        <p className="max-w-lg text-lg font-semibold text-slate-600 md:text-xl">
-          Explorer mode — accounts and saved progress come later.
-        </p>
-        <Link
-          href="/learn"
-          className="rounded-full bg-rose-500 px-6 py-3 text-base font-extrabold text-white shadow-md"
-        >
-          Back to path
-        </Link>
-      </main>
+      <ProfileShowcase path={result.data} />
     </AppShell>
   );
 }

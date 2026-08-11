@@ -38,3 +38,5 @@ npm test
 
 - Design: `docs/superpowers/specs/2026-08-07-rizal-levels-path-design.md`
 - Plan: `docs/superpowers/plans/2026-08-07-rizal-levels-path.md`
+- Profile design: `docs/superpowers/specs/2026-08-11-fun-profile-page-design.md`
+- Profile plan: `docs/superpowers/plans/2026-08-11-fun-profile-page.md`
