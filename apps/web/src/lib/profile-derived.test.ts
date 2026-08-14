@@ -7,8 +7,20 @@ import {
 } from "./profile-derived";
 
 const fixture: PathResponse = {
-  course: { id: "rizal", title: "Work and Life of Rizal" },
-  learner: { displayName: "Explorer", streak: 3, hearts: 5, xp: 120 },
+  module: {
+    id: "rizal",
+    title: "Work and Life of Rizal",
+    subtitle: "From Calamba to Bagumbayan",
+    coverColor: "#A855F7",
+    featured: true,
+  },
+  learner: {
+    id: "demo-student",
+    displayName: "Explorer",
+    streak: 3,
+    hearts: 5,
+    xp: 120,
+  },
   sections: [
     {
       id: "childhood",

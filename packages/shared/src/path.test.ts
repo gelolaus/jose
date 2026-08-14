@@ -2,8 +2,20 @@ import { describe, expect, it } from "vitest";
 import { pathResponseSchema } from "./path";
 
 const sample = {
-  course: { id: "rizal", title: "Work and Life of Rizal" },
-  learner: { displayName: "Explorer", streak: 3, hearts: 5, xp: 120 },
+  module: {
+    id: "rizal",
+    title: "Work and Life of Rizal",
+    subtitle: "The full story",
+    coverColor: "#A855F7",
+    featured: true,
+  },
+  learner: {
+    id: "demo-student",
+    displayName: "Explorer",
+    streak: 3,
+    hearts: 5,
+    xp: 120,
+  },
   sections: [
     {
       id: "childhood",
@@ -26,7 +38,7 @@ const sample = {
 
 describe("pathResponseSchema", () => {
   it("accepts a valid path payload", () => {
-    expect(pathResponseSchema.parse(sample).course.id).toBe("rizal");
+    expect(pathResponseSchema.parse(sample).module.id).toBe("rizal");
   });
 
   it("rejects a node missing status", () => {

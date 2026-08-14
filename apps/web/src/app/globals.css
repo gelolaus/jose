@@ -47,6 +47,38 @@
   }
 }
 
+.jose-prose h1,
+.jose-prose h2,
+.jose-prose h3 {
+  margin: 0.85em 0 0.4em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #1e293b;
+}
+
+.jose-prose p,
+.jose-prose ul,
+.jose-prose ol {
+  margin: 0.65em 0;
+}
+
+.jose-prose ul,
+.jose-prose ol {
+  padding-left: 1.2em;
+}
+
+.jose-prose a {
+  color: #6d28d9;
+  font-weight: 800;
+  text-decoration: underline;
+}
+
+.jose-prose code {
+  border-radius: 0.4rem;
+  background: #f1f5f9;
+  padding: 0.1em 0.35em;
+}
+
 @layer utilities {
   .font-display {
     font-family: var(--font-display);

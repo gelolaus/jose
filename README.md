@@ -1,13 +1,13 @@
 # Jose
 
 Kids-first adventure path for the Filipino college course **Work and Life of Rizal**.
-Duolingo-style levels UI (Next.js) + seeded demo API (NestJS).
+Module grid + Duolingo-style levels (Next.js) and NestJS API with local SQLite (Turso-ready).
 
 ## Stack
 
 - Turborepo monorepo (`apps/web`, `apps/api`, `packages/shared`)
 - Next.js 16 + Tailwind CSS v4
-- NestJS REST (`GET /path/demo`, `GET /health`)
+- NestJS REST + Drizzle + libSQL (`apps/api/data/jose.sqlite`)
 - Zod shared schemas
 
 ## Quick start
@@ -19,14 +19,10 @@ npm run dev
 ```
 
 - Web: http://localhost:3000/learn  
-- API: http://localhost:3001/path/demo  
+- API: http://localhost:3001/health  
+- Teacher studio: Profile → Teacher studio, or http://localhost:3000/teach  
 
-Or run separately:
-
-```bash
-npm run dev:api
-npm run dev:web
-```
+The API creates `apps/api/data/jose.sqlite` and seeds **Work and Life of Rizal** plus the **Ateneo days** deep dive on first boot.
 
 ## Tests
 
@@ -36,7 +32,7 @@ npm test
 
 ## Docs
 
-- Design: `docs/superpowers/specs/2026-08-07-rizal-levels-path-design.md`
-- Plan: `docs/superpowers/plans/2026-08-07-rizal-levels-path.md`
-- Profile design: `docs/superpowers/specs/2026-08-11-fun-profile-page-design.md`
-- Profile plan: `docs/superpowers/plans/2026-08-11-fun-profile-page.md`
+- Modules / lessons / games: `docs/superpowers/specs/2026-08-15-rizal-modules-lessons-games-design.md`
+- Future work (accounts, Turso, monitoring): `docs/superpowers/specs/2026-08-15-jose-future-work.md`
+- Original path: `docs/superpowers/specs/2026-08-07-rizal-levels-path-design.md`
+- Profile: `docs/superpowers/specs/2026-08-11-fun-profile-page-design.md`

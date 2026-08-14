@@ -1,13 +1,19 @@
 "use client";
 
 import type { LevelNode as LevelNodeType } from "@jose/shared";
-import { BookOpen, Check, Gift, Star } from "lucide-react";
+import { BookOpen, Check, Gift, Puzzle, Star } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "@/components/toast";
 
 /** Circle/chest sits on the path point; title hangs below without shifting alignment. */
-export function LevelNode({ node }: { node: LevelNodeType }) {
+export function LevelNode({
+  node,
+  moduleId,
+}: {
+  node: LevelNodeType;
+  moduleId: string;
+}) {
   const router = useRouter();
   const toast = useToast();
   const [shake, setShake] = useState(false);
@@ -21,7 +27,7 @@ export function LevelNode({ node }: { node: LevelNodeType }) {
       window.setTimeout(() => setShake(false), 450);
       return;
     }
-    router.push(`/learn/${node.id}`);
+    router.push(`/learn/${moduleId}/${node.id}`);
   }
 
   return (
@@ -77,6 +83,9 @@ function NodeGlyph({
   }
   if (icon === "chest") {
     return <Gift className={className} strokeWidth={stroke} aria-hidden />;
+  }
+  if (icon === "game") {
+    return <Puzzle className={className} strokeWidth={stroke} aria-hidden />;
   }
   return <BookOpen className={className} strokeWidth={stroke} aria-hidden />;
 }

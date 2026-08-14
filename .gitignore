@@ -26,3 +26,7 @@ coverage
 # IDE
 .idea
 .vscode
+
+# Local SQLite (seeded on API boot)
+apps/api/data/*.sqlite
+apps/api/data/*.sqlite-*

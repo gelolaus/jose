@@ -50,12 +50,20 @@ export function ProfileShowcase({ path }: ProfileShowcaseProps) {
             Rizal path explorer
           </p>
         </div>
-        <Link
-          href="/profile/edit"
-          className="rounded-full bg-rose-500 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
-        >
-          Edit explorer
-        </Link>
+        <div className="flex flex-col items-center gap-2 sm:flex-row">
+          <Link
+            href="/profile/edit"
+            className="rounded-full bg-rose-500 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
+          >
+            Edit explorer
+          </Link>
+          <Link
+            href="/teach"
+            className="rounded-full bg-slate-800 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
+          >
+            Teacher studio
+          </Link>
+        </div>
       </section>
 
       <section aria-label="Stats" className="flex flex-wrap items-center justify-center gap-3">
