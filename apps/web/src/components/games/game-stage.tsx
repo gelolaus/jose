@@ -66,6 +66,8 @@ export function StarCelebration({
   error,
   onRetry,
   onContinue,
+  retryLabel = "Retry",
+  continueLabel = "Continue",
 }: {
   title: string;
   score: number;
@@ -74,6 +76,8 @@ export function StarCelebration({
   error?: string | null;
   onRetry: () => void;
   onContinue: () => void;
+  retryLabel?: string;
+  continueLabel?: string;
 }) {
   return (
     <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center gap-4 px-6 py-12 text-center">
@@ -105,14 +109,14 @@ export function StarCelebration({
           onClick={onRetry}
           className="flex-1 rounded-full bg-slate-100 px-5 py-3 text-sm font-extrabold text-slate-700"
         >
-          Retry
+          {retryLabel}
         </button>
         <button
           type="button"
           onClick={onContinue}
           className="flex-1 rounded-full bg-violet-600 px-5 py-3 text-sm font-extrabold text-white shadow-md"
         >
-          Continue
+          {continueLabel}
         </button>
       </div>
     </div>
@@ -163,18 +167,20 @@ export function GameFrame({
   children: ReactNode;
 }) {
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
-      <div className="mb-5 flex items-start justify-between gap-3">
+    <div className="mx-auto w-full max-w-3xl px-4 py-3 sm:px-6 sm:py-8">
+      <div className="mb-2.5 flex items-start justify-between gap-3 sm:mb-5">
         <div className="min-w-0">
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-800 sm:text-4xl">
+          <h1 className="font-display text-xl font-semibold tracking-tight text-slate-800 sm:text-4xl">
             {title}
           </h1>
-          <p className="mt-1 text-sm font-semibold text-slate-500">{hint}</p>
+          <p className="mt-0.5 text-xs font-semibold leading-snug text-slate-500 sm:mt-1 sm:text-sm">
+            {hint}
+          </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           {showHearts && hearts !== undefined ? <HeartsHud hearts={hearts} /> : null}
           {progress ? (
-            <p className="text-xs font-extrabold uppercase tracking-wide text-violet-500">
+            <p className="hidden text-xs font-extrabold uppercase tracking-wide text-violet-500 sm:block">
               {progress}
             </p>
           ) : null}

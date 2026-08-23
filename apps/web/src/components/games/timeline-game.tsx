@@ -5,6 +5,7 @@ import { shuffledCopy } from "@jose/shared";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { PlayBoardProps } from "./play-types";
+import { PlaceGhost, usePlaceDrag } from "./use-place-drag";
 
 export function TimelineGame({
   game,
@@ -35,10 +36,18 @@ function TimelinePlay({
   onFinish,
 }: { game: TimelineContent } & PlayBoardProps) {
   const [placed, setPlaced] = useState<Record<number, string>>({});
-  const [selected, setSelected] = useState<string | null>(null);
   const [shakeSlot, setShakeSlot] = useState<number | null>(null);
   const missesRef = useRef(0);
   const [bank, setBank] = useState(game.items);
+  const drag = usePlaceDrag({
+    disabled,
+    dropSelector: "[data-timeline-slot]",
+    onDrop: (itemId, target) => {
+      const slot = Number(target.dataset.timelineSlot);
+      if (!Number.isInteger(slot)) return;
+      void dropOn(slot, itemId);
+    },
+  });
 
   useEffect(() => {
     const copy = shuffledCopy(game.items);
@@ -49,12 +58,16 @@ function TimelinePlay({
   }, [game.items]);
 
   const remaining = bank.filter((item) => !Object.values(placed).includes(item.id));
+  const overSlot =
+    drag.overEl?.dataset.timelineSlot !== undefined
+      ? Number(drag.overEl.dataset.timelineSlot)
+      : null;
 
-  async function dropOn(slot: number) {
-    if (disabled || selected === null || placed[slot]) return;
-    const item = game.items.find((entry) => entry.id === selected);
+  async function dropOn(slot: number, itemId = drag.selectedRef.current) {
+    if (disabled || itemId === null || placed[slot]) return;
+    const item = game.items.find((entry) => entry.id === itemId);
     if (!item) return;
-    const correct = game.items[slot]?.id === selected;
+    const correct = game.items[slot]?.id === itemId;
     if (!correct) {
       setShakeSlot(slot);
       window.setTimeout(() => setShakeSlot(null), 550);
@@ -62,16 +75,16 @@ function TimelinePlay({
         title: item.label,
         body:
           item.why?.trim() ||
-          `This belongs at ${game.items.findIndex((entry) => entry.id === selected) + 1}, not here.`,
+          `This belongs at ${game.items.findIndex((entry) => entry.id === itemId) + 1}, not here.`,
       });
       missesRef.current += 1;
-      setSelected(null);
+      drag.select(null);
       if (result === "empty") return;
       return;
     }
-    const next = { ...placed, [slot]: selected };
+    const next = { ...placed, [slot]: itemId };
     setPlaced(next);
-    setSelected(null);
+    drag.select(null);
     if (Object.keys(next).length === game.items.length) {
       onFinish(
         game.items.length - missesRef.current,
@@ -83,12 +96,14 @@ function TimelinePlay({
 
   return (
     <div className="space-y-6">
+      <PlaceGhost ghost={drag.ghost} />
       <TimelineRail
         items={game.items}
         placed={placed}
-        selected={selected}
+        selected={drag.selected}
+        overSlot={overSlot}
         shakeSlot={shakeSlot}
-        onSlot={dropOn}
+        onSlot={(slot) => void dropOn(slot)}
       />
       <div>
         <p className="mb-2 text-xs font-extrabold uppercase tracking-[0.14em] text-violet-500">
@@ -96,17 +111,27 @@ function TimelinePlay({
         </p>
         <div className="flex flex-wrap gap-2">
           {remaining.map((item) => {
-            const on = selected === item.id;
+            const on = drag.selected === item.id;
+            const lifting = drag.dragging === item.id;
             return (
               <button
                 key={item.id}
                 type="button"
                 disabled={disabled}
-                onClick={() => setSelected(on ? null : item.id)}
-                className={`rounded-2xl px-4 py-3 text-left text-sm font-extrabold shadow-sm ring-2 transition ${
-                  on
-                    ? "bg-violet-600 text-white ring-violet-700"
-                    : "bg-white text-slate-800 ring-black/10 hover:bg-violet-50"
+                onPointerDown={(event) => drag.onPointerDown(event, item.id, item.label)}
+                onPointerMove={drag.onPointerMove}
+                onPointerUp={drag.onPointerUp}
+                onPointerCancel={drag.onPointerCancel}
+                onClick={() => {
+                  if (drag.consumeClick()) return;
+                  drag.select(on ? null : item.id);
+                }}
+                className={`touch-none select-none rounded-2xl px-4 py-3 text-left text-sm font-extrabold shadow-sm ring-2 transition ${
+                  lifting
+                    ? "cursor-grabbing bg-violet-100 text-violet-400 ring-violet-200 opacity-40"
+                    : on
+                      ? "cursor-grab bg-violet-600 text-white ring-violet-700"
+                      : "cursor-grab bg-white text-slate-800 ring-black/10 hover:bg-violet-50"
                 }`}
               >
                 {item.year ? (
@@ -128,6 +153,7 @@ function TimelineRail({
   items,
   placed,
   selected,
+  overSlot,
   shakeSlot,
   onSlot,
   filled,
@@ -136,6 +162,7 @@ function TimelineRail({
   items: TimelineItem[];
   placed?: Record<number, string>;
   selected?: string | null;
+  overSlot?: number | null;
   shakeSlot?: number | null;
   onSlot?: (index: number) => void;
   filled?: boolean;
@@ -151,8 +178,13 @@ function TimelineRail({
         const placedId = placed?.[index];
         const shown = filled ? item : items.find((entry) => entry.id === placedId);
         const side = index % 2 === 0 ? "left" : "right";
+        const waiting = Boolean(!shown && (selected || overSlot === index));
         return (
-          <li key={item.id} className="relative flex gap-4 py-3 sm:gap-5">
+          <li
+            key={item.id}
+            data-timeline-slot={onSlot && !shown ? String(index) : undefined}
+            className="relative flex gap-4 py-3 sm:gap-5"
+          >
             <button
               type="button"
               disabled={!onSlot && !onEdit}
@@ -160,8 +192,10 @@ function TimelineRail({
               className={`relative z-[1] mt-1 flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-extrabold shadow-md ring-4 ring-[var(--jose-cream)] sm:size-10 ${
                 shown
                   ? "bg-violet-600 text-white"
-                  : `bg-white text-violet-500 ${selected ? "slot-glow" : ""}`
-              } ${shakeSlot === index ? "snap-back" : ""}`}
+                  : `bg-white text-violet-500 ${waiting ? "slot-glow" : ""}`
+              } ${shakeSlot === index ? "snap-back" : ""} ${
+                overSlot === index && !shown ? "scale-110 bg-amber-200 text-amber-800" : ""
+              }`}
             >
               {index + 1}
             </button>
@@ -172,7 +206,9 @@ function TimelineRail({
               className={`min-w-0 flex-1 rounded-[1.4rem] px-4 py-3 text-left shadow-sm ring-2 transition sm:px-5 sm:py-4 ${
                 shown
                   ? "bg-white ring-violet-200"
-                  : "border-2 border-dashed border-violet-300 bg-violet-50/60 ring-transparent"
+                  : overSlot === index
+                    ? "border-2 border-amber-400 bg-amber-50 ring-amber-200"
+                    : "border-2 border-dashed border-violet-300 bg-violet-50/60 ring-transparent"
               } ${side === "right" ? "sm:ml-6" : ""}`}
             >
               {shown ? (

@@ -65,7 +65,7 @@ Memory cards currently take https URLs. Later: upload into object storage (or Tu
 
 ## Practice tab
 
-Still a stub. Later: replay completed games, mixed drills from finished modules, or hearts practice. Do not invent a second curriculum graph.
+Game Lab at `/practice` (and `/practice/[type]`). Sample boards for all five types, no hearts, no saved attempts. Not a second curriculum graph. Later: replay completed path games, mixed drills, or hearts practice.
 
 ## Other parked items
 

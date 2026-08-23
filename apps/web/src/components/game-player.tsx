@@ -1,5 +1,6 @@
 "use client";
 
+import { hintFor, labelFor } from "@/lib/game-copy";
 import { ApiError, recordMiss, submitAttempt } from "@/lib/path-api";
 import {
   HEARTS_EMPTY_CODE,
@@ -151,36 +152,6 @@ export function GamePlayer({
       ) : null}
     </>
   );
-}
-
-function hintFor(type: GameContent["type"]) {
-  switch (type) {
-    case "timeline":
-      return "Oldest at the top. Tap a card, then tap its stop on the rail.";
-    case "memory":
-      return "Flip two cards. Find the pairs.";
-    case "sort":
-      return "Tap a chip, then tap the chest it belongs in.";
-    case "quiz":
-      return "Read the stage. Tap the answer you trust.";
-    case "blank":
-      return "Fill the hole in the letter. One chip is the missing word.";
-  }
-}
-
-function labelFor(type: GameContent["type"]) {
-  switch (type) {
-    case "timeline":
-      return "Timeline";
-    case "memory":
-      return "Match";
-    case "sort":
-      return "Chests";
-    case "quiz":
-      return "Quiz";
-    case "blank":
-      return "Letter";
-  }
 }
 
 export function GameSwitch({

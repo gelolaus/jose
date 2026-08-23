@@ -26,7 +26,7 @@ The five teacher-authored game types stay. They must **play as games**, not work
 
 ## Non-goals
 
-- New game types, Practice tab content, accounts, pass marks, sound packs, file upload, leaderboards.
+- New game types, accounts, pass marks, sound packs, file upload, leaderboards.
 
 ## Architecture
 
@@ -82,9 +82,9 @@ HUD: title, hearts, piece progress. Cream page, gold/violet toys, Fredoka titles
 
 | Type | Board | Interaction |
 | --- | --- | --- |
-| timeline | Vertical history rail (oldest at top), year ticks, empty stations, event cards in a tray | Tap a card, tap a station. Wrong station: snap back, why, heart. |
+| timeline | Vertical history rail (oldest at top), year ticks, empty stations, event cards in a tray | Drag a card onto a station, or tap a card then tap a station. Wrong station: snap back, why, heart. |
 | memory | Felt table, thick flip cards | Flip two. Mismatch: flip back, heart. Match: stay lit, show why. |
-| sort | 2–3 labeled chests + chip tray | Tap chip, tap chest. Wrong chest: bounce back, why, heart. |
+| sort | 2–3 labeled chests + chip tray | Drag a chip onto a chest, or tap chip then tap chest. Wrong chest: bounce back, why, heart. |
 | quiz | Spotlight prompt + big 3D answer buttons | Tap. Wrong: why + correct stays marked, then next. |
 | blank | One parchment sentence at a time, hole for the missing word, chip bank | Tap a chip. Wrong: why + correct revealed, that sentence is spent, next. |
 
@@ -139,4 +139,5 @@ Student:
 3. At 0 hearts, a game will not start; a lesson will, and Continue fills hearts.
 4. Teacher studio edits the timeline on the rail and Playtest plays that board.
 5. Featured path shows a game in every section; Ateneo days has all five types.
-6. Phone-width play uses tap-to-place; desktop is the same game, bigger.
+6. Phone-width play uses tap-to-place; desktop can drag onto the same stations. Both gestures work.
+7. Practice (`/practice`) is a Game Lab: all five types, local scores, no hearts.
