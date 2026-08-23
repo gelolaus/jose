@@ -36,6 +36,11 @@ export class StudentController {
     return this.curriculum.completeLevel(id);
   }
 
+  @Post("levels/:id/miss")
+  miss(@Param("id") id: string) {
+    return this.curriculum.recordMiss(id);
+  }
+
   @Post("levels/:id/attempts")
   attempt(@Param("id") id: string, @Body() body: unknown) {
     return this.curriculum.submitAttempt(id, body);

@@ -4,6 +4,7 @@ import {
   gameContentSchema,
   memoryGameSchema,
   memoryScore,
+  parseGameContent,
 } from "./games";
 
 describe("gameContentSchema", () => {
@@ -34,6 +35,17 @@ describe("gameContentSchema", () => {
     for (const type of ["quiz", "memory", "timeline", "blank", "sort"] as const) {
       expect(gameContentSchema.parse(emptyGameContent(type)).type).toBe(type);
     }
+  });
+
+  it("coerces legacy timeline string lists", () => {
+    const parsed = parseGameContent({
+      type: "timeline",
+      items: ["Born in Calamba", "School in Biñan"],
+    });
+    expect(parsed.type).toBe("timeline");
+    if (parsed.type !== "timeline") throw new Error("expected timeline");
+    expect(parsed.items[0]?.label).toBe("Born in Calamba");
+    expect(parsed.items[0]?.id).toBe("event-1");
   });
 });
 

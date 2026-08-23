@@ -1,4 +1,5 @@
 import {
+  missResponseSchema,
   modulesResponseSchema,
   pathResponseSchema,
   playLevelResponseSchema,
@@ -34,7 +35,7 @@ async function apiFetch(path: string, init?: RequestInit): Promise<unknown> {
   const json: unknown = await res.json().catch(() => null);
   if (!res.ok) {
     const message = extractApiMessage(json) ?? `API returned ${res.status}`;
-    throw new ApiError(message, res.status);
+    throw new ApiError(message, res.status, extractApiCode(json));
   }
   return json;
 }
@@ -43,6 +44,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly code?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -89,7 +91,8 @@ export async function fetchDemoPath(): Promise<
 export async function fetchPlayLevel(
   levelId: string,
 ): Promise<
-  { ok: true; data: PlayLevelResponse } | { ok: false; error: string; status?: number }
+  | { ok: true; data: PlayLevelResponse }
+  | { ok: false; error: string; status?: number; code?: string }
 > {
   try {
     const json = await apiFetch(`/levels/${levelId}`);
@@ -99,12 +102,21 @@ export async function fetchPlayLevel(
       ok: false,
       error: errorMessage(error),
       status: error instanceof ApiError ? error.status : undefined,
+      code: error instanceof ApiError ? error.code : undefined,
     };
   }
 }
 
 export async function completeLevel(levelId: string) {
   return apiFetch(`/levels/${levelId}/complete`, { method: "POST", body: "{}" });
+}
+
+export async function recordMiss(levelId: string) {
+  const json = await apiFetch(`/levels/${levelId}/miss`, {
+    method: "POST",
+    body: "{}",
+  });
+  return missResponseSchema.parse(json);
 }
 
 export async function submitAttempt(
@@ -242,6 +254,12 @@ export function findNode(path: PathResponse, nodeId: string) {
     if (node) return { section, node };
   }
   return null;
+}
+
+function extractApiCode(json: unknown): string | undefined {
+  if (typeof json !== "object" || !json || !("code" in json)) return undefined;
+  const code = (json as { code: unknown }).code;
+  return typeof code === "string" ? code : undefined;
 }
 
 function extractApiMessage(json: unknown): string | null {

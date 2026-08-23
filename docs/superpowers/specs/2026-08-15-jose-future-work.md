@@ -69,7 +69,7 @@ Still a stub. Later: replay completed games, mixed drills from finished modules,
 
 ## Other parked items
 
-- Hearts / streak economy (lose hearts on wrong quiz answers, daily streak from `attempts`)
+- Hearts / streak economy (daily streak from `attempts`; hearts now spend on game misses — see `2026-08-23-game-stage-design.md`)
 - Chest editor for teachers (seeded chests only today)
 - Module prerequisites (lock a deep dive until the featured path reaches a section)
 - Draft autosave / version history

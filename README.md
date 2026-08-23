@@ -33,6 +33,7 @@ npm test
 ## Docs
 
 - Modules / lessons / games: `docs/superpowers/specs/2026-08-15-rizal-modules-lessons-games-design.md`
+- Game stage (playable boards): `docs/superpowers/specs/2026-08-23-game-stage-design.md`
 - Future work (accounts, Turso, monitoring): `docs/superpowers/specs/2026-08-15-jose-future-work.md`
 - Original path: `docs/superpowers/specs/2026-08-07-rizal-levels-path-design.md`
 - Profile: `docs/superpowers/specs/2026-08-11-fun-profile-page-design.md`

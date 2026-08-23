@@ -6,6 +6,7 @@ const STATEMENTS = [
     display_name TEXT NOT NULL,
     streak INTEGER NOT NULL,
     hearts INTEGER NOT NULL,
+    hearts_updated_at INTEGER NOT NULL DEFAULT 0,
     xp INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS modules (
@@ -66,4 +67,17 @@ export async function ensureSchema(client: Client) {
   for (const sql of STATEMENTS) {
     await client.execute(sql);
   }
+  await ensureColumn(client, "learners", "hearts_updated_at", "INTEGER NOT NULL DEFAULT 0");
+}
+
+async function ensureColumn(
+  client: Client,
+  table: string,
+  column: string,
+  definition: string,
+) {
+  const info = await client.execute(`PRAGMA table_info(${table})`);
+  const names = info.rows.map((row) => String(row.name ?? row[1] ?? ""));
+  if (names.includes(column)) return;
+  await client.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }

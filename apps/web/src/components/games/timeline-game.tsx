@@ -1,92 +1,318 @@
 "use client";
 
-import type { TimelineGame } from "@jose/shared";
-import { ChevronDown, ChevronUp } from "lucide-react";
-import { useMemo, useState } from "react";
-
-function shuffledCopy(items: string[]) {
-  const next = [...items];
-  for (let i = next.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [next[i], next[j]] = [next[j]!, next[i]!];
-  }
-  if (next.every((item, i) => item === items[i]) && next.length > 1) {
-    [next[0], next[1]] = [next[1]!, next[0]!];
-  }
-  return next;
-}
+import type { TimelineGame as TimelineContent, TimelineItem } from "@jose/shared";
+import { shuffledCopy } from "@jose/shared";
+import { Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import type { PlayBoardProps } from "./play-types";
 
 export function TimelineGame({
   game,
-  disabled,
+  mode = "play",
+  disabled = false,
+  onMiss,
   onFinish,
+  onChange,
 }: {
-  game: TimelineGame;
-  disabled: boolean;
-  onFinish: (score: number, maxScore: number) => void;
-}) {
-  const [order, setOrder] = useState(() => shuffledCopy(game.items));
-
-  function move(index: number, direction: -1 | 1) {
-    const next = [...order];
-    const swap = index + direction;
-    if (swap < 0 || swap >= next.length) return;
-    [next[index], next[swap]] = [next[swap]!, next[index]!];
-    setOrder(next);
+  game: TimelineContent;
+  mode?: "play" | "build";
+  disabled?: boolean;
+  onChange?: (game: TimelineContent) => void;
+} & Partial<PlayBoardProps>) {
+  if (mode === "build" && onChange) {
+    return <TimelineBuild game={game} onChange={onChange} />;
   }
+  if (!onMiss || !onFinish) return null;
+  return (
+    <TimelinePlay game={game} disabled={disabled} onMiss={onMiss} onFinish={onFinish} />
+  );
+}
 
-  function submit() {
-    const score = order.filter((item, i) => item === game.items[i]).length;
-    onFinish(score, game.items.length);
+function TimelinePlay({
+  game,
+  disabled,
+  onMiss,
+  onFinish,
+}: { game: TimelineContent } & PlayBoardProps) {
+  const [placed, setPlaced] = useState<Record<number, string>>({});
+  const [selected, setSelected] = useState<string | null>(null);
+  const [shakeSlot, setShakeSlot] = useState<number | null>(null);
+  const missesRef = useRef(0);
+  const [bank, setBank] = useState(game.items);
+
+  useEffect(() => {
+    const copy = shuffledCopy(game.items);
+    if (copy.length > 1 && copy.every((item, i) => item.id === game.items[i]?.id)) {
+      [copy[0], copy[1]] = [copy[1]!, copy[0]!];
+    }
+    setBank(copy);
+  }, [game.items]);
+
+  const remaining = bank.filter((item) => !Object.values(placed).includes(item.id));
+
+  async function dropOn(slot: number) {
+    if (disabled || selected === null || placed[slot]) return;
+    const item = game.items.find((entry) => entry.id === selected);
+    if (!item) return;
+    const correct = game.items[slot]?.id === selected;
+    if (!correct) {
+      setShakeSlot(slot);
+      window.setTimeout(() => setShakeSlot(null), 550);
+      const result = await onMiss({
+        title: item.label,
+        body:
+          item.why?.trim() ||
+          `This belongs at ${game.items.findIndex((entry) => entry.id === selected) + 1}, not here.`,
+      });
+      missesRef.current += 1;
+      setSelected(null);
+      if (result === "empty") return;
+      return;
+    }
+    const next = { ...placed, [slot]: selected };
+    setPlaced(next);
+    setSelected(null);
+    if (Object.keys(next).length === game.items.length) {
+      onFinish(
+        game.items.length - missesRef.current,
+        game.items.length,
+        missesRef.current,
+      );
+    }
   }
-
-  const hint = useMemo(() => "Oldest or first at the top.", []);
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm font-semibold text-slate-500">{hint}</p>
-      <ol className="space-y-2">
-        {order.map((item, index) => (
-          <li
-            key={`${item}-${index}`}
-            className="flex items-center gap-2 rounded-3xl bg-white px-3 py-2 ring-1 ring-black/10"
-          >
-            <span className="w-7 text-center text-sm font-extrabold text-violet-600">
+    <div className="space-y-6">
+      <TimelineRail
+        items={game.items}
+        placed={placed}
+        selected={selected}
+        shakeSlot={shakeSlot}
+        onSlot={dropOn}
+      />
+      <div>
+        <p className="mb-2 text-xs font-extrabold uppercase tracking-[0.14em] text-violet-500">
+          Events
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {remaining.map((item) => {
+            const on = selected === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                disabled={disabled}
+                onClick={() => setSelected(on ? null : item.id)}
+                className={`rounded-2xl px-4 py-3 text-left text-sm font-extrabold shadow-sm ring-2 transition ${
+                  on
+                    ? "bg-violet-600 text-white ring-violet-700"
+                    : "bg-white text-slate-800 ring-black/10 hover:bg-violet-50"
+                }`}
+              >
+                {item.year ? (
+                  <span className="mb-1 block text-[11px] uppercase tracking-wide opacity-80">
+                    {item.year}
+                  </span>
+                ) : null}
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TimelineRail({
+  items,
+  placed,
+  selected,
+  shakeSlot,
+  onSlot,
+  filled,
+  onEdit,
+}: {
+  items: TimelineItem[];
+  placed?: Record<number, string>;
+  selected?: string | null;
+  shakeSlot?: number | null;
+  onSlot?: (index: number) => void;
+  filled?: boolean;
+  onEdit?: (index: number) => void;
+}) {
+  return (
+    <ol className="relative mx-auto max-w-xl pl-2">
+      <span
+        className="absolute top-4 bottom-4 left-[1.15rem] w-1 rounded-full bg-gradient-to-b from-amber-300 via-violet-400 to-rose-400 sm:left-[1.35rem]"
+        aria-hidden
+      />
+      {items.map((item, index) => {
+        const placedId = placed?.[index];
+        const shown = filled ? item : items.find((entry) => entry.id === placedId);
+        const side = index % 2 === 0 ? "left" : "right";
+        return (
+          <li key={item.id} className="relative flex gap-4 py-3 sm:gap-5">
+            <button
+              type="button"
+              disabled={!onSlot && !onEdit}
+              onClick={() => (onEdit ? onEdit(index) : onSlot?.(index))}
+              className={`relative z-[1] mt-1 flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-extrabold shadow-md ring-4 ring-[var(--jose-cream)] sm:size-10 ${
+                shown
+                  ? "bg-violet-600 text-white"
+                  : `bg-white text-violet-500 ${selected ? "slot-glow" : ""}`
+              } ${shakeSlot === index ? "snap-back" : ""}`}
+            >
               {index + 1}
-            </span>
-            <span className="min-w-0 flex-1 text-base font-extrabold text-slate-800">
-              {item}
-            </span>
-            <span className="flex flex-col">
-              <button
-                type="button"
-                aria-label="Move up"
-                disabled={disabled || index === 0}
-                onClick={() => move(index, -1)}
-                className="rounded-lg p-1 text-slate-500 disabled:opacity-30"
-              >
-                <ChevronUp className="size-5" strokeWidth={2.5} />
-              </button>
-              <button
-                type="button"
-                aria-label="Move down"
-                disabled={disabled || index === order.length - 1}
-                onClick={() => move(index, 1)}
-                className="rounded-lg p-1 text-slate-500 disabled:opacity-30"
-              >
-                <ChevronDown className="size-5" strokeWidth={2.5} />
-              </button>
-            </span>
+            </button>
+            <button
+              type="button"
+              disabled={!onSlot && !onEdit}
+              onClick={() => (onEdit ? onEdit(index) : onSlot?.(index))}
+              className={`min-w-0 flex-1 rounded-[1.4rem] px-4 py-3 text-left shadow-sm ring-2 transition sm:px-5 sm:py-4 ${
+                shown
+                  ? "bg-white ring-violet-200"
+                  : "border-2 border-dashed border-violet-300 bg-violet-50/60 ring-transparent"
+              } ${side === "right" ? "sm:ml-6" : ""}`}
+            >
+              {shown ? (
+                <>
+                  {shown.year ? (
+                    <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-amber-600">
+                      {shown.year}
+                    </p>
+                  ) : null}
+                  <p className="font-display text-lg font-semibold text-slate-800 sm:text-xl">
+                    {shown.label}
+                  </p>
+                </>
+              ) : (
+                <p className="font-extrabold text-violet-400">Drop event {index + 1}</p>
+              )}
+            </button>
           </li>
-        ))}
-      </ol>
+        );
+      })}
+    </ol>
+  );
+}
+
+function TimelineBuild({
+  game,
+  onChange,
+}: {
+  game: TimelineContent;
+  onChange: (game: TimelineContent) => void;
+}) {
+  const [editing, setEditing] = useState(0);
+  const current = game.items[editing];
+
+  function updateItem(index: number, patch: Partial<TimelineItem>) {
+    const items = game.items.map((item, i) =>
+      i === index ? { ...item, ...patch } : item,
+    );
+    onChange({ ...game, items });
+  }
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm font-semibold text-slate-500">
+        Oldest at the top. Tap a stop to edit it. This is the real timeline students will play.
+      </p>
+      <TimelineRail
+        items={game.items}
+        filled
+        onEdit={setEditing}
+      />
+      {current ? (
+        <div className="space-y-3 rounded-[1.5rem] bg-white p-4 ring-1 ring-black/10">
+          <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-violet-500">
+            Stop {editing + 1}
+          </p>
+          <label className="block text-xs font-extrabold text-slate-500">
+            Year or marker
+            <input
+              value={current.year ?? ""}
+              onChange={(e) => updateItem(editing, { year: e.target.value || undefined })}
+              className="mt-1 w-full rounded-xl bg-slate-50 px-3 py-2 text-base font-bold text-slate-800"
+            />
+          </label>
+          <label className="block text-xs font-extrabold text-slate-500">
+            What happened
+            <input
+              value={current.label}
+              onChange={(e) => updateItem(editing, { label: e.target.value })}
+              className="mt-1 w-full rounded-xl bg-slate-50 px-3 py-2 text-base font-bold text-slate-800"
+            />
+          </label>
+          <label className="block text-xs font-extrabold text-slate-500">
+            Why (shown on a miss)
+            <textarea
+              value={current.why ?? ""}
+              onChange={(e) => updateItem(editing, { why: e.target.value || undefined })}
+              rows={2}
+              className="mt-1 w-full rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800"
+            />
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={editing === 0}
+              onClick={() => {
+                if (editing === 0) return;
+                const items = [...game.items];
+                [items[editing - 1], items[editing]] = [items[editing]!, items[editing - 1]!];
+                onChange({ ...game, items });
+                setEditing(editing - 1);
+              }}
+              className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-700 disabled:opacity-40"
+            >
+              Move up
+            </button>
+            <button
+              type="button"
+              disabled={editing === game.items.length - 1}
+              onClick={() => {
+                if (editing >= game.items.length - 1) return;
+                const items = [...game.items];
+                [items[editing + 1], items[editing]] = [items[editing]!, items[editing + 1]!];
+                onChange({ ...game, items });
+                setEditing(editing + 1);
+              }}
+              className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-700 disabled:opacity-40"
+            >
+              Move down
+            </button>
+            <button
+              type="button"
+              disabled={game.items.length <= 2}
+              onClick={() => {
+                const items = game.items.filter((_, i) => i !== editing);
+                onChange({ ...game, items });
+                setEditing(Math.max(0, editing - 1));
+              }}
+              className="ml-auto inline-flex items-center gap-1 rounded-full bg-rose-50 px-3 py-1.5 text-xs font-extrabold text-rose-700 disabled:opacity-40"
+            >
+              <Trash2 className="size-3.5" strokeWidth={2.5} />
+              Remove
+            </button>
+          </div>
+        </div>
+      ) : null}
       <button
         type="button"
-        disabled={disabled}
-        onClick={submit}
-        className="w-full rounded-full bg-violet-600 px-5 py-3.5 text-base font-extrabold text-white shadow-md disabled:opacity-60"
+        onClick={() => {
+          const id = `event-${Date.now()}`;
+          onChange({
+            ...game,
+            items: [...game.items, { id, label: "New event" }],
+          });
+          setEditing(game.items.length);
+        }}
+        className="inline-flex items-center gap-2 text-sm font-extrabold text-violet-700"
       >
-        Check order
+        <Plus className="size-4" strokeWidth={2.5} />
+        Add event
       </button>
     </div>
   );

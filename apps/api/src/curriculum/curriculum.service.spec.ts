@@ -2,10 +2,13 @@ import { Test, type TestingModule } from "@nestjs/testing";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { modulesResponseSchema, pathResponseSchema } from "@jose/shared";
+import { modulesResponseSchema, pathResponseSchema, HEARTS_EMPTY_CODE } from "@jose/shared";
 import { AppModule } from "../app.module";
 import { CurriculumService } from "./curriculum.service";
 import { DatabaseService } from "../db/database.service";
+import { eq } from "drizzle-orm";
+import { learners } from "../db/schema";
+import { HttpException } from "@nestjs/common";
 
 describe("CurriculumService", () => {
   let service: CurriculumService;
@@ -57,5 +60,45 @@ describe("CurriculumService", () => {
 
   it("refuses to delete the featured module", async () => {
     await expect(service.deleteModule("rizal")).rejects.toThrow(/cannot be deleted/i);
+  });
+
+  it("spends a heart on a miss and refills after a lesson", async () => {
+    await service.completeLevel("ateneo-welcome");
+    await database.db
+      .update(learners)
+      .set({ hearts: 5, heartsUpdatedAt: Date.now() })
+      .where(eq(learners.id, "demo-student"));
+    const before = await service.getLearner();
+    await service.recordMiss("ateneo-quiz");
+    const afterMiss = await service.getLearner();
+    expect(afterMiss.hearts).toBe(before.hearts - 1);
+
+    await database.db
+      .update(learners)
+      .set({ hearts: 1, heartsUpdatedAt: Date.now() })
+      .where(eq(learners.id, "demo-student"));
+    await service.completeLevel("edu-binan");
+    expect((await service.getLearner()).hearts).toBe(5);
+  });
+
+  it("blocks starting a game at zero hearts", async () => {
+    await service.completeLevel("ateneo-welcome");
+    await database.db
+      .update(learners)
+      .set({ hearts: 0, heartsUpdatedAt: Date.now() })
+      .where(eq(learners.id, "demo-student"));
+    try {
+      await service.getPlayLevel("ateneo-quiz");
+      throw new Error("expected HEARTS_EMPTY");
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpException);
+      expect((error as HttpException).getResponse()).toMatchObject({
+        code: HEARTS_EMPTY_CODE,
+      });
+    }
+    await database.db
+      .update(learners)
+      .set({ hearts: 5, heartsUpdatedAt: Date.now() })
+      .where(eq(learners.id, "demo-student"));
   });
 });

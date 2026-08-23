@@ -1,10 +1,12 @@
+import { HEARTS_EMPTY_CODE } from "@jose/shared";
 import { NapState } from "@/app/learn/page";
 import { ChestPlayer } from "@/components/chest-player";
 import { GamePlayer } from "@/components/game-player";
+import { HeartsBreak } from "@/components/games/game-stage";
 import { AppShell } from "@/components/learning-shell";
 import { LessonPlayer } from "@/components/lesson-player";
 import { fetchPlayLevel } from "@/lib/path-api";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Heart } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -25,6 +27,13 @@ export default async function PlayLevelPage({ params }: Props) {
   const result = await fetchPlayLevel(levelId);
 
   if (!result.ok) {
+    if (result.status === 403 && result.code === HEARTS_EMPTY_CODE) {
+      return (
+        <AppShell>
+          <HeartsBreak moduleId={moduleId} />
+        </AppShell>
+      );
+    }
     if (result.status === 403) redirect(`/learn/${moduleId}`);
     if (result.status === 404) notFound();
     return (
@@ -58,7 +67,10 @@ export default async function PlayLevelPage({ params }: Props) {
             <p className="truncate font-display text-lg font-semibold tracking-tight text-slate-800 md:text-xl">
               {data.level.sectionTitle}
             </p>
-            <span className="w-20" />
+            <span className="inline-flex items-center gap-1 text-sm font-extrabold text-rose-500">
+              <Heart className="size-4 fill-rose-500" strokeWidth={2.4} aria-hidden />
+              {data.learner.hearts}
+            </span>
           </div>
         </header>
       }
@@ -77,6 +89,7 @@ export default async function PlayLevelPage({ params }: Props) {
           moduleId={moduleId}
           title={data.level.title}
           game={data.game}
+          hearts={data.learner.hearts}
         />
       ) : null}
       {data.level.kind === "chest" && data.chest ? (

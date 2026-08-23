@@ -10,6 +10,7 @@ export const learners = sqliteTable("learners", {
   displayName: text("display_name").notNull(),
   streak: integer("streak").notNull(),
   hearts: integer("hearts").notNull(),
+  heartsUpdatedAt: integer("hearts_updated_at").notNull().default(0),
   xp: integer("xp").notNull(),
 });
 

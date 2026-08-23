@@ -37,6 +37,7 @@ export const playLevelMetaSchema = z.object({
 
 export const playLevelResponseSchema = z.object({
   level: playLevelMetaSchema,
+  learner: learnerSchema,
   lesson: lessonContentSchema.optional(),
   game: gameContentSchema.optional(),
   chest: z.object({ message: z.string().min(1) }).optional(),
@@ -48,7 +49,18 @@ export const attemptBodySchema = z.object({
   payload: z.unknown().optional(),
 });
 
+export const missResponseSchema = z.object({
+  learner: learnerSchema,
+});
+
+export const attemptResultSchema = z.object({
+  completed: z.boolean(),
+  firstTime: z.boolean(),
+  learner: learnerSchema,
+});
+
 export type ModuleCard = z.infer<typeof moduleCardSchema>;
 export type ModulesResponse = z.infer<typeof modulesResponseSchema>;
 export type PlayLevelResponse = z.infer<typeof playLevelResponseSchema>;
 export type AttemptBody = z.infer<typeof attemptBodySchema>;
+export type MissResponse = z.infer<typeof missResponseSchema>;

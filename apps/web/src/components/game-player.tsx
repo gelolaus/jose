@@ -1,11 +1,23 @@
 "use client";
 
-import { submitAttempt } from "@/lib/path-api";
-import type { GameContent } from "@jose/shared";
+import { ApiError, recordMiss, submitAttempt } from "@/lib/path-api";
+import {
+  HEARTS_EMPTY_CODE,
+  firstTryScore,
+  pieceCount,
+  type GameContent,
+} from "@jose/shared";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { BlankGame } from "./games/blank-game";
+import {
+  GameFrame,
+  HeartsBreak,
+  StarCelebration,
+  WhySheet,
+} from "./games/game-stage";
 import { MemoryGame } from "./games/memory-game";
+import type { WhyPayload } from "./games/play-types";
 import { QuizGame } from "./games/quiz-game";
 import { SortGame } from "./games/sort-game";
 import { TimelineGame } from "./games/timeline-game";
@@ -15,106 +27,232 @@ export function GamePlayer({
   moduleId,
   title,
   game,
+  hearts: startHearts,
 }: {
   levelId: string;
   moduleId: string;
   title: string;
   game: GameContent;
+  hearts: number;
 }) {
   const router = useRouter();
-  const [result, setResult] = useState<{ score: number; maxScore: number } | null>(
-    null,
-  );
+  const [hearts, setHearts] = useState(startHearts);
+  const [why, setWhy] = useState<WhyPayload | null>(null);
+  const [empty, setEmpty] = useState(startHearts <= 0);
+  const pendingEmpty = useRef(false);
+  const [result, setResult] = useState<{
+    score: number;
+    maxScore: number;
+    stars: number;
+  } | null>(null);
   const [nonce, setNonce] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function onFinish(score: number, maxScore: number, payload?: unknown) {
+  async function onMiss(payload: WhyPayload): Promise<"ok" | "empty"> {
     setBusy(true);
     setError(null);
     try {
-      await submitAttempt(levelId, { score, maxScore, payload });
-      setResult({ score, maxScore });
+      const parsed = await recordMiss(levelId);
+      setHearts(parsed.learner.hearts);
+      setWhy(payload);
+      if (parsed.learner.hearts <= 0) {
+        pendingEmpty.current = true;
+        return "empty";
+      }
+      return "ok";
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save score");
+      if (err instanceof ApiError && err.code === HEARTS_EMPTY_CODE) {
+        setHearts(0);
+        setWhy(payload);
+        pendingEmpty.current = true;
+        return "empty";
+      }
+      setError(err instanceof Error ? err.message : "Could not save the miss");
+      setWhy(payload);
+      return "ok";
     } finally {
       setBusy(false);
     }
   }
 
+  async function onFinish(_score: number, _max: number, misses: number) {
+    setBusy(true);
+    setError(null);
+    const scored = firstTryScore(pieceCount(game), misses);
+    try {
+      await submitAttempt(levelId, {
+        score: scored.score,
+        maxScore: scored.maxScore,
+        payload: { misses, stars: scored.stars },
+      });
+      setResult(scored);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save score");
+      setResult(scored);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (empty) {
+    return <HeartsBreak moduleId={moduleId} />;
+  }
+
   if (result) {
     return (
-      <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center gap-4 px-6 py-12 text-center">
-        <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-violet-500">
-          Score
-        </p>
-        <p className="font-display text-5xl font-semibold text-slate-800">
-          {result.score}
-          <span className="text-2xl text-slate-400">/{result.maxScore}</span>
-        </p>
-        <p className="text-base font-semibold text-slate-600">{title}</p>
-        {error ? <p className="text-sm font-bold text-rose-600">{error}</p> : null}
-        <div className="mt-2 flex w-full flex-col gap-2 sm:flex-row">
-          <button
-            type="button"
-            onClick={() => {
-              setResult(null);
-              setNonce((n) => n + 1);
-            }}
-            className="flex-1 rounded-full bg-slate-100 px-5 py-3 text-sm font-extrabold text-slate-700"
-          >
-            Retry
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              router.push(`/learn/${moduleId}`);
-              router.refresh();
-            }}
-            className="flex-1 rounded-full bg-violet-600 px-5 py-3 text-sm font-extrabold text-white shadow-md"
-          >
-            Continue
-          </button>
-        </div>
-      </div>
+      <StarCelebration
+        title={title}
+        score={result.score}
+        maxScore={result.maxScore}
+        stars={result.stars}
+        error={error}
+        onRetry={() => {
+          setResult(null);
+          setNonce((n) => n + 1);
+        }}
+        onContinue={() => {
+          router.push(`/learn/${moduleId}`);
+          router.refresh();
+        }}
+      />
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
-      <h1 className="mb-6 font-display text-3xl font-semibold tracking-tight text-slate-800 sm:text-4xl">
-        {title}
-      </h1>
-      {error ? <p className="mb-4 text-sm font-bold text-rose-600">{error}</p> : null}
-      <GameSwitch
-        key={nonce}
-        game={game}
-        disabled={busy}
-        onFinish={onFinish}
-      />
-    </div>
+    <>
+      <GameFrame
+        title={title}
+        hint={hintFor(game.type)}
+        hearts={hearts}
+        showHearts
+        progress={labelFor(game.type)}
+      >
+        {error ? <p className="mb-4 text-sm font-bold text-rose-600">{error}</p> : null}
+        <GameSwitch
+          key={nonce}
+          game={game}
+          disabled={busy || Boolean(why)}
+          onMiss={onMiss}
+          onFinish={onFinish}
+        />
+      </GameFrame>
+      {why ? (
+        <WhySheet
+          why={why}
+          onDismiss={() => {
+            setWhy(null);
+            if (pendingEmpty.current) {
+              pendingEmpty.current = false;
+              setEmpty(true);
+            }
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 
-function GameSwitch({
+function hintFor(type: GameContent["type"]) {
+  switch (type) {
+    case "timeline":
+      return "Oldest at the top. Tap a card, then tap its stop on the rail.";
+    case "memory":
+      return "Flip two cards. Find the pairs.";
+    case "sort":
+      return "Tap a chip, then tap the chest it belongs in.";
+    case "quiz":
+      return "Read the stage. Tap the answer you trust.";
+    case "blank":
+      return "Fill the hole in the letter. One chip is the missing word.";
+  }
+}
+
+function labelFor(type: GameContent["type"]) {
+  switch (type) {
+    case "timeline":
+      return "Timeline";
+    case "memory":
+      return "Match";
+    case "sort":
+      return "Chests";
+    case "quiz":
+      return "Quiz";
+    case "blank":
+      return "Letter";
+  }
+}
+
+export function GameSwitch({
   game,
+  mode = "play",
   disabled,
+  onMiss,
   onFinish,
+  onChange,
 }: {
   game: GameContent;
-  disabled: boolean;
-  onFinish: (score: number, maxScore: number, payload?: unknown) => void;
+  mode?: "play" | "build";
+  disabled?: boolean;
+  onMiss?: (why: WhyPayload) => Promise<"ok" | "empty">;
+  onFinish?: (score: number, maxScore: number, misses: number) => void;
+  onChange?: (game: GameContent) => void;
 }) {
   switch (game.type) {
     case "quiz":
-      return <QuizGame game={game} disabled={disabled} onFinish={onFinish} />;
+      return (
+        <QuizGame
+          game={game}
+          mode={mode}
+          disabled={Boolean(disabled)}
+          onMiss={onMiss}
+          onFinish={onFinish}
+          onChange={onChange as ((g: typeof game) => void) | undefined}
+        />
+      );
     case "memory":
-      return <MemoryGame game={game} disabled={disabled} onFinish={onFinish} />;
+      return (
+        <MemoryGame
+          game={game}
+          mode={mode}
+          disabled={Boolean(disabled)}
+          onMiss={onMiss}
+          onFinish={onFinish}
+          onChange={onChange as ((g: typeof game) => void) | undefined}
+        />
+      );
     case "timeline":
-      return <TimelineGame game={game} disabled={disabled} onFinish={onFinish} />;
+      return (
+        <TimelineGame
+          game={game}
+          mode={mode}
+          disabled={Boolean(disabled)}
+          onMiss={onMiss}
+          onFinish={onFinish}
+          onChange={onChange as ((g: typeof game) => void) | undefined}
+        />
+      );
     case "blank":
-      return <BlankGame game={game} disabled={disabled} onFinish={onFinish} />;
+      return (
+        <BlankGame
+          game={game}
+          mode={mode}
+          disabled={Boolean(disabled)}
+          onMiss={onMiss}
+          onFinish={onFinish}
+          onChange={onChange as ((g: typeof game) => void) | undefined}
+        />
+      );
     case "sort":
-      return <SortGame game={game} disabled={disabled} onFinish={onFinish} />;
+      return (
+        <SortGame
+          game={game}
+          mode={mode}
+          disabled={Boolean(disabled)}
+          onMiss={onMiss}
+          onFinish={onFinish}
+          onChange={onChange as ((g: typeof game) => void) | undefined}
+        />
+      );
   }
 }

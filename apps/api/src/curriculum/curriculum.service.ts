@@ -2,11 +2,16 @@ import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import {
   DEMO_LEARNER_ID,
+  HEARTS_EMPTY_CODE,
+  MAX_HEARTS,
+  applyHeartDrip,
   attemptBodySchema,
   createLevelBodySchema,
   createModuleBodySchema,
@@ -17,6 +22,8 @@ import {
   isLevelLocked,
   moveBodySchema,
   nodeIconFor,
+  parseGameContent,
+  coerceGameContent,
   parseYoutubeVideoId,
   patchLevelBodySchema,
   patchModuleBodySchema,
@@ -75,14 +82,7 @@ export class CurriculumService {
   }
 
   async getLearner(): Promise<Learner> {
-    const row = await this.requireLearner();
-    return {
-      id: row.id,
-      displayName: row.displayName,
-      streak: row.streak,
-      hearts: row.hearts,
-      xp: row.xp,
-    };
+    return this.syncedLearner();
   }
 
   async listPublishedModules(): Promise<ModulesResponse> {
@@ -139,8 +139,13 @@ export class CurriculumService {
     }
     const statuses = deriveLevelStatuses(ordered, completed);
     const status = statuses[levelId] ?? "current";
+    const learner = await this.syncedLearner();
+    if (ctx.level.kind === "game" && learner.hearts <= 0) {
+      throw this.heartsEmpty();
+    }
 
     const payload: PlayLevelResponse = {
+      learner,
       level: {
         id: ctx.level.id,
         title: ctx.level.title,
@@ -167,7 +172,7 @@ export class CurriculumService {
         .select()
         .from(gameContent)
         .where(eq(gameContent.levelId, levelId));
-      payload.game = gameContentSchema.parse(JSON.parse(content?.json ?? "{}"));
+      payload.game = parseGameContent(JSON.parse(content?.json ?? "{}"));
     } else {
       payload.chest = {
         message: `You opened ${ctx.level.title}! Keep walking the path.`,
@@ -183,8 +188,33 @@ export class CurriculumService {
     }
     await this.ensureUnlocked(ctx.module.id, levelId);
     const first = await this.markComplete(levelId);
+    if (ctx.level.kind === "lesson") {
+      await this.refillHearts();
+    }
     const learner = await this.getLearner();
     return { completed: true, firstTime: first, learner };
+  }
+
+  async recordMiss(levelId: string) {
+    const ctx = await this.levelContext(levelId);
+    if (ctx.level.kind !== "game") {
+      throw new BadRequestException("Misses are only for game levels");
+    }
+    await this.ensureUnlocked(ctx.module.id, levelId);
+    const learner = await this.syncedLearner();
+    if (learner.hearts <= 0) {
+      throw this.heartsEmpty();
+    }
+    const leavingFull = learner.hearts >= MAX_HEARTS;
+    const row = await this.requireLearner();
+    await this.db
+      .update(learners)
+      .set({
+        hearts: learner.hearts - 1,
+        heartsUpdatedAt: leavingFull ? Date.now() : row.heartsUpdatedAt,
+      })
+      .where(eq(learners.id, DEMO_LEARNER_ID));
+    return { learner: await this.getLearner() };
   }
 
   async submitAttempt(levelId: string, body: unknown) {
@@ -194,6 +224,10 @@ export class CurriculumService {
       throw new BadRequestException("Attempts are only for game levels");
     }
     await this.ensureUnlocked(ctx.module.id, levelId);
+    const learnerBefore = await this.syncedLearner();
+    if (learnerBefore.hearts <= 0) {
+      throw this.heartsEmpty();
+    }
     await this.db.insert(attempts).values({
       id: randomUUID(),
       learnerId: DEMO_LEARNER_ID,
@@ -520,7 +554,7 @@ export class CurriculumService {
         .select()
         .from(gameContent)
         .where(eq(gameContent.levelId, levelId));
-      game = gameContentSchema.parse(JSON.parse(content?.json ?? "{}"));
+      game = parseGameContent(JSON.parse(content?.json ?? "{}"));
     }
     return {
       id: ctx.level.id,
@@ -667,7 +701,7 @@ export class CurriculumService {
             .from(gameContent)
             .where(eq(gameContent.levelId, level.id));
           const parsed = gameContentSchema.safeParse(
-            JSON.parse(content?.json ?? "{}"),
+            coerceGameContent(JSON.parse(content?.json ?? "{}")),
           );
           if (!parsed.success) problems.push(level.title);
         }
@@ -693,6 +727,45 @@ export class CurriculumService {
       sectionCount: sectionRows.length,
       levelCount: ordered.length,
     };
+  }
+
+  private async syncedLearner(): Promise<Learner> {
+    const row = await this.requireLearner();
+    const dripped = applyHeartDrip(row.hearts, row.heartsUpdatedAt, Date.now());
+    if (dripped.changed) {
+      await this.db
+        .update(learners)
+        .set({
+          hearts: dripped.hearts,
+          heartsUpdatedAt: dripped.heartsUpdatedAt,
+        })
+        .where(eq(learners.id, DEMO_LEARNER_ID));
+    }
+    return {
+      id: row.id,
+      displayName: row.displayName,
+      streak: row.streak,
+      hearts: dripped.hearts,
+      xp: row.xp,
+    };
+  }
+
+  private async refillHearts() {
+    await this.db
+      .update(learners)
+      .set({ hearts: MAX_HEARTS, heartsUpdatedAt: Date.now() })
+      .where(eq(learners.id, DEMO_LEARNER_ID));
+  }
+
+  private heartsEmpty() {
+    return new HttpException(
+      {
+        statusCode: HttpStatus.FORBIDDEN,
+        code: HEARTS_EMPTY_CODE,
+        message: "You're out of hearts. Read a lesson or wait a bit.",
+      },
+      HttpStatus.FORBIDDEN,
+    );
   }
 
   private async requireLearner() {
