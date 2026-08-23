@@ -44,7 +44,9 @@ export function WhySheet({
           Not quite
         </p>
         <p className="mt-2 font-display text-2xl font-semibold text-slate-800">{why.title}</p>
-        <p className="mt-2 text-base font-semibold leading-relaxed text-slate-600">{why.body}</p>
+        <p className="mt-2 whitespace-pre-line text-base font-semibold leading-relaxed text-slate-600">
+          {why.body}
+        </p>
         <button
           type="button"
           disabled={!ready}

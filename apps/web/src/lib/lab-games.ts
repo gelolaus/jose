@@ -117,7 +117,7 @@ export const LAB_GAMES: LabGame[] = [
     type: "sort",
     title: "Sort",
     blurb: "Drop chips into the right chest.",
-    how: "On a phone, tap a chip and then a chest. On a bigger screen you can drag.",
+    how: "On a phone, tap a chip and then a chest. On a bigger screen you can drag. Check when every chip is in a chest.",
     color: "#22C55E",
     game: parseGameContent({
       type: "sort",

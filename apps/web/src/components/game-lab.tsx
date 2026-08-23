@@ -140,7 +140,7 @@ export function GameLabPlay({ entry }: { entry: LabGame }) {
           game={entry.game}
           disabled={Boolean(why)}
           onMiss={async (payload) => {
-            setWhy(payload);
+            if (payload) setWhy(payload);
             return "ok";
           }}
           onFinish={(_score, _max, misses) => {

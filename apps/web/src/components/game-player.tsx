@@ -50,27 +50,32 @@ export function GamePlayer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function onMiss(payload: WhyPayload): Promise<"ok" | "empty"> {
+  async function onMiss(payload: WhyPayload | null): Promise<"ok" | "empty"> {
     setBusy(true);
     setError(null);
     try {
       const parsed = await recordMiss(levelId);
       setHearts(parsed.learner.hearts);
-      setWhy(payload);
+      if (payload) setWhy(payload);
       if (parsed.learner.hearts <= 0) {
-        pendingEmpty.current = true;
+        if (payload) pendingEmpty.current = true;
+        else setEmpty(true);
         return "empty";
       }
       return "ok";
     } catch (err) {
       if (err instanceof ApiError && err.code === HEARTS_EMPTY_CODE) {
         setHearts(0);
-        setWhy(payload);
-        pendingEmpty.current = true;
+        if (payload) {
+          setWhy(payload);
+          pendingEmpty.current = true;
+        } else {
+          setEmpty(true);
+        }
         return "empty";
       }
       setError(err instanceof Error ? err.message : "Could not save the miss");
-      setWhy(payload);
+      if (payload) setWhy(payload);
       return "ok";
     } finally {
       setBusy(false);
@@ -165,7 +170,7 @@ export function GameSwitch({
   game: GameContent;
   mode?: "play" | "build";
   disabled?: boolean;
-  onMiss?: (why: WhyPayload) => Promise<"ok" | "empty">;
+  onMiss?: (why: WhyPayload | null) => Promise<"ok" | "empty">;
   onFinish?: (score: number, maxScore: number, misses: number) => void;
   onChange?: (game: GameContent) => void;
 }) {

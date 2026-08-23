@@ -84,7 +84,7 @@ HUD: title, hearts, piece progress. Cream page, gold/violet toys, Fredoka titles
 | --- | --- | --- |
 | timeline | Vertical history rail (oldest at top), year ticks, empty stations, event cards in a tray | Drag a card onto a station, or tap a card then tap a station. Wrong station: snap back, why, heart. |
 | memory | Felt table, thick flip cards | Flip two. Mismatch: flip back, heart. Match: stay lit, show why. |
-| sort | 2–3 labeled chests + chip tray | Drag a chip onto a chest, or tap chip then tap chest. Wrong chest: bounce back, why, heart. |
+| sort | 2–3 labeled chests + chip tray | Place every chip (tap or drag), then Check. Wrong chips bounce back; one heart per failed Check. See `2026-08-23-sort-game-chests-design.md`. |
 | quiz | Spotlight prompt + big 3D answer buttons | Tap. Wrong: why + correct stays marked, then next. |
 | blank | One parchment sentence at a time, hole for the missing word, chip bank | Tap a chip. Wrong: why + correct revealed, that sentence is spent, next. |
 

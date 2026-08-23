@@ -30,10 +30,12 @@ export function usePlaceDrag({
   disabled,
   dropSelector,
   onDrop,
+  allowDrag = true,
 }: {
   disabled: boolean;
   dropSelector: string;
   onDrop: (itemId: string, target: HTMLElement) => void;
+  allowDrag?: boolean;
 }) {
   const selectedRef = useRef<string | null>(null);
   const pointerIdRef = useRef<number | null>(null);
@@ -69,14 +71,13 @@ export function usePlaceDrag({
     itemId: string,
     label: string,
   ) {
-    if (disabled || event.button !== 0) return;
-    select(itemId);
+    if (disabled || event.button > 0 || !allowDrag) return;
     draggingIdRef.current = itemId;
     pointerIdRef.current = event.pointerId;
     originRef.current = { x: event.clientX, y: event.clientY };
     movedRef.current = false;
     labelRef.current = label;
-    event.currentTarget.setPointerCapture(event.pointerId);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
   }
 
   function onPointerMove(event: ReactPointerEvent<HTMLElement>) {
@@ -104,8 +105,8 @@ export function usePlaceDrag({
     const target = moved
       ? closestFromPoint(event.clientX, event.clientY, dropSelector)
       : null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
     }
     endDrag();
     if (id && target) {

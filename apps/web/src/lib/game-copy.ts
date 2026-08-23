@@ -7,7 +7,7 @@ export function hintFor(type: GameContent["type"]) {
     case "memory":
       return "Flip two cards. Find the pairs.";
     case "sort":
-      return "Tap a chip, then a chest.";
+      return "Put every chip in a chest, then Check.";
     case "quiz":
       return "Read the stage. Tap the answer you trust.";
     case "blank":

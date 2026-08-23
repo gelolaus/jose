@@ -2,15 +2,26 @@
 
 import type { SortGame as SortContent } from "@jose/shared";
 import { Plus } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { PlayBoardProps } from "./play-types";
+import { allChipsPlaced, formatSortWhy, gradeSortCheck } from "./sort-grade";
 import { PlaceGhost, usePlaceDrag } from "./use-place-drag";
 
-const CHEST_COLORS = [
-  { lid: "#FFD56A", body: "#F08A3A", deep: "#D96B28" },
-  { lid: "#FFC14D", body: "#E5724A", deep: "#C4512C" },
-  { lid: "#F5C84C", body: "#E09A3C", deep: "#C67A24" },
-] as const;
+const CHEST_BODY = ["#f59e0b", "#f97316", "#eab308"] as const;
+const CHEST_SHADOW = ["#d97706", "#c2410c", "#a16207"] as const;
+
+function useWideScreen() {
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(min-width: 640px)");
+    const sync = () => setWide(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+  return wide;
+}
 
 export function SortGame({
   game,
@@ -39,140 +50,182 @@ function SortPlay({
   onFinish,
 }: { game: SortContent } & PlayBoardProps) {
   const [placed, setPlaced] = useState<Record<string, string>>({});
-  const [shake, setShake] = useState<string | null>(null);
+  const [locked, setLocked] = useState<Record<string, true>>({});
+  const [shake, setShake] = useState(false);
   const missesRef = useRef(0);
+  const wide = useWideScreen();
   const drag = usePlaceDrag({
     disabled,
     dropSelector: "[data-sort-bucket]",
+    allowDrag: wide,
     onDrop: (itemId, target) => {
       const bucketId = target.dataset.sortBucket;
       if (!bucketId) return;
-      void assign(bucketId, itemId);
+      putChip(bucketId, itemId);
     },
   });
-  const overBucket = drag.overEl?.dataset.sortBucket ?? null;
 
-  async function assign(bucketId: string, itemId = drag.selectedRef.current) {
-    if (!itemId || disabled) return;
-    const item = game.items.find((entry) => entry.id === itemId);
-    if (!item) return;
-    if (item.bucketId !== bucketId) {
-      setShake(bucketId);
-      window.setTimeout(() => setShake(null), 550);
-      const result = await onMiss({
-        title: item.label,
-        body:
-          item.why?.trim() ||
-          `That belongs in ${game.buckets.find((b) => b.id === item.bucketId)?.label ?? "another chest"}.`,
-      });
-      missesRef.current += 1;
-      drag.select(null);
-      if (result === "empty") return;
+  function putChip(bucketId: string, itemId = drag.selectedRef.current) {
+    if (!itemId || disabled || locked[itemId]) return;
+    if (!game.items.some((item) => item.id === itemId)) return;
+    setPlaced((prev) => ({ ...prev, [itemId]: bucketId }));
+    drag.select(null);
+  }
+
+  function returnChip(itemId: string) {
+    if (disabled || locked[itemId]) return;
+    setPlaced((prev) => {
+      const next = { ...prev };
+      delete next[itemId];
+      return next;
+    });
+    drag.select(null);
+  }
+
+  async function check() {
+    if (disabled || !allChipsPlaced(game.items, placed)) return;
+    const result = gradeSortCheck(game.items, placed);
+    if (result.perfect) {
+      const all: Record<string, true> = {};
+      for (const item of game.items) all[item.id] = true;
+      setLocked(all);
+      onFinish(game.items.length - missesRef.current, game.items.length, missesRef.current);
       return;
     }
-    const next = { ...placed, [itemId]: bucketId };
-    setPlaced(next);
+    missesRef.current += 1;
+    const nextPlaced = { ...placed };
+    const nextLocked: Record<string, true> = { ...locked };
+    for (const id of result.correctIds) nextLocked[id] = true;
+    for (const item of result.wrongItems) delete nextPlaced[item.id];
+    setPlaced(nextPlaced);
+    setLocked(nextLocked);
     drag.select(null);
-    if (game.items.every((entry) => next[entry.id])) {
-      onFinish(
-        game.items.length - missesRef.current,
-        game.items.length,
-        missesRef.current,
-      );
-    }
+    setShake(true);
+    window.setTimeout(() => setShake(false), 550);
+    const why = formatSortWhy(result.wrongItems);
+    await onMiss(why);
   }
 
   const leftover = game.items.filter((item) => !placed[item.id]);
   const three = game.buckets.length === 3;
+  const hovering = drag.overEl?.dataset.sortBucket ?? null;
+  const canCheck = allChipsPlaced(game.items, placed);
 
   return (
-    <div className="flex flex-col gap-3 pb-28 sm:gap-5 sm:pb-0">
+    <div className={`flex flex-col gap-3 pb-28 sm:gap-5 sm:pb-0 ${shake ? "snap-back" : ""}`}>
       <PlaceGhost ghost={drag.ghost} />
-      {leftover.length > 0 ? (
-        <div className="order-2 z-20 -mx-4 border-t border-amber-200/70 bg-[var(--jose-cream)] px-4 py-2 max-sm:fixed max-sm:inset-x-0 max-sm:bottom-[calc(5.2rem+env(safe-area-inset-bottom,0px))] sm:order-1 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
-          <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-amber-800 sm:hidden">
-            Your chips
-          </p>
-          <div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory sm:flex-wrap sm:overflow-visible sm:pb-0 sm:snap-none">
-            {leftover.map((item) => {
-              const on = drag.selected === item.id;
-              const lifting = drag.dragging === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  disabled={disabled}
-                  onPointerDown={(event) => drag.onPointerDown(event, item.id, item.label)}
-                  onPointerMove={drag.onPointerMove}
-                  onPointerUp={drag.onPointerUp}
-                  onPointerCancel={drag.onPointerCancel}
-                  onClick={() => {
-                    if (drag.consumeClick()) return;
-                    drag.select(on ? null : item.id);
-                  }}
-                  className={`min-h-12 shrink-0 snap-start whitespace-nowrap touch-manipulation select-none rounded-full px-4 text-sm font-extrabold ring-2 sm:min-h-11 ${
-                    lifting
-                      ? "cursor-grabbing bg-violet-100 text-violet-400 ring-violet-200 opacity-40"
-                      : on
-                        ? "cursor-grab bg-violet-600 text-white ring-violet-700"
-                        : "cursor-grab bg-white text-slate-800 ring-black/10"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
       <div
-        className={`order-1 grid gap-3 sm:order-2 sm:gap-5 ${
+        className={`grid gap-3 sm:gap-5 ${
           three ? "grid-cols-1 min-[520px]:grid-cols-3" : "grid-cols-2"
         }`}
       >
         {game.buckets.map((bucket, index) => {
           const chips = game.items.filter((item) => placed[item.id] === bucket.id);
-          const hovering = overBucket === bucket.id;
-          const inviting = Boolean(drag.selected) || hovering;
+          const active = hovering === bucket.id || Boolean(drag.selected);
           return (
-            <button
+            <SortChest
               key={bucket.id}
-              type="button"
-              data-sort-bucket={bucket.id}
-              disabled={disabled}
-              aria-label={`${bucket.label} chest`}
-              onClick={() => void assign(bucket.id)}
-              className={`group min-h-12 min-w-0 whitespace-normal touch-manipulation text-left ${
-                hovering ? "scale-[1.03]" : ""
-              } ${shake === bucket.id ? "snap-back" : ""}`}
+              bucketId={bucket.id}
+              label={bucket.label}
+              palette={index}
+              active={hovering === bucket.id}
+              inviting={active}
+              onChoose={() => putChip(bucket.id)}
             >
-              <SortChest
-                label={bucket.label}
-                open={inviting || chips.length > 0}
-                active={hovering}
-                palette={index}
-                wide={three}
-              >
-                {chips.length > 0 ? (
-                  <ul className="space-y-1 p-0.5 sm:p-2">
-                    {chips.map((item) => (
-                      <li
-                        key={item.id}
-                        className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-extrabold leading-tight text-amber-950 sm:px-3 sm:py-1 sm:text-sm"
-                      >
-                        {item.label}
+              {chips.length > 0 ? (
+                <ul className="space-y-1">
+                  {chips.map((item) => {
+                    const isLocked = Boolean(locked[item.id]);
+                    const on = drag.selected === item.id;
+                    if (isLocked) {
+                      return (
+                        <li key={item.id}>
+                          <span className="block rounded-full bg-emerald-50 px-3 py-1.5 text-left text-xs font-extrabold text-emerald-900 ring-2 ring-emerald-300 sm:text-sm">
+                            {item.label}
+                          </span>
+                        </li>
+                      );
+                    }
+                    return (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          disabled={disabled}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (on) {
+                              returnChip(item.id);
+                              return;
+                            }
+                            drag.select(item.id);
+                          }}
+                          className={`w-full rounded-full px-3 py-1.5 text-left text-xs font-extrabold ring-2 sm:text-sm ${
+                            on
+                              ? "bg-violet-600 text-white ring-violet-700"
+                              : "bg-white text-slate-800 ring-black/10"
+                          }`}
+                        >
+                          {item.label}
+                        </button>
                       </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="px-1 py-2 text-center text-[10px] font-extrabold uppercase tracking-wide text-amber-100/90 sm:px-2 sm:py-3 sm:text-xs">
-                    In here
-                  </p>
-                )}
-              </SortChest>
-            </button>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="px-1 py-3 text-center text-[10px] font-extrabold uppercase tracking-wide text-amber-800/70">
+                  In here
+                </p>
+              )}
+            </SortChest>
           );
         })}
+      </div>
+      <div className="z-20 -mx-4 border-t border-amber-200/70 bg-[var(--jose-cream)] px-4 py-2 max-sm:fixed max-sm:inset-x-0 max-sm:bottom-[calc(5.2rem+env(safe-area-inset-bottom,0px))] sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
+        {leftover.length > 0 ? (
+          <>
+            <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-amber-800 sm:hidden">
+              Your chips
+            </p>
+            <div className="mb-2 flex gap-2 overflow-x-auto pb-1 sm:mb-3 sm:flex-wrap sm:overflow-visible">
+              {leftover.map((item) => {
+                const on = drag.selected === item.id;
+                const lifting = drag.dragging === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    disabled={disabled}
+                    onPointerDown={(event) => drag.onPointerDown(event, item.id, item.label)}
+                    onPointerMove={drag.onPointerMove}
+                    onPointerUp={drag.onPointerUp}
+                    onPointerCancel={drag.onPointerCancel}
+                    onClick={() => {
+                      if (drag.consumeClick()) return;
+                      drag.select(on ? null : item.id);
+                    }}
+                    className={`min-h-12 shrink-0 whitespace-nowrap touch-manipulation select-none rounded-full px-4 text-sm font-extrabold ring-2 ${
+                      lifting
+                        ? "cursor-grabbing bg-violet-100 text-violet-400 opacity-40 ring-violet-200"
+                        : on
+                          ? "cursor-grab bg-violet-600 text-white ring-violet-700"
+                          : "cursor-grab bg-white text-slate-800 ring-black/10"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
+        <button
+          type="button"
+          disabled={disabled || !canCheck}
+          onClick={() => void check()}
+          className="w-full rounded-full bg-violet-600 px-5 py-3 text-base font-extrabold text-white shadow-md disabled:bg-violet-200 disabled:text-white"
+        >
+          Check
+        </button>
       </div>
     </div>
   );
@@ -199,11 +252,10 @@ function SortBuild({
         {game.buckets.map((bucket, i) => (
           <div key={bucket.id}>
             <SortChest
+              bucketId={bucket.id}
               label={bucket.label}
-              open
               palette={i}
-              wide={three}
-              interactive
+              inviting
               labelSlot={
                 <input
                   value={bucket.label}
@@ -217,7 +269,7 @@ function SortBuild({
                 />
               }
             >
-              <ul className="space-y-2 p-1 sm:p-2">
+              <ul className="space-y-2">
                 {game.items
                   .filter((item) => item.bucketId === bucket.id)
                   .map((item) => (
@@ -230,7 +282,7 @@ function SortBuild({
                           );
                           onChange({ ...game, items });
                         }}
-                        className="w-full rounded-full bg-amber-50 px-3 py-1 text-sm font-extrabold"
+                        className="w-full rounded-full bg-white px-3 py-1 text-sm font-extrabold ring-1 ring-black/10"
                       />
                       <input
                         value={item.why ?? ""}
@@ -243,14 +295,14 @@ function SortBuild({
                           );
                           onChange({ ...game, items });
                         }}
-                        className="mt-1 w-full rounded-full bg-amber-50/70 px-3 py-1 text-xs font-semibold"
+                        className="mt-1 w-full rounded-full bg-white/70 px-3 py-1 text-xs font-semibold ring-1 ring-black/5"
                       />
                     </li>
                   ))}
               </ul>
               <button
                 type="button"
-                className="px-3 pb-2 text-xs font-extrabold text-amber-100"
+                className="mt-2 text-xs font-extrabold text-amber-900"
                 onClick={() =>
                   onChange({
                     ...game,
@@ -278,10 +330,7 @@ function SortBuild({
           onClick={() =>
             onChange({
               ...game,
-              buckets: [
-                ...game.buckets,
-                { id: `b${Date.now()}`, label: "New chest" },
-              ],
+              buckets: [...game.buckets, { id: `b${Date.now()}`, label: "New chest" }],
             })
           }
         >
@@ -293,71 +342,62 @@ function SortBuild({
 }
 
 function SortChest({
+  bucketId,
   label,
   labelSlot,
-  open = false,
-  active = false,
   palette = 0,
-  wide = false,
-  interactive = false,
+  active = false,
+  inviting = false,
+  onChoose,
   children,
 }: {
+  bucketId: string;
   label: string;
   labelSlot?: ReactNode;
-  open?: boolean;
-  active?: boolean;
   palette?: number;
-  wide?: boolean;
-  interactive?: boolean;
+  active?: boolean;
+  inviting?: boolean;
+  onChoose?: () => void;
   children?: ReactNode;
 }) {
-  const colors = CHEST_COLORS[palette % CHEST_COLORS.length]!;
-  return (
-    <span
-      className={`toy-chest ${open ? "toy-chest-open" : ""} ${active ? "toy-chest-active" : ""} ${
-        interactive ? "toy-chest-build" : ""
-      }`}
-    >
-      <span className="toy-chest-tag">{labelSlot ?? label}</span>
-      <span className={`toy-chest-art ${wide ? "toy-chest-art-wide" : ""}`}>
-        <span className="toy-chest-sparkle" aria-hidden />
-        <CuteChestSvg colors={colors} />
-        <span className="toy-chest-mouth">{children}</span>
-      </span>
-    </span>
-  );
-}
+  const body = CHEST_BODY[palette % CHEST_BODY.length]!;
+  const shadow = CHEST_SHADOW[palette % CHEST_SHADOW.length]!;
 
-function CuteChestSvg({
-  colors,
-}: {
-  colors: (typeof CHEST_COLORS)[number];
-}) {
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (!onChoose) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onChoose();
+    }
+  }
+
   return (
-    <svg viewBox="0 0 200 168" className="h-auto w-full overflow-visible" aria-hidden>
-      <ellipse cx="100" cy="158" rx="72" ry="8" fill="#000" opacity="0.12" />
-      <rect x="28" y="140" width="30" height="16" rx="8" fill={colors.deep} stroke="#7A3410" strokeWidth="3" />
-      <rect x="142" y="140" width="30" height="16" rx="8" fill={colors.deep} stroke="#7A3410" strokeWidth="3" />
-      <rect x="14" y="76" width="172" height="74" rx="34" fill={colors.body} stroke="#7A3410" strokeWidth="4" />
-      <rect x="32" y="86" width="136" height="34" rx="17" fill="#3F1D0F" />
-      <rect x="14" y="112" width="172" height="10" rx="5" fill="#F6D36A" stroke="#7A3410" strokeWidth="2" />
-      <g className="toy-chest-lid-svg">
-        <path
-          d="M16 82c0-44 32-66 84-66s84 22 84 66H16z"
-          fill={colors.lid}
-          stroke="#7A3410"
-          strokeWidth="4"
-          strokeLinejoin="round"
-        />
-        <ellipse cx="62" cy="48" rx="22" ry="12" fill="#fff8e4" opacity="0.5" />
-        <ellipse cx="50" cy="62" rx="14" ry="9" fill="#FF9EBA" />
-        <ellipse cx="150" cy="62" rx="14" ry="9" fill="#FF9EBA" />
-        <path d="M86 36c7-11 21-11 28 0" fill="none" stroke="#7A3410" strokeWidth="3.2" strokeLinecap="round" />
-        <circle cx="100" cy="28" r="3.5" fill="#fff8e4" />
-      </g>
-      <circle cx="100" cy="128" r="19" fill="#FFE566" stroke="#7A3410" strokeWidth="4" />
-      <circle cx="100" cy="125" r="6" fill="none" stroke="#7A3410" strokeWidth="2.5" />
-      <path d="M100 131v9" stroke="#7A3410" strokeWidth="2.5" strokeLinecap="round" />
-    </svg>
+    <div className="flex w-full min-w-0 flex-col">
+      <div className="mb-1.5 rounded-2xl bg-white px-2 py-1.5 text-center font-display text-xs font-semibold text-amber-950 shadow-[0_2px_0_rgb(180_83_9/18%)] sm:text-sm">
+        {labelSlot ?? label}
+      </div>
+      <div
+        data-sort-bucket={bucketId}
+        role={onChoose ? "button" : undefined}
+        tabIndex={onChoose ? 0 : undefined}
+        aria-label={onChoose ? `${label} chest` : undefined}
+        onClick={onChoose}
+        onKeyDown={onKeyDown}
+        className={`overflow-hidden rounded-[1.15rem] outline-none ${active ? "scale-[1.03]" : ""} ${
+          inviting ? "ring-2 ring-violet-400" : ""
+        }`}
+        style={{ boxShadow: `0 3px 0 ${shadow}` }}
+      >
+        <div className="relative h-4 border-b-[3px] border-amber-600" style={{ background: "#f5c518" }}>
+          <span
+            aria-hidden
+            className="absolute left-1/2 top-full h-2.5 w-2.5 -translate-x-1/2 -translate-y-[40%] rounded-full bg-[#fff8ef] ring-2 ring-amber-800"
+          />
+        </div>
+        <div className="px-2 pb-2 pt-3" style={{ background: body }}>
+          <div className="min-h-[4.5rem] rounded-xl bg-[#fff8ef] p-1.5">{children}</div>
+        </div>
+      </div>
+    </div>
   );
 }

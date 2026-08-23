@@ -78,7 +78,7 @@ export function GameEditor({
             game={draft}
             disabled={Boolean(why)}
             onMiss={async (payload) => {
-              setWhy(payload);
+              if (payload) setWhy(payload);
               return "ok";
             }}
             onFinish={(_score, _max, misses) => {
