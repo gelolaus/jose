@@ -71,7 +71,11 @@ export function GameEditor({
           onContinue={() => setTab("build")}
         />
       ) : (
-        <GameFrame title="Playtest" hint="Hearts are off. This is only for you.">
+        <GameFrame
+          title="Playtest"
+          hint="Hearts are off. This is only for you."
+          wide={draft.type === "timeline"}
+        >
           <GameSwitch
             key={playKey}
             mode="play"

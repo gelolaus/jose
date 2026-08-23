@@ -159,6 +159,7 @@ export function GameFrame({
   hearts,
   progress,
   showHearts,
+  wide,
   children,
 }: {
   title: string;
@@ -166,10 +167,11 @@ export function GameFrame({
   hearts?: number;
   progress?: string;
   showHearts?: boolean;
+  wide?: boolean;
   children: ReactNode;
 }) {
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-3 sm:px-6 sm:py-8">
+    <div className={`mx-auto w-full px-4 py-3 sm:px-6 sm:py-8 ${wide ? "max-w-5xl" : "max-w-3xl"}`}>
       <div className="mb-2.5 flex items-start justify-between gap-3 sm:mb-5">
         <div className="min-w-0">
           <h1 className="font-display text-xl font-semibold tracking-tight text-slate-800 sm:text-4xl">

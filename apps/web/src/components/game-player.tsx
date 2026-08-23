@@ -136,6 +136,7 @@ export function GamePlayer({
         hearts={hearts}
         showHearts
         progress={labelFor(game.type)}
+        wide={game.type === "timeline"}
       >
         {error ? <p className="mb-4 text-sm font-bold text-rose-600">{error}</p> : null}
         <GameSwitch

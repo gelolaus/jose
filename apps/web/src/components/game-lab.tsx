@@ -134,6 +134,7 @@ export function GameLabPlay({ entry }: { entry: LabGame }) {
         title={entry.title}
         hint={hintFor(entry.type)}
         progress={labelFor(entry.type)}
+        wide={entry.type === "timeline"}
       >
         <GameSwitch
           key={nonce}

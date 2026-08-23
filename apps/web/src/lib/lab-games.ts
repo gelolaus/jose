@@ -13,8 +13,8 @@ export const LAB_GAMES: LabGame[] = [
   {
     type: "timeline",
     title: "Timeline",
-    blurb: "Put years on a history rail.",
-    how: "Grab an event and drop it on the numbered stop. On a phone, tap the event, then tap the stop.",
+    blurb: "Hang events on the gold rail, then Check.",
+    how: "On a phone, tap an event and then a stop. On a bigger screen you can drag. Check when every stop is filled.",
     color: "#F59E0B",
     game: parseGameContent({
       type: "timeline",
@@ -22,7 +22,7 @@ export const LAB_GAMES: LabGame[] = [
         {
           id: "born",
           label: "Born in Calamba, Laguna",
-          year: "1861",
+          year: "June 19, 1861",
           why: "June 19, 1861 — Calamba is the start of the path.",
         },
         {

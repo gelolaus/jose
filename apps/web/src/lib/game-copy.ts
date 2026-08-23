@@ -3,7 +3,7 @@ import type { GameContent } from "@jose/shared";
 export function hintFor(type: GameContent["type"]) {
   switch (type) {
     case "timeline":
-      return "Oldest at the top. Drag an event onto its stop — or tap the event, then tap the stop.";
+      return "Put every event on its stop, then Check.";
     case "memory":
       return "Flip two cards. Match the picture to the name before the clock runs out.";
     case "sort":
