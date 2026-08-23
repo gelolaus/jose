@@ -84,31 +84,43 @@ export const LAB_GAMES: LabGame[] = [
   {
     type: "memory",
     title: "Memory",
-    blurb: "Flip two cards. Find the pairs.",
-    how: "Tap one card, then another. Matches stay open. Mismatches flip back.",
+    blurb: "Flip two cards. Match each picture to its name.",
+    how: "Tap a card, then another. Match the photo to the name. A miss costs 3 seconds. Finish before the clock hits zero.",
     color: "#0EA5E9",
     game: parseGameContent({
       type: "memory",
       pairs: [
         {
-          a: { text: "Paris" },
-          b: { text: "Ophthalmology training" },
+          a: {
+            imageUrl:
+              "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Jose_Rizal_full.jpg/256px-Jose_Rizal_full.jpg",
+          },
+          b: { text: "José Rizal" },
+          why: "José Rizal — the novelist, doctor, and the face of this path.",
+        },
+        {
+          a: {
+            imageUrl:
+              "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Andres_Bonifacio.jpg/256px-Andres_Bonifacio.jpg",
+          },
+          b: { text: "Andrés Bonifacio" },
+          why: "Andrés Bonifacio led the Katipunan. Teachers pair him with Rizal so the two revolutions stay distinct.",
+        },
+        {
+          a: {
+            imageUrl:
+              "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Tour_Eiffel_Wikimedia_Commons.jpg/320px-Tour_Eiffel_Wikimedia_Commons.jpg",
+          },
+          b: { text: "Paris" },
           why: "In Paris he trained his eyes — literally — as an eye doctor.",
         },
         {
-          a: { text: "Heidelberg" },
-          b: { text: "Science in Germany" },
-          why: "Heidelberg is the German science stop on the path.",
-        },
-        {
-          a: { text: "Berlin" },
-          b: { text: "Noli Me Tangere, 1887" },
-          why: "The novel is printed in Berlin. Travels and the books share this city.",
-        },
-        {
-          a: { text: "Morga" },
-          b: { text: "The islands had a history before Spain" },
-          why: "He annotated Morga so readers could see a Philippines that was not empty before the colony.",
+          a: {
+            imageUrl:
+              "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Brandenburger_Tor_abends.jpg/320px-Brandenburger_Tor_abends.jpg",
+          },
+          b: { text: "Berlin" },
+          why: "Noli Me Tangere is printed in Berlin in 1887.",
         },
       ],
     }),

@@ -126,6 +126,19 @@
     transform: rotateY(180deg);
   }
 
+  .card-face {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .card-face-front {
+    transform: rotateY(180deg);
+  }
+
+  .clock-hit {
+    animation: jose-clock-hit 0.4s ease;
+  }
+
   .snap-back {
     animation: jose-snap 0.55s ease;
   }
@@ -217,5 +230,20 @@
   }
   50% {
     box-shadow: 0 0 0 8px rgb(245 197 24 / 0%);
+  }
+}
+
+@keyframes jose-clock-hit {
+  0% {
+    transform: scale(1);
+    background-color: #14532d;
+  }
+  35% {
+    transform: scale(1.08);
+    background-color: #b45309;
+  }
+  100% {
+    transform: scale(1);
+    background-color: #14532d;
   }
 }

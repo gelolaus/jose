@@ -159,23 +159,35 @@ const TRAVELS_MEMORY: GameContent = {
   type: "memory",
   pairs: [
     {
-      a: { text: "Paris" },
-      b: { text: "Ophthalmology training" },
+      a: {
+        imageUrl:
+          "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Tour_Eiffel_Wikimedia_Commons.jpg/320px-Tour_Eiffel_Wikimedia_Commons.jpg",
+      },
+      b: { text: "Paris" },
       why: "In Paris he trained his eyes — literally — as an eye doctor.",
     },
     {
-      a: { text: "Heidelberg" },
-      b: { text: "Science in Germany" },
+      a: {
+        imageUrl:
+          "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Heidelberger_Schloss.jpg/320px-Heidelberger_Schloss.jpg",
+      },
+      b: { text: "Heidelberg" },
       why: "Heidelberg is the German science stop on the path.",
     },
     {
-      a: { text: "Berlin" },
-      b: { text: "Noli Me Tangere, 1887" },
+      a: {
+        imageUrl:
+          "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Brandenburger_Tor_abends.jpg/320px-Brandenburger_Tor_abends.jpg",
+      },
+      b: { text: "Berlin" },
       why: "The novel is printed in Berlin. Travels and the books share this city.",
     },
     {
-      a: { text: "Morga" },
-      b: { text: "The islands had a history before Spain" },
+      a: {
+        imageUrl:
+          "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Antonio_de_Morga.jpg/256px-Antonio_de_Morga.jpg",
+      },
+      b: { text: "Morga" },
       why: "He annotated Morga so readers could see a Philippines that was not empty before the colony.",
     },
   ],

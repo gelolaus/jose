@@ -5,7 +5,7 @@ export function hintFor(type: GameContent["type"]) {
     case "timeline":
       return "Oldest at the top. Drag an event onto its stop — or tap the event, then tap the stop.";
     case "memory":
-      return "Flip two cards. Find the pairs.";
+      return "Flip two cards. Match the picture to the name before the clock runs out.";
     case "sort":
       return "Put every chip in a chest, then Check.";
     case "quiz":

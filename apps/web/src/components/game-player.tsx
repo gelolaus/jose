@@ -50,7 +50,10 @@ export function GamePlayer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function onMiss(payload: WhyPayload | null): Promise<"ok" | "empty"> {
+  async function onMiss(
+    payload: WhyPayload | null,
+    opts?: { hold?: boolean },
+  ): Promise<"ok" | "empty"> {
     setBusy(true);
     setError(null);
     try {
@@ -59,7 +62,7 @@ export function GamePlayer({
       if (payload) setWhy(payload);
       if (parsed.learner.hearts <= 0) {
         if (payload) pendingEmpty.current = true;
-        else setEmpty(true);
+        else if (!opts?.hold) setEmpty(true);
         return "empty";
       }
       return "ok";
@@ -69,7 +72,7 @@ export function GamePlayer({
         if (payload) {
           setWhy(payload);
           pendingEmpty.current = true;
-        } else {
+        } else if (!opts?.hold) {
           setEmpty(true);
         }
         return "empty";
@@ -141,6 +144,7 @@ export function GamePlayer({
           disabled={busy || Boolean(why)}
           onMiss={onMiss}
           onFinish={onFinish}
+          onHeartsEmpty={() => setEmpty(true)}
         />
       </GameFrame>
       {why ? (
@@ -165,13 +169,18 @@ export function GameSwitch({
   disabled,
   onMiss,
   onFinish,
+  onHeartsEmpty,
   onChange,
 }: {
   game: GameContent;
   mode?: "play" | "build";
   disabled?: boolean;
-  onMiss?: (why: WhyPayload | null) => Promise<"ok" | "empty">;
+  onMiss?: (
+    why: WhyPayload | null,
+    opts?: { hold?: boolean },
+  ) => Promise<"ok" | "empty">;
   onFinish?: (score: number, maxScore: number, misses: number) => void;
+  onHeartsEmpty?: () => void;
   onChange?: (game: GameContent) => void;
 }) {
   switch (game.type) {
@@ -194,6 +203,7 @@ export function GameSwitch({
           disabled={Boolean(disabled)}
           onMiss={onMiss}
           onFinish={onFinish}
+          onHeartsEmpty={onHeartsEmpty}
           onChange={onChange as ((g: typeof game) => void) | undefined}
         />
       );
