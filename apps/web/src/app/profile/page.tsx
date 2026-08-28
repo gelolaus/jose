@@ -4,6 +4,8 @@ import { fetchDemoPath } from "@/lib/path-api";
 import type { Metadata } from "next";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Profile",
 };

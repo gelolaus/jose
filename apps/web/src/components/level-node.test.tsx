@@ -14,6 +14,7 @@ describe("LevelNode", () => {
   it("marks locked nodes in the accessible name", () => {
     render(
       <LevelNode
+        moduleId="rizal"
         node={{
           id: "x",
           title: "Ateneo Municipal",
@@ -32,6 +33,7 @@ describe("LevelNode", () => {
   it("does not mark current nodes as locked", () => {
     render(
       <LevelNode
+        moduleId="rizal"
         node={{
           id: "y",
           title: "Ateneo Municipal",

@@ -82,7 +82,7 @@ export function PathView({ path }: { path: PathResponse }) {
                   {section.subtitle}
                 </p>
               </div>
-              <PathTrack nodes={section.nodes} />
+              <PathTrack nodes={section.nodes} moduleId={path.module.id} />
               <MascotAccent sectionId={section.id} />
             </section>
           ))}
@@ -96,7 +96,13 @@ export function PathView({ path }: { path: PathResponse }) {
   );
 }
 
-function PathTrack({ nodes }: { nodes: LevelNodeType[] }) {
+function PathTrack({
+  nodes,
+  moduleId,
+}: {
+  nodes: LevelNodeType[];
+  moduleId: string;
+}) {
   const n = nodes.length;
   if (n === 0) return null;
 
@@ -144,7 +150,7 @@ function PathTrack({ nodes }: { nodes: LevelNodeType[] }) {
             transform: "translate(-50%, -50%)",
           }}
         >
-          <LevelNode node={node} />
+          <LevelNode node={node} moduleId={moduleId} />
         </div>
       ))}
     </div>

@@ -26,3 +26,10 @@ coverage
 # IDE
 .idea
 .vscode
+
+# Brainstorm companion mockups
+.superpowers/
+
+# Local SQLite (seeded on API boot)
+apps/api/data/*.sqlite
+apps/api/data/*.sqlite-*
