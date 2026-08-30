@@ -3,32 +3,38 @@
 import { ExplorerAvatar } from "@/components/explorer-avatar";
 import { AVATAR_CATALOG } from "@/lib/avatar-catalog";
 import {
-  DEFAULT_AVATAR_ID,
   DEFAULT_DISPLAY_NAME,
   isAvatarId,
   normalizeDisplayName,
-  readExplorerIdentity,
   writeExplorerIdentity,
   type AvatarId,
 } from "@/lib/explorer-identity";
+import {
+  notifyExplorerIdentityChanged,
+  useExplorerIdentity,
+} from "@/lib/use-explorer-identity";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 
 export function ProfileEditForm() {
-  const router = useRouter();
-  const [displayName, setDisplayName] = useState(DEFAULT_DISPLAY_NAME);
-  const [avatarId, setAvatarId] = useState<AvatarId>(DEFAULT_AVATAR_ID);
-  const [error, setError] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+  const identity = useExplorerIdentity(DEFAULT_DISPLAY_NAME);
+  return (
+    <ProfileEditFields
+      key={`${identity.displayName}:${identity.avatarId}`}
+      initial={identity}
+    />
+  );
+}
 
-  useEffect(() => {
-    const stored = readExplorerIdentity();
-    if (stored) {
-      setDisplayName(stored.displayName);
-      setAvatarId(stored.avatarId);
-    }
-    setReady(true);
-  }, []);
+function ProfileEditFields({
+  initial,
+}: {
+  initial: { displayName: string; avatarId: AvatarId };
+}) {
+  const router = useRouter();
+  const [displayName, setDisplayName] = useState(initial.displayName);
+  const [avatarId, setAvatarId] = useState<AvatarId>(initial.avatarId);
+  const [error, setError] = useState<string | null>(null);
 
   function onSave(event: FormEvent) {
     event.preventDefault();
@@ -42,6 +48,7 @@ export function ProfileEditForm() {
       return;
     }
     writeExplorerIdentity({ displayName: name, avatarId });
+    notifyExplorerIdentityChanged();
     router.push("/profile");
   }
 
@@ -74,7 +81,6 @@ export function ProfileEditForm() {
             setError(null);
           }}
           maxLength={20}
-          disabled={!ready}
           className="rounded-2xl border border-black/10 bg-white px-4 py-3 text-base font-bold text-slate-800 outline-none ring-rose-300 focus:ring-2"
           autoComplete="nickname"
           aria-invalid={Boolean(error)}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Heart, Star } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { WhyPayload } from "./play-types";
 
 export function HeartsHud({ hearts, max = 5 }: { hearts: number; max?: number }) {
@@ -31,20 +31,42 @@ export function WhySheet({
   onDismiss: () => void;
 }) {
   const [ready, setReady] = useState(false);
+  const readyRef = useRef(false);
+  const titleId = useId();
+  const bodyId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    setReady(false);
-    const t = window.setTimeout(() => setReady(true), 650);
+    dialogRef.current?.focus();
+    const t = window.setTimeout(() => {
+      readyRef.current = true;
+      setReady(true);
+    }, 650);
     return () => window.clearTimeout(t);
-  }, [why.title, why.body]);
+  }, []);
+
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape" && readyRef.current) onDismiss();
+  }
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 p-4 sm:items-center">
-      <div className="why-pop w-full max-w-md rounded-[1.75rem] bg-white p-5 shadow-xl ring-2 ring-amber-200 sm:p-6">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={bodyId}
+        tabIndex={-1}
+        onKeyDown={onKeyDown}
+        className="why-pop w-full max-w-md rounded-[1.75rem] bg-white p-5 shadow-xl outline-none ring-2 ring-amber-200 sm:p-6"
+      >
         <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-600">
           Not quite
         </p>
-        <p className="mt-2 font-display text-2xl font-semibold text-slate-800">{why.title}</p>
-        <p className="mt-2 whitespace-pre-line text-base font-semibold leading-relaxed text-slate-600">
+        <h2 id={titleId} className="mt-2 font-display text-2xl font-semibold text-slate-800">
+          {why.title}
+        </h2>
+        <p id={bodyId} className="mt-2 whitespace-pre-line text-base font-semibold leading-relaxed text-slate-600">
           {why.body}
         </p>
         <button
@@ -104,7 +126,7 @@ export function StarCelebration({
         <span className="text-2xl text-slate-400">/{maxScore}</span>
       </p>
       <p className="text-base font-semibold text-slate-600">{title}</p>
-      {error ? <p className="text-sm font-bold text-rose-600">{error}</p> : null}
+      {error ? <p className="text-sm font-bold text-rose-600" role="alert">{error}</p> : null}
       <div className="mt-2 flex w-full flex-col gap-2 sm:flex-row">
         <button
           type="button"

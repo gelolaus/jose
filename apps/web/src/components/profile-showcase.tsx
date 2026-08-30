@@ -2,10 +2,8 @@
 
 import { ExplorerAvatar } from "@/components/explorer-avatar";
 import {
-  defaultExplorerIdentity,
-  readExplorerIdentity,
-  type ExplorerIdentity,
-} from "@/lib/explorer-identity";
+  useExplorerIdentity,
+} from "@/lib/use-explorer-identity";
 import {
   deriveTrophies,
   highlightSectionId,
@@ -14,25 +12,13 @@ import {
 import type { PathResponse } from "@jose/shared";
 import { Flame, Heart, Lock, Trophy, Zap } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
 type ProfileShowcaseProps = {
   path: PathResponse;
 };
 
 export function ProfileShowcase({ path }: ProfileShowcaseProps) {
-  const [identity, setIdentity] = useState<ExplorerIdentity>(() =>
-    defaultExplorerIdentity(path.learner.displayName),
-  );
-
-  useEffect(() => {
-    const stored = readExplorerIdentity();
-    if (stored) {
-      setIdentity(stored);
-      return;
-    }
-    setIdentity(defaultExplorerIdentity(path.learner.displayName));
-  }, [path.learner.displayName]);
+  const identity = useExplorerIdentity(path.learner.displayName);
 
   const trophies = deriveTrophies(path);
   const activeSectionId = highlightSectionId(path);

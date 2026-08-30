@@ -33,6 +33,14 @@ function yearLabel(item: TimelineItem, index: number) {
   return text || `Stop ${index + 1}`;
 }
 
+function dealTimelineItems(items: TimelineItem[]) {
+  const copy = shuffledCopy(items);
+  if (copy.length > 1 && copy.every((item, i) => item.id === items[i]?.id)) {
+    [copy[0], copy[1]] = [copy[1]!, copy[0]!];
+  }
+  return copy;
+}
+
 function StopShell({ className = "sm:w-44", children }: { className?: string; children: ReactNode }) {
   return (
     <div
@@ -127,14 +135,13 @@ function TimelinePlay({
   });
 
   useEffect(() => {
-    const copy = shuffledCopy(game.items);
-    if (copy.length > 1 && copy.every((item, i) => item.id === game.items[i]?.id)) {
-      [copy[0], copy[1]] = [copy[1]!, copy[0]!];
-    }
-    setBank(copy);
-    setPlaced({});
-    setLocked({});
-    missesRef.current = 0;
+    const timer = window.setTimeout(() => {
+      setBank(dealTimelineItems(game.items));
+      setPlaced({});
+      setLocked({});
+      missesRef.current = 0;
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [game.items]);
 
   function putOn(slot: number, itemId = drag.selectedRef.current) {

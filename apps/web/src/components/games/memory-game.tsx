@@ -2,7 +2,7 @@
 
 import type { MemoryGame as MemoryContent } from "@jose/shared";
 import { Plus } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   applyMismatch,
   clockMs,
@@ -30,7 +30,7 @@ function shuffle<T>(items: T[]): T[] {
   return next;
 }
 
-function deal(pairs: MemoryContent["pairs"]): Card[] {
+function buildDeck(pairs: MemoryContent["pairs"]): Card[] {
   const built: Card[] = [];
   pairs.forEach((pair, pairId) => {
     built.push({
@@ -46,7 +46,11 @@ function deal(pairs: MemoryContent["pairs"]): Card[] {
       imageUrl: pair.b.imageUrl,
     });
   });
-  return shuffle(built);
+  return built;
+}
+
+function deal(pairs: MemoryContent["pairs"]): Card[] {
+  return shuffle(buildDeck(pairs));
 }
 
 export function MemoryGame({
@@ -86,8 +90,7 @@ function MemoryPlay({
   onHeartsEmpty,
 }: { game: MemoryContent } & PlayBoardProps) {
   const pairCount = game.pairs.length;
-  const [dealKey, setDealKey] = useState(0);
-  const cards = useMemo(() => deal(game.pairs), [game.pairs, dealKey]);
+  const [cards, setCards] = useState(() => buildDeck(game.pairs));
 
   const [flipped, setFlipped] = useState<string[]>([]);
   const [matched, setMatched] = useState<Set<number>>(new Set());
@@ -108,8 +111,21 @@ function MemoryPlay({
   const endingRef = useRef(false);
   const onMissRef = useRef(onMiss);
   const onFinishRef = useRef(onFinish);
-  onMissRef.current = onMiss;
-  onFinishRef.current = onFinish;
+  const lostDialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    onMissRef.current = onMiss;
+    onFinishRef.current = onFinish;
+  }, [onFinish, onMiss]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setCards(deal(game.pairs)), 0);
+    return () => window.clearTimeout(timer);
+  }, [game.pairs]);
+
+  useEffect(() => {
+    if (lost) lostDialogRef.current?.focus();
+  }, [lost]);
 
   function resetBoard() {
     endingRef.current = false;
@@ -128,7 +144,7 @@ function MemoryPlay({
     setLostEmpty(false);
     setHit(false);
     setShake(false);
-    setDealKey((n) => n + 1);
+    setCards(deal(game.pairs));
   }
 
   async function lose() {
@@ -280,11 +296,18 @@ function MemoryPlay({
       ) : null}
       {lost ? (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 p-4 sm:items-center">
-          <div className="w-full max-w-md rounded-[1.75rem] bg-white p-5 shadow-xl ring-2 ring-amber-200 sm:p-6">
+          <div
+            ref={lostDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="memory-timeout-title"
+            tabIndex={-1}
+            className="w-full max-w-md rounded-[1.75rem] bg-white p-5 shadow-xl outline-none ring-2 ring-amber-200 sm:p-6"
+          >
             <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-600">
               Memory
             </p>
-            <h2 className="mt-2 font-display text-2xl font-semibold text-slate-800">
+            <h2 id="memory-timeout-title" className="mt-2 font-display text-2xl font-semibold text-slate-800">
               Time’s up
             </h2>
             <p className="mt-2 text-base font-semibold leading-relaxed text-slate-600">

@@ -13,6 +13,7 @@ import {
 } from "@/lib/path-api";
 import type { GameType, TeachModuleDetail } from "@jose/shared";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 const GAME_TYPES: { id: GameType; label: string }[] = [
@@ -24,6 +25,7 @@ const GAME_TYPES: { id: GameType; label: string }[] = [
 ];
 
 export function TeachModuleEditor({ initial }: { initial: TeachModuleDetail }) {
+  const router = useRouter();
   const [mod, setMod] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -150,7 +152,7 @@ export function TeachModuleEditor({ initial }: { initial: TeachModuleDetail }) {
               onAdd={async (body) => {
                 try {
                   const created = await createTeachLevel(section.id, body);
-                  window.location.href = `/teach/modules/${mod.id}/levels/${created.id}`;
+                  router.push(`/teach/modules/${mod.id}/levels/${created.id}`);
                 } catch (err) {
                   setError(err instanceof Error ? err.message : "Could not add level");
                 }

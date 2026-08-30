@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -45,7 +46,10 @@ export function usePlaceDrag({
   const skipClickRef = useRef(false);
   const labelRef = useRef("");
   const onDropRef = useRef(onDrop);
-  onDropRef.current = onDrop;
+
+  useEffect(() => {
+    onDropRef.current = onDrop;
+  }, [onDrop]);
 
   const [selected, setSelected] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);

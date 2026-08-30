@@ -51,6 +51,10 @@ export class ApiError extends Error {
   }
 }
 
+export function isNotFoundError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404;
+}
+
 export async function fetchModules(): Promise<
   { ok: true; data: ModulesResponse } | { ok: false; error: string }
 > {

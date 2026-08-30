@@ -138,7 +138,7 @@ export function GamePlayer({
         progress={labelFor(game.type)}
         wide={game.type === "timeline"}
       >
-        {error ? <p className="mb-4 text-sm font-bold text-rose-600">{error}</p> : null}
+        {error ? <p className="mb-4 text-sm font-bold text-rose-600" role="alert">{error}</p> : null}
         <GameSwitch
           key={nonce}
           game={game}

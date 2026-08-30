@@ -36,7 +36,14 @@ function BlankPlay({
     game.items.map((item) => [item.answer, ...item.decoys]),
   );
   useEffect(() => {
-    setBanks(game.items.map((item) => shuffledCopy([item.answer, ...item.decoys])));
+    const timer = window.setTimeout(() => {
+      setBanks(
+        game.items.map((item) =>
+          shuffledCopy([item.answer, ...item.decoys]),
+        ),
+      );
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [game.items]);
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);

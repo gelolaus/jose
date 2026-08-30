@@ -45,6 +45,11 @@
   h3 {
     font-family: var(--font-display);
   }
+
+  :where(a, button, input, textarea, select, [tabindex]):focus-visible {
+    outline: 3px solid #7c3aed;
+    outline-offset: 3px;
+  }
 }
 
 .jose-prose h1,
@@ -245,5 +250,16 @@
   100% {
     transform: scale(1);
     background-color: #14532d;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
