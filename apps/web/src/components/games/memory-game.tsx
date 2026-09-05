@@ -1,5 +1,6 @@
 "use client";
 
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import type { MemoryGame as MemoryContent } from "@jose/shared";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -112,6 +113,7 @@ function MemoryPlay({
   const onMissRef = useRef(onMiss);
   const onFinishRef = useRef(onFinish);
   const lostDialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(lost, lostDialogRef, true);
 
   useEffect(() => {
     onMissRef.current = onMiss;
@@ -122,10 +124,6 @@ function MemoryPlay({
     const timer = window.setTimeout(() => setCards(deal(game.pairs)), 0);
     return () => window.clearTimeout(timer);
   }, [game.pairs]);
-
-  useEffect(() => {
-    if (lost) lostDialogRef.current?.focus();
-  }, [lost]);
 
   function resetBoard() {
     endingRef.current = false;
@@ -257,13 +255,19 @@ function MemoryPlay({
         <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
           {cards.map((card) => {
             const open = flipped.includes(card.id) || matched.has(card.pairId);
+            const faceLabel = card.text?.trim()
+              ? card.text
+              : card.imageUrl
+                ? "Image card"
+                : "Blank card";
             return (
               <li key={card.id} className="[perspective:1000px]">
                 <button
                   type="button"
-                  aria-label={`Card ${card.id}`}
+                  aria-label={open ? `Revealed: ${faceLabel}` : `Hidden card`}
+                  aria-pressed={open}
                   onClick={() => flip(card)}
-                  className="block w-full [transform-style:preserve-3d]"
+                  className="block min-h-11 w-full [transform-style:preserve-3d]"
                 >
                   <span
                     className={`card-flip relative block aspect-[3/4] w-full ${
@@ -289,8 +293,28 @@ function MemoryPlay({
           })}
         </ul>
       </div>
+      <div className="sr-only" aria-live="polite">
+        {flipped.length
+          ? flipped
+              .map((id) => {
+                const card = cards.find((c) => c.id === id);
+                if (!card) return null;
+                const faceLabel = card.text?.trim()
+                  ? card.text
+                  : card.imageUrl
+                    ? "Image card"
+                    : "Blank card";
+                return `Revealed ${faceLabel}`;
+              })
+              .filter(Boolean)
+              .join(". ")
+          : ""}
+      </div>
       {fact ? (
-        <p className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 ring-1 ring-amber-200">
+        <p
+          className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 ring-1 ring-amber-200"
+          role="status"
+        >
           {fact}
         </p>
       ) : null}
@@ -302,6 +326,12 @@ function MemoryPlay({
             aria-modal="true"
             aria-labelledby="memory-timeout-title"
             tabIndex={-1}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                if (lostEmpty) onHeartsEmpty?.();
+                else resetBoard();
+              }
+            }}
             className="w-full max-w-md rounded-[1.75rem] bg-white p-5 shadow-xl outline-none ring-2 ring-amber-200 sm:p-6"
           >
             <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-600">

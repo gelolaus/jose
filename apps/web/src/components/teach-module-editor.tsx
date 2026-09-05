@@ -1,6 +1,7 @@
 "use client";
 
 import { COVER_COLORS, FieldLabel, TeachTitle } from "@/components/teach-shell";
+import { accessibleColorName, meetsWcagAa } from "@/lib/contrast";
 import {
   createTeachLevel,
   createTeachSection,
@@ -196,25 +197,34 @@ function ModuleFields({
         void onSave({ title, subtitle, coverColor });
       }}
     >
-      <FieldLabel>Title</FieldLabel>
+      <FieldLabel htmlFor="module-title">Title</FieldLabel>
       <input
+        id="module-title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         className="w-full rounded-2xl bg-slate-50 px-4 py-3 font-bold ring-1 ring-black/10"
       />
-      <FieldLabel>Subtitle</FieldLabel>
+      <FieldLabel htmlFor="module-subtitle">Subtitle</FieldLabel>
       <input
+        id="module-subtitle"
         value={subtitle}
         onChange={(e) => setSubtitle(e.target.value)}
         className="w-full rounded-2xl bg-slate-50 px-4 py-3 font-bold ring-1 ring-black/10"
       />
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Cover color">
         {COVER_COLORS.map((color) => (
           <button
             key={color}
             type="button"
+            aria-label={accessibleColorName(color)}
+            aria-pressed={coverColor === color}
+            title={
+              meetsWcagAa("#FFFFFF", color, true)
+                ? accessibleColorName(color)
+                : `${accessibleColorName(color)} — low contrast with white labels`
+            }
             onClick={() => setCoverColor(color)}
-            className={`size-9 rounded-2xl ring-2 ${
+            className={`size-11 min-h-11 rounded-2xl ring-2 ${
               coverColor === color ? "ring-slate-800" : "ring-transparent"
             }`}
             style={{ backgroundColor: color }}

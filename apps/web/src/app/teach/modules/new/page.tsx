@@ -1,6 +1,7 @@
 "use client";
 
 import { COVER_COLORS, FieldLabel, TeachTitle } from "@/components/teach-shell";
+import { accessibleColorName, meetsWcagAa } from "@/lib/contrast";
 import { createTeachModule } from "@/lib/path-api";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -31,8 +32,9 @@ export default function NewModulePage() {
       <TeachTitle kicker="Studio" title="New module" />
       <form onSubmit={onSubmit} className="space-y-4">
         <div>
-          <FieldLabel>Title</FieldLabel>
+          <FieldLabel htmlFor="new-module-title">Title</FieldLabel>
           <input
+            id="new-module-title"
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -40,8 +42,9 @@ export default function NewModulePage() {
           />
         </div>
         <div>
-          <FieldLabel>Subtitle</FieldLabel>
+          <FieldLabel htmlFor="new-module-subtitle">Subtitle</FieldLabel>
           <input
+            id="new-module-subtitle"
             required
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
@@ -49,15 +52,23 @@ export default function NewModulePage() {
           />
         </div>
         <div>
-          <FieldLabel>Cover color</FieldLabel>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <p id="cover-color-label" className="block text-sm font-extrabold text-slate-600">
+            Cover color
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2" role="group" aria-labelledby="cover-color-label">
             {COVER_COLORS.map((color) => (
               <button
                 key={color}
                 type="button"
-                aria-label={color}
+                aria-label={accessibleColorName(color)}
+                aria-pressed={coverColor === color}
+                title={
+                  meetsWcagAa("#FFFFFF", color, true)
+                    ? accessibleColorName(color)
+                    : `${accessibleColorName(color)} — check contrast for white labels`
+                }
                 onClick={() => setCoverColor(color)}
-                className={`size-10 rounded-2xl ring-2 ${
+                className={`size-11 min-h-11 rounded-2xl ring-2 ${
                   coverColor === color ? "ring-slate-800" : "ring-transparent"
                 }`}
                 style={{ backgroundColor: color }}
@@ -65,11 +76,11 @@ export default function NewModulePage() {
             ))}
           </div>
         </div>
-        {error ? <p className="text-sm font-bold text-rose-600">{error}</p> : null}
+        {error ? <p className="text-sm font-bold text-rose-600" role="alert">{error}</p> : null}
         <button
           type="submit"
           disabled={busy}
-          className="rounded-full bg-violet-600 px-6 py-3 text-sm font-extrabold text-white shadow-md disabled:opacity-60"
+          className="min-h-11 rounded-full bg-violet-600 px-6 py-3 text-sm font-extrabold text-white shadow-md disabled:opacity-60"
         >
           {busy ? "Creating…" : "Create draft"}
         </button>

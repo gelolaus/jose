@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/learning-shell";
 import { PathView } from "@/components/path-view";
+import { RecoveryState } from "@/components/recovery-state";
 import { TopBar } from "@/components/top-bar";
-import { NapState } from "@/app/learn/page";
 import { fetchModulePath } from "@/lib/path-api";
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
@@ -27,7 +27,12 @@ export default async function ModulePathPage({ params }: Props) {
     if (result.status === 404) notFound();
     return (
       <AppShell>
-        <NapState title="Path is napping" error={result.error} href={`/learn/${moduleId}`} />
+        <RecoveryState
+          title="This path is unavailable"
+          error={result.error}
+          href={`/learn/${moduleId}`}
+          status={result.status}
+        />
       </AppShell>
     );
   }
@@ -47,7 +52,7 @@ export default async function ModulePathPage({ params }: Props) {
           <div className="border-b border-black/5 bg-white/90 px-4 py-2 sm:px-6 lg:px-8">
             <Link
               href="/learn"
-              className="inline-flex items-center gap-1.5 text-sm font-extrabold text-violet-700"
+              className="inline-flex min-h-11 items-center gap-1.5 text-sm font-extrabold text-violet-700"
             >
               <ArrowLeft className="size-4" strokeWidth={2.5} aria-hidden />
               All modules

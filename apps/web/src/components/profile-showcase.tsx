@@ -36,16 +36,28 @@ export function ProfileShowcase({ path }: ProfileShowcaseProps) {
             Rizal path explorer
           </p>
         </div>
-        <div className="flex flex-col items-center gap-2 sm:flex-row">
+        <div className="flex flex-col items-center gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
           <Link
             href="/profile/edit"
-            className="rounded-full bg-rose-500 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
+            className="min-h-11 rounded-full bg-rose-500 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
           >
             Edit explorer
           </Link>
           <Link
+            href="/profile/preferences"
+            className="min-h-11 rounded-full bg-violet-100 px-6 py-3 text-base font-extrabold text-violet-800 shadow-sm transition"
+          >
+            Language & reading
+          </Link>
+          <Link
+            href="/journal"
+            className="min-h-11 rounded-full bg-amber-100 px-6 py-3 text-base font-extrabold text-amber-900 shadow-sm transition"
+          >
+            Field journal
+          </Link>
+          <Link
             href="/teach"
-            className="rounded-full bg-slate-800 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
+            className="min-h-11 rounded-full bg-slate-800 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
           >
             Teacher studio
           </Link>
