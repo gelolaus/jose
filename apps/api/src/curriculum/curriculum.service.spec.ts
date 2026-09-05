@@ -2,13 +2,18 @@ import { Test, type TestingModule } from "@nestjs/testing";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { modulesResponseSchema, pathResponseSchema, HEARTS_EMPTY_CODE } from "@jose/shared";
+import {
+  DEMO_LEARNER_ID,
+  modulesResponseSchema,
+  pathResponseSchema,
+  HEARTS_EMPTY_CODE,
+} from "@jose/shared";
 import { AppModule } from "../app.module";
 import { CurriculumService } from "./curriculum.service";
 import { DatabaseService } from "../db/database.service";
 import { eq } from "drizzle-orm";
-import { learners } from "../db/schema";
-import { HttpException } from "@nestjs/common";
+import { attempts, learnerProgress, learners, modules } from "../db/schema";
+import { HttpException, NotFoundException } from "@nestjs/common";
 
 describe("CurriculumService", () => {
   let service: CurriculumService;
@@ -100,5 +105,137 @@ describe("CurriculumService", () => {
       .update(learners)
       .set({ hearts: 5, heartsUpdatedAt: Date.now() })
       .where(eq(learners.id, "demo-student"));
+  });
+
+  describe("publication checks (ticket 04)", () => {
+    let draftModuleId: string;
+    let draftLessonId: string;
+    let draftGameId: string;
+
+    beforeAll(async () => {
+      const created = await service.createModule({
+        title: "Draft only",
+        subtitle: "Unpublished fixture",
+        coverColor: "#334155",
+      });
+      draftModuleId = created.id;
+      const sectionId = created.sections[0]!.id;
+      const lesson = await service.createLevel(sectionId, {
+        title: "Secret lesson",
+        kind: "lesson",
+      });
+      draftLessonId = lesson.id;
+      await service.putLesson(draftLessonId, {
+        markdown: "## Secret\n\nStudents must not see this.",
+        youtubeUrl: "",
+      });
+      const game = await service.createLevel(sectionId, {
+        title: "Secret quiz",
+        kind: "game",
+        gameType: "quiz",
+      });
+      draftGameId = game.id;
+      await service.putGame(draftGameId, {
+        type: "quiz",
+        questions: [
+          {
+            prompt: "Hidden?",
+            choices: ["Yes", "No"],
+            correctIndex: 0,
+            why: "Because.",
+          },
+        ],
+      });
+      expect(created.published).toBe(false);
+    });
+
+    async function learnerSnapshot() {
+      const learner = await service.getLearner();
+      const progress = await database.db
+        .select()
+        .from(learnerProgress)
+        .where(eq(learnerProgress.learnerId, DEMO_LEARNER_ID));
+      const attemptRows = await database.db
+        .select()
+        .from(attempts)
+        .where(eq(attempts.learnerId, DEMO_LEARNER_ID));
+      return {
+        hearts: learner.hearts,
+        xp: learner.xp,
+        progressIds: progress.map((row) => row.levelId).sort(),
+        attemptCount: attemptRows.length,
+        attemptLevelIds: attemptRows.map((row) => row.levelId).sort(),
+      };
+    }
+
+    it("rejects reading an unpublished lesson by id without revealing content", async () => {
+      await expect(service.getPlayLevel(draftLessonId)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      await expect(service.getModulePath(draftModuleId)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it("rejects completing, missing, and attempting unpublished levels without mutating progress", async () => {
+      await database.db
+        .update(learners)
+        .set({ hearts: 5, heartsUpdatedAt: Date.now() })
+        .where(eq(learners.id, DEMO_LEARNER_ID));
+      const before = await learnerSnapshot();
+
+      await expect(service.completeLevel(draftLessonId)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      await expect(service.recordMiss(draftGameId)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      await expect(
+        service.submitAttempt(draftGameId, { score: 1, maxScore: 1 }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      const after = await learnerSnapshot();
+      expect(after).toEqual(before);
+      expect(after.progressIds).not.toContain(draftLessonId);
+      expect(after.progressIds).not.toContain(draftGameId);
+      expect(after.attemptLevelIds).not.toContain(draftGameId);
+    });
+
+    it("keeps teacher preview available for unpublished levels without student mutations", async () => {
+      const before = await learnerSnapshot();
+      const preview = await service.getTeachLevel(draftLessonId);
+      expect(preview.id).toBe(draftLessonId);
+      expect(preview.lesson?.markdown).toMatch(/Secret/);
+      const gamePreview = await service.getTeachLevel(draftGameId);
+      expect(gamePreview.game?.type).toBe("quiz");
+      const after = await learnerSnapshot();
+      expect(after).toEqual(before);
+    });
+
+    it("omits unpublished featured modules from the student featured path", async () => {
+      await database.db
+        .update(modules)
+        .set({ featured: false })
+        .where(eq(modules.id, "rizal"));
+      await database.db
+        .update(modules)
+        .set({ featured: true, published: false })
+        .where(eq(modules.id, draftModuleId));
+
+      try {
+        await expect(service.getFeaturedPath()).rejects.toBeInstanceOf(
+          NotFoundException,
+        );
+      } finally {
+        await database.db
+          .update(modules)
+          .set({ featured: false, published: false })
+          .where(eq(modules.id, draftModuleId));
+        await database.db
+          .update(modules)
+          .set({ featured: true, published: true })
+          .where(eq(modules.id, "rizal"));
+      }
+    });
   });
 });

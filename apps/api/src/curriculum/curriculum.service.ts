@@ -41,7 +41,7 @@ import {
   type TeachModule,
   type TeachModuleDetail,
 } from "@jose/shared";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { asc, desc, eq, inArray, and } from "drizzle-orm";
 import { DatabaseService } from "../db/database.service";
 import {
   attempts,
@@ -113,10 +113,7 @@ export class CurriculumService {
   }
 
   async getModulePath(moduleId: string): Promise<PathResponse> {
-    const mod = await this.requireModule(moduleId);
-    if (!mod.published) {
-      throw new NotFoundException("Module not published");
-    }
+    const mod = await this.requirePublishedModule(moduleId);
     return this.buildPath(mod);
   }
 
@@ -124,14 +121,14 @@ export class CurriculumService {
     const [mod] = await this.db
       .select()
       .from(modules)
-      .where(eq(modules.featured, true))
+      .where(and(eq(modules.featured, true), eq(modules.published, true)))
       .limit(1);
     if (!mod) throw new NotFoundException("No featured module");
     return this.buildPath(mod);
   }
 
   async getPlayLevel(levelId: string): Promise<PlayLevelResponse> {
-    const ctx = await this.levelContext(levelId);
+    const ctx = await this.requireStudentVisibleLevel(levelId);
     const ordered = await this.orderedLevelIds(ctx.module.id);
     const completed = await this.completedSet();
     if (isLevelLocked(ordered, completed, levelId)) {
@@ -182,7 +179,7 @@ export class CurriculumService {
   }
 
   async completeLevel(levelId: string) {
-    const ctx = await this.levelContext(levelId);
+    const ctx = await this.requireStudentVisibleLevel(levelId);
     if (ctx.level.kind === "game") {
       throw new BadRequestException("Finish the game to complete this level");
     }
@@ -196,7 +193,7 @@ export class CurriculumService {
   }
 
   async recordMiss(levelId: string) {
-    const ctx = await this.levelContext(levelId);
+    const ctx = await this.requireStudentVisibleLevel(levelId);
     if (ctx.level.kind !== "game") {
       throw new BadRequestException("Misses are only for game levels");
     }
@@ -219,7 +216,7 @@ export class CurriculumService {
 
   async submitAttempt(levelId: string, body: unknown) {
     const data = parseBody(attemptBodySchema, body);
-    const ctx = await this.levelContext(levelId);
+    const ctx = await this.requireStudentVisibleLevel(levelId);
     if (ctx.level.kind !== "game") {
       throw new BadRequestException("Attempts are only for game levels");
     }
@@ -438,7 +435,7 @@ export class CurriculumService {
   }
 
   async patchLevel(levelId: string, body: unknown) {
-    await this.levelContext(levelId);
+    await this.requireAuthorizedTeacherPreview(levelId);
     const data = parseBody(patchLevelBodySchema, body);
     if (data.title !== undefined) {
       await this.db
@@ -450,7 +447,7 @@ export class CurriculumService {
   }
 
   async deleteLevel(levelId: string) {
-    const ctx = await this.levelContext(levelId);
+    const ctx = await this.requireAuthorizedTeacherPreview(levelId);
     const siblings = await this.db
       .select()
       .from(levels)
@@ -465,7 +462,7 @@ export class CurriculumService {
 
   async moveLevel(levelId: string, body: unknown) {
     const data = parseBody(moveBodySchema, body);
-    const ctx = await this.levelContext(levelId);
+    const ctx = await this.requireAuthorizedTeacherPreview(levelId);
     const siblings = await this.db
       .select()
       .from(levels)
@@ -491,7 +488,7 @@ export class CurriculumService {
   }
 
   async putLesson(levelId: string, body: unknown) {
-    const ctx = await this.levelContext(levelId);
+    const ctx = await this.requireAuthorizedTeacherPreview(levelId);
     if (ctx.level.kind !== "lesson") {
       throw new BadRequestException("This level is not a lesson");
     }
@@ -519,7 +516,7 @@ export class CurriculumService {
   }
 
   async putGame(levelId: string, body: unknown) {
-    const ctx = await this.levelContext(levelId);
+    const ctx = await this.requireAuthorizedTeacherPreview(levelId);
     if (ctx.level.kind !== "game") {
       throw new BadRequestException("This level is not a game");
     }
@@ -536,7 +533,7 @@ export class CurriculumService {
   }
 
   async getTeachLevel(levelId: string): Promise<TeachLevelDetail> {
-    const ctx = await this.levelContext(levelId);
+    const ctx = await this.requireAuthorizedTeacherPreview(levelId);
     let lesson: TeachLevelDetail["lesson"] = null;
     let game: TeachLevelDetail["game"] = null;
     if (ctx.level.kind === "lesson") {
@@ -786,6 +783,14 @@ export class CurriculumService {
     return row;
   }
 
+  private async requirePublishedModule(moduleId: string) {
+    const mod = await this.requireModule(moduleId);
+    if (!mod.published) {
+      throw new NotFoundException("Module not published");
+    }
+    return mod;
+  }
+
   private async requireSection(sectionId: string) {
     const [row] = await this.db
       .select()
@@ -795,7 +800,25 @@ export class CurriculumService {
     return row;
   }
 
-  private async levelContext(levelId: string) {
+  /** Student-visible content: requires the module's published revision. */
+  private async requireStudentVisibleLevel(levelId: string) {
+    const ctx = await this.resolveLevelContext(levelId);
+    if (!ctx.module.published) {
+      throw new NotFoundException("Level not found");
+    }
+    return ctx;
+  }
+
+  /**
+   * Authorized teacher preview/edit path: resolves unpublished drafts.
+   * Does not touch learner progress, hearts, attempts, or unlocks.
+   * Role/ownership enforcement belongs with ticket 02 auth guards.
+   */
+  private async requireAuthorizedTeacherPreview(levelId: string) {
+    return this.resolveLevelContext(levelId);
+  }
+
+  private async resolveLevelContext(levelId: string) {
     const [level] = await this.db.select().from(levels).where(eq(levels.id, levelId));
     if (!level) throw new NotFoundException("Level not found");
     const section = await this.requireSection(level.sectionId);
