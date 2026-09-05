@@ -1,11 +1,20 @@
 "use client";
 
 import { hintFor, labelFor } from "@/lib/game-copy";
-import { ApiError, recordMiss, submitAttempt } from "@/lib/path-api";
+import {
+  ApiError,
+  evaluateAttempt,
+  finishAttempt,
+  recordMiss,
+} from "@/lib/path-api";
 import {
   HEARTS_EMPTY_CODE,
   firstTryScore,
   pieceCount,
+  type AssessmentGame,
+  type AttemptEvent,
+  type AttemptInfo,
+  type FinishAnswers,
   type GameContent,
 } from "@jose/shared";
 import { useRouter } from "next/navigation";
@@ -28,12 +37,14 @@ export function GamePlayer({
   moduleId,
   title,
   game,
+  attempt,
   hearts: startHearts,
 }: {
   levelId: string;
   moduleId: string;
   title: string;
-  game: GameContent;
+  game: AssessmentGame;
+  attempt: AttemptInfo;
   hearts: number;
 }) {
   const router = useRouter();
@@ -49,6 +60,7 @@ export function GamePlayer({
   const [nonce, setNonce] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [attemptId, setAttemptId] = useState(attempt.id);
 
   async function onMiss(
     payload: WhyPayload | null,
@@ -85,20 +97,31 @@ export function GamePlayer({
     }
   }
 
-  async function onFinish(_score: number, _max: number, misses: number) {
+  async function onEvaluate(event: AttemptEvent) {
+    return evaluateAttempt(attemptId, event);
+  }
+
+  async function onFinish(
+    _score: number,
+    _max: number,
+    _misses: number,
+    answers?: FinishAnswers,
+  ) {
+    if (!answers) {
+      setError("Missing answers for assessment finish");
+      return;
+    }
     setBusy(true);
     setError(null);
-    const scored = firstTryScore(pieceCount(game), misses);
     try {
-      await submitAttempt(levelId, {
-        score: scored.score,
-        maxScore: scored.maxScore,
-        payload: { misses, stars: scored.stars },
+      const finished = await finishAttempt(attemptId, { answers });
+      setResult({
+        score: finished.score,
+        maxScore: finished.maxScore,
+        stars: finished.stars,
       });
-      setResult(scored);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save score");
-      setResult(scored);
     } finally {
       setBusy(false);
     }
@@ -118,7 +141,11 @@ export function GamePlayer({
         error={error}
         onRetry={() => {
           setResult(null);
+          setError(null);
           setNonce((n) => n + 1);
+          // Reload so a fresh server attempt is issued for the current revision.
+          router.refresh();
+          setAttemptId(attempt.id);
         }}
         onContinue={() => {
           router.push(`/learn/${moduleId}`);
@@ -145,6 +172,7 @@ export function GamePlayer({
           disabled={busy || Boolean(why)}
           onMiss={onMiss}
           onFinish={onFinish}
+          onEvaluate={onEvaluate}
           onHeartsEmpty={() => setEmpty(true)}
         />
       </GameFrame>
@@ -170,17 +198,24 @@ export function GameSwitch({
   disabled,
   onMiss,
   onFinish,
+  onEvaluate,
   onHeartsEmpty,
   onChange,
 }: {
-  game: GameContent;
+  game: GameContent | AssessmentGame;
   mode?: "play" | "build";
   disabled?: boolean;
   onMiss?: (
     why: WhyPayload | null,
     opts?: { hold?: boolean },
   ) => Promise<"ok" | "empty">;
-  onFinish?: (score: number, maxScore: number, misses: number) => void;
+  onFinish?: (
+    score: number,
+    maxScore: number,
+    misses: number,
+    answers?: FinishAnswers,
+  ) => void;
+  onEvaluate?: (event: AttemptEvent) => Promise<import("@jose/shared").EvaluateEventResult>;
   onHeartsEmpty?: () => void;
   onChange?: (game: GameContent) => void;
 }) {
@@ -193,7 +228,8 @@ export function GameSwitch({
           disabled={Boolean(disabled)}
           onMiss={onMiss}
           onFinish={onFinish}
-          onChange={onChange as ((g: typeof game) => void) | undefined}
+          onEvaluate={onEvaluate}
+          onChange={onChange as ((g: Extract<GameContent, { type: "quiz" }>) => void) | undefined}
         />
       );
     case "memory":
@@ -204,8 +240,9 @@ export function GameSwitch({
           disabled={Boolean(disabled)}
           onMiss={onMiss}
           onFinish={onFinish}
+          onEvaluate={onEvaluate}
           onHeartsEmpty={onHeartsEmpty}
-          onChange={onChange as ((g: typeof game) => void) | undefined}
+          onChange={onChange as ((g: Extract<GameContent, { type: "memory" }>) => void) | undefined}
         />
       );
     case "timeline":
@@ -216,7 +253,8 @@ export function GameSwitch({
           disabled={Boolean(disabled)}
           onMiss={onMiss}
           onFinish={onFinish}
-          onChange={onChange as ((g: typeof game) => void) | undefined}
+          onEvaluate={onEvaluate}
+          onChange={onChange as ((g: Extract<GameContent, { type: "timeline" }>) => void) | undefined}
         />
       );
     case "blank":
@@ -227,7 +265,8 @@ export function GameSwitch({
           disabled={Boolean(disabled)}
           onMiss={onMiss}
           onFinish={onFinish}
-          onChange={onChange as ((g: typeof game) => void) | undefined}
+          onEvaluate={onEvaluate}
+          onChange={onChange as ((g: Extract<GameContent, { type: "blank" }>) => void) | undefined}
         />
       );
     case "sort":
@@ -238,8 +277,17 @@ export function GameSwitch({
           disabled={Boolean(disabled)}
           onMiss={onMiss}
           onFinish={onFinish}
-          onChange={onChange as ((g: typeof game) => void) | undefined}
+          onEvaluate={onEvaluate}
+          onChange={onChange as ((g: Extract<GameContent, { type: "sort" }>) => void) | undefined}
         />
       );
   }
+}
+
+/** Practice / playtest helper — local scoring only, never writes grades. */
+export function localPracticeFinish(
+  game: GameContent,
+  misses: number,
+): { score: number; maxScore: number; stars: 1 | 2 | 3 } {
+  return firstTryScore(pieceCount(game), misses);
 }

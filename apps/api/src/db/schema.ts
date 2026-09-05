@@ -87,8 +87,15 @@ export const attempts = sqliteTable("attempts", {
   levelId: text("level_id")
     .notNull()
     .references(() => levels.id, { onDelete: "cascade" }),
+  contentRevision: text("content_revision").notNull().default(""),
+  mode: text("mode").notNull().default("assessment"),
+  status: text("status").notNull().default("finished"),
   score: integer("score").notNull(),
   maxScore: integer("max_score").notNull(),
+  stars: integer("stars"),
   payload: text("payload"),
+  secretJson: text("secret_json"),
+  eventsJson: text("events_json"),
   createdAt: integer("created_at").notNull(),
+  finishedAt: integer("finished_at"),
 });

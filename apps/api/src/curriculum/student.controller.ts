@@ -41,8 +41,19 @@ export class StudentController {
     return this.curriculum.recordMiss(id);
   }
 
+  /** Legacy client-scored posts are rejected. */
   @Post("levels/:id/attempts")
   attempt(@Param("id") id: string, @Body() body: unknown) {
     return this.curriculum.submitAttempt(id, body);
+  }
+
+  @Post("attempts/:attemptId/events")
+  evaluate(@Param("attemptId") attemptId: string, @Body() body: unknown) {
+    return this.curriculum.evaluateAttempt(attemptId, body);
+  }
+
+  @Post("attempts/:attemptId/finish")
+  finish(@Param("attemptId") attemptId: string, @Body() body: unknown) {
+    return this.curriculum.finishAttempt(attemptId, body);
   }
 }

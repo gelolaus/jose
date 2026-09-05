@@ -1,4 +1,6 @@
 import {
+  evaluateEventResultSchema,
+  finishAttemptResultSchema,
   missResponseSchema,
   modulesResponseSchema,
   pathResponseSchema,
@@ -131,6 +133,28 @@ export async function submitAttempt(
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+export async function evaluateAttempt(
+  attemptId: string,
+  event: import("@jose/shared").AttemptEvent,
+) {
+  const json = await apiFetch(`/attempts/${attemptId}/events`, {
+    method: "POST",
+    body: JSON.stringify(event),
+  });
+  return evaluateEventResultSchema.parse(json);
+}
+
+export async function finishAttempt(
+  attemptId: string,
+  body: { answers: import("@jose/shared").FinishAnswers },
+) {
+  const json = await apiFetch(`/attempts/${attemptId}/finish`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return finishAttemptResultSchema.parse(json);
 }
 
 export async function fetchTeachModules(): Promise<TeachModule[]> {

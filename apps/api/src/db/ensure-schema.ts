@@ -55,10 +55,17 @@ const STATEMENTS = [
     id TEXT PRIMARY KEY,
     learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
     level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+    content_revision TEXT NOT NULL DEFAULT '',
+    mode TEXT NOT NULL DEFAULT 'assessment',
+    status TEXT NOT NULL DEFAULT 'finished',
     score INTEGER NOT NULL,
     max_score INTEGER NOT NULL,
+    stars INTEGER,
     payload TEXT,
-    created_at INTEGER NOT NULL
+    secret_json TEXT,
+    events_json TEXT,
+    created_at INTEGER NOT NULL,
+    finished_at INTEGER
   )`,
 ];
 
@@ -68,6 +75,13 @@ export async function ensureSchema(client: Client) {
     await client.execute(sql);
   }
   await ensureColumn(client, "learners", "hearts_updated_at", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(client, "attempts", "content_revision", "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(client, "attempts", "mode", "TEXT NOT NULL DEFAULT 'assessment'");
+  await ensureColumn(client, "attempts", "status", "TEXT NOT NULL DEFAULT 'finished'");
+  await ensureColumn(client, "attempts", "stars", "INTEGER");
+  await ensureColumn(client, "attempts", "secret_json", "TEXT");
+  await ensureColumn(client, "attempts", "events_json", "TEXT");
+  await ensureColumn(client, "attempts", "finished_at", "INTEGER");
 }
 
 async function ensureColumn(

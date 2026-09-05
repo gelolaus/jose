@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { gameContentSchema, lessonContentSchema } from "./games";
+import {
+  assessmentGameSchema,
+  attemptInfoSchema,
+} from "./assessment";
+import { lessonContentSchema } from "./games";
 import {
   gameTypeSchema,
   hexColorSchema,
@@ -39,15 +43,21 @@ export const playLevelResponseSchema = z.object({
   level: playLevelMetaSchema,
   learner: learnerSchema,
   lesson: lessonContentSchema.optional(),
-  game: gameContentSchema.optional(),
+  /** Assessment delivery only — answer keys are stripped. */
+  game: assessmentGameSchema.optional(),
+  attempt: attemptInfoSchema.optional(),
   chest: z.object({ message: z.string().min(1) }).optional(),
 });
 
+/** @deprecated Client scores are no longer accepted for assessment finishes. */
 export const attemptBodySchema = z.object({
-  score: z.number().int().nonnegative(),
-  maxScore: z.number().int().nonnegative(),
+  score: z.number().int().nonnegative().optional(),
+  maxScore: z.number().int().nonnegative().optional(),
   payload: z.unknown().optional(),
-});
+}).refine(
+  (body) => body.score === undefined && body.maxScore === undefined,
+  { message: "Client scores are not accepted; finish the server-issued attempt instead" },
+);
 
 export const missResponseSchema = z.object({
   learner: learnerSchema,
