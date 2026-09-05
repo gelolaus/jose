@@ -60,6 +60,70 @@ const STATEMENTS = [
     payload TEXT,
     created_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    role TEXT NOT NULL DEFAULT 'student',
+    admission_email TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    suspended_at INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS external_identities (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL,
+    issuer TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    tenant_id TEXT,
+    oid TEXT,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    revoked_at INTEGER,
+    created_at INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS oauth_states (
+    state TEXT PRIMARY KEY,
+    nonce TEXT NOT NULL,
+    code_verifier TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    consumed_at INTEGER
+  )`,
+  `CREATE TABLE IF NOT EXISTS pending_admissions (
+    id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    issuer TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    tenant_id TEXT,
+    oid TEXT,
+    claimed_email TEXT,
+    candidate_email TEXT,
+    display_name TEXT,
+    status TEXT NOT NULL,
+    denial_reason TEXT,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    consumed_at INTEGER
+  )`,
+  `CREATE TABLE IF NOT EXISTS mailbox_verifications (
+    id TEXT PRIMARY KEY,
+    pending_admission_id TEXT NOT NULL REFERENCES pending_admissions(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    code_hash TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    last_sent_at INTEGER NOT NULL,
+    consumed_at INTEGER,
+    created_at INTEGER NOT NULL
+  )`,
 ];
 
 export async function ensureSchema(client: Client) {
@@ -68,6 +132,26 @@ export async function ensureSchema(client: Client) {
     await client.execute(sql);
   }
   await ensureColumn(client, "learners", "hearts_updated_at", "INTEGER NOT NULL DEFAULT 0");
+  await ensureIndex(
+    client,
+    "external_identities_provider_issuer_subject",
+    `CREATE UNIQUE INDEX IF NOT EXISTS external_identities_provider_issuer_subject
+      ON external_identities(provider, issuer, subject)`,
+  );
+  await ensureIndex(
+    client,
+    "sessions_token_hash",
+    `CREATE UNIQUE INDEX IF NOT EXISTS sessions_token_hash ON sessions(token_hash)`,
+  );
+  await ensureIndex(
+    client,
+    "users_admission_email",
+    `CREATE UNIQUE INDEX IF NOT EXISTS users_admission_email ON users(admission_email)`,
+  );
+}
+
+async function ensureIndex(client: Client, _name: string, sql: string) {
+  await client.execute(sql);
 }
 
 async function ensureColumn(

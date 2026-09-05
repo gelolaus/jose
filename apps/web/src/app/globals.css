@@ -263,3 +263,164 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* School login / admission surfaces */
+.jose-login {
+  position: relative;
+  isolation: isolate;
+  min-height: 100%;
+  overflow: auto;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background:
+    radial-gradient(circle at 20% 20%, rgb(56 189 248 / 28%), transparent 42%),
+    radial-gradient(circle at 80% 0%, rgb(245 197 24 / 35%), transparent 40%),
+    linear-gradient(160deg, #fff8ef 0%, #fde68a 45%, #e0f2fe 100%);
+}
+
+.jose-login__glow {
+  position: absolute;
+  inset: 10% 15%;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 35%);
+  filter: blur(40px);
+  z-index: -1;
+  animation: jose-float 5s ease-in-out infinite;
+}
+
+.jose-login__card {
+  width: min(34rem, 100%);
+  padding: 1.75rem 1.5rem 1.5rem;
+  border-radius: 1.5rem;
+  background: rgb(255 252 245 / 92%);
+  box-shadow: 0 18px 40px rgb(31 41 55 / 14%);
+  animation: jose-why-pop 0.4s ease-out;
+}
+
+.jose-login__brand {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #7c3aed;
+}
+
+.jose-login__card h1 {
+  margin: 0.15rem 0 0.5rem;
+  font-size: clamp(1.6rem, 4vw, 2rem);
+  color: #1f2937;
+}
+
+.jose-login__lead,
+.jose-login__hint,
+.jose-login__meta {
+  color: #4b5563;
+  line-height: 1.45;
+}
+
+.jose-login__lead {
+  margin: 0 0 1rem;
+}
+
+.jose-login__meta {
+  margin: 1rem 0 0;
+  font-size: 0.85rem;
+}
+
+.jose-login__banner {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+}
+
+.jose-login__banner--warn {
+  background: #fff1f2;
+  border: 1px solid #fb7185;
+}
+
+.jose-login__banner--ok {
+  background: #ecfdf5;
+  border: 1px solid #34d399;
+}
+
+.jose-login__banner strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.jose-login__banner p {
+  margin: 0.25rem 0;
+}
+
+.jose-login__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.jose-login__primary,
+.jose-login__secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  font-weight: 800;
+  text-decoration: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.jose-login__primary {
+  background: #7c3aed;
+  color: #fff;
+  box-shadow: 0 6px 0 #5b21b6;
+}
+
+.jose-login__primary:active {
+  transform: translateY(3px);
+  box-shadow: 0 3px 0 #5b21b6;
+}
+
+.jose-login__secondary {
+  background: #fff;
+  color: #5b21b6;
+  border: 2px solid #ddd6fe;
+}
+
+.jose-login__form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.jose-login__field {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 700;
+  color: #374151;
+}
+
+.jose-login__field input {
+  min-height: 2.75rem;
+  border-radius: 0.85rem;
+  border: 2px solid #e5e7eb;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  background: #fff;
+}
+
+.jose-login__presets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.jose-login__preset {
+  width: 100%;
+}

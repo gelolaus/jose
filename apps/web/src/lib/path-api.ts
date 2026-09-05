@@ -30,6 +30,7 @@ async function apiFetch(path: string, init?: RequestInit): Promise<unknown> {
   const res = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
     cache: "no-store",
+    credentials: "include",
     headers,
   });
   const json: unknown = await res.json().catch(() => null);

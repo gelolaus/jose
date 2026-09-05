@@ -38,6 +38,12 @@ export function ProfileShowcase({ path }: ProfileShowcaseProps) {
         </div>
         <div className="flex flex-col items-center gap-2 sm:flex-row">
           <Link
+            href="/login"
+            className="rounded-full bg-violet-600 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
+          >
+            School sign-in
+          </Link>
+          <Link
             href="/profile/edit"
             className="rounded-full bg-rose-500 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
           >

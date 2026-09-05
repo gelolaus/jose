@@ -92,3 +92,83 @@ export const attempts = sqliteTable("attempts", {
   payload: text("payload"),
   createdAt: integer("created_at").notNull(),
 });
+
+/** Application accounts. Email is admission metadata, never the primary key. */
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  role: text("role").notNull().default("student"),
+  admissionEmail: text("admission_email").notNull(),
+  displayName: text("display_name").notNull(),
+  suspendedAt: integer("suspended_at"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+/** Stable Microsoft (or other) provider keys bound to a Jose user. */
+export const externalIdentities = sqliteTable("external_identities", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(),
+  issuer: text("issuer").notNull(),
+  subject: text("subject").notNull(),
+  tenantId: text("tenant_id"),
+  oid: text("oid"),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const sessions = sqliteTable("sessions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  revokedAt: integer("revoked_at"),
+  createdAt: integer("created_at").notNull(),
+  lastSeenAt: integer("last_seen_at").notNull(),
+});
+
+/** Short-lived OAuth state + PKCE material (server-side only). */
+export const oauthStates = sqliteTable("oauth_states", {
+  state: text("state").primaryKey(),
+  nonce: text("nonce").notNull(),
+  codeVerifier: text("code_verifier").notNull(),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  consumedAt: integer("consumed_at"),
+});
+
+/** Pending Microsoft identity awaiting APC mailbox verification / admission. */
+export const pendingAdmissions = sqliteTable("pending_admissions", {
+  id: text("id").primaryKey(),
+  provider: text("provider").notNull(),
+  issuer: text("issuer").notNull(),
+  subject: text("subject").notNull(),
+  tenantId: text("tenant_id"),
+  oid: text("oid"),
+  claimedEmail: text("claimed_email"),
+  candidateEmail: text("candidate_email"),
+  displayName: text("display_name"),
+  status: text("status").notNull(),
+  denialReason: text("denial_reason"),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  consumedAt: integer("consumed_at"),
+});
+
+export const mailboxVerifications = sqliteTable("mailbox_verifications", {
+  id: text("id").primaryKey(),
+  pendingAdmissionId: text("pending_admission_id")
+    .notNull()
+    .references(() => pendingAdmissions.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  codeHash: text("code_hash").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  maxAttempts: integer("max_attempts").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  lastSentAt: integer("last_sent_at").notNull(),
+  consumedAt: integer("consumed_at"),
+  createdAt: integer("created_at").notNull(),
+});

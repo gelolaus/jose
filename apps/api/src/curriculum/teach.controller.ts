@@ -7,10 +7,14 @@ import {
   Patch,
   Post,
   Put,
+  UseGuards,
 } from "@nestjs/common";
+import { SessionAuthGuard } from "../auth/session.guard";
+import { TeacherRoleGuard } from "../auth/teacher-role.guard";
 import { CurriculumService } from "./curriculum.service";
 
 @Controller("teach")
+@UseGuards(SessionAuthGuard, TeacherRoleGuard)
 export class TeachController {
   constructor(private readonly curriculum: CurriculumService) {}
 
