@@ -6,12 +6,17 @@ import {
   createTeachSection,
   deleteTeachLevel,
   deleteTeachSection,
+  fetchPublishReadiness,
   fetchTeachModule,
   moveTeachLevel,
+  moveTeachSection,
   patchTeachModule,
   patchTeachSection,
+  publishTeachModule,
+  unpublishTeachModule,
+  ApiError,
 } from "@/lib/path-api";
-import type { GameType, TeachModuleDetail } from "@jose/shared";
+import type { GameType, PublishIssue, TeachModuleDetail } from "@jose/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -28,6 +33,7 @@ export function TeachModuleEditor({ initial }: { initial: TeachModuleDetail }) {
   const router = useRouter();
   const [mod, setMod] = useState(initial);
   const [error, setError] = useState<string | null>(null);
+  const [issues, setIssues] = useState<PublishIssue[]>([]);
   const [busy, setBusy] = useState(false);
 
   async function reload() {
@@ -46,6 +52,18 @@ export function TeachModuleEditor({ initial }: { initial: TeachModuleDetail }) {
         }
       />
       {error ? <p className="mb-4 text-sm font-bold text-rose-600">{error}</p> : null}
+      {issues.length > 0 ? (
+        <ul className="mb-4 space-y-1 rounded-2xl bg-rose-50 p-3 text-sm font-semibold text-rose-800">
+          {issues.map((issue) => (
+            <li key={`${issue.code}-${issue.path}`}>
+              <a href={`#${issue.levelId ?? issue.field ?? "module"}`} className="underline">
+                {issue.message}
+              </a>
+              <span className="ml-2 text-xs font-bold text-rose-500">{issue.path}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <ModuleFields
         mod={mod}
         busy={busy}
@@ -60,6 +78,42 @@ export function TeachModuleEditor({ initial }: { initial: TeachModuleDetail }) {
             setBusy(false);
           }
         }}
+        onPublish={async () => {
+          setBusy(true);
+          setError(null);
+          setIssues([]);
+          try {
+            await patchTeachModule(mod.id, { authorReviewed: true });
+            const result = await publishTeachModule(mod.id);
+            setMod(result.module);
+          } catch (err) {
+            if (err instanceof ApiError) {
+              const readiness = extractReadiness(err.payload);
+              if (readiness) setIssues([...readiness.blockers, ...readiness.warnings]);
+              setError(err.message);
+            } else {
+              setError(err instanceof Error ? err.message : "Publish failed");
+            }
+            try {
+              setIssues((await fetchPublishReadiness(mod.id)).blockers);
+            } catch {
+              // ignore
+            }
+          } finally {
+            setBusy(false);
+          }
+        }}
+        onUnpublish={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            setMod(await unpublishTeachModule(mod.id));
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Unpublish failed");
+          } finally {
+            setBusy(false);
+          }
+        }}
       />
       <div className="mt-8 space-y-6">
         {mod.sections.map((section) => (
@@ -70,6 +124,14 @@ export function TeachModuleEditor({ initial }: { initial: TeachModuleDetail }) {
             <SectionHeader
               section={section}
               canDelete={mod.sections.length > 1}
+              onMove={async (direction) => {
+                setError(null);
+                try {
+                  setMod(await moveTeachSection(section.id, { direction }));
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Section move failed");
+                }
+              }}
               onSave={async (patch) => {
                 setError(null);
                 try {
@@ -91,6 +153,7 @@ export function TeachModuleEditor({ initial }: { initial: TeachModuleDetail }) {
               {section.levels.map((level, index) => (
                 <li
                   key={level.id}
+                  id={level.id}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2.5"
                 >
                   <div>
@@ -105,7 +168,7 @@ export function TeachModuleEditor({ initial }: { initial: TeachModuleDetail }) {
                       type="button"
                       disabled={index === 0}
                       onClick={async () => {
-                        setMod(await moveTeachLevel(level.id, "up"));
+                        setMod(await moveTeachLevel(level.id, { direction: "up" }));
                       }}
                       className="rounded-full bg-white px-3 py-1 text-xs font-extrabold text-slate-600 ring-1 ring-black/10 disabled:opacity-40"
                     >
@@ -115,7 +178,7 @@ export function TeachModuleEditor({ initial }: { initial: TeachModuleDetail }) {
                       type="button"
                       disabled={index === section.levels.length - 1}
                       onClick={async () => {
-                        setMod(await moveTeachLevel(level.id, "down"));
+                        setMod(await moveTeachLevel(level.id, { direction: "down" }));
                       }}
                       className="rounded-full bg-white px-3 py-1 text-xs font-extrabold text-slate-600 ring-1 ring-black/10 disabled:opacity-40"
                     >
@@ -179,21 +242,27 @@ function ModuleFields({
   mod,
   busy,
   onSave,
+  onPublish,
+  onUnpublish,
 }: {
   mod: TeachModuleDetail;
   busy: boolean;
   onSave: (patch: Record<string, unknown>) => Promise<void>;
+  onPublish: () => Promise<void>;
+  onUnpublish: () => Promise<void>;
 }) {
   const [title, setTitle] = useState(mod.title);
   const [subtitle, setSubtitle] = useState(mod.subtitle);
   const [coverColor, setCoverColor] = useState(mod.coverColor);
+  const [objectives, setObjectives] = useState(mod.objectives ?? "");
 
   return (
     <form
+      id="module"
       className="space-y-3 rounded-[1.75rem] bg-white p-4 ring-1 ring-black/10 sm:p-5"
       onSubmit={(e) => {
         e.preventDefault();
-        void onSave({ title, subtitle, coverColor });
+        void onSave({ title, subtitle, coverColor, objectives });
       }}
     >
       <FieldLabel>Title</FieldLabel>
@@ -207,6 +276,14 @@ function ModuleFields({
         value={subtitle}
         onChange={(e) => setSubtitle(e.target.value)}
         className="w-full rounded-2xl bg-slate-50 px-4 py-3 font-bold ring-1 ring-black/10"
+      />
+      <FieldLabel>Objectives</FieldLabel>
+      <textarea
+        value={objectives}
+        onChange={(e) => setObjectives(e.target.value)}
+        rows={3}
+        className="w-full rounded-2xl bg-slate-50 px-4 py-3 font-bold ring-1 ring-black/10"
+        placeholder="What should learners understand after this module?"
       />
       <div className="flex flex-wrap gap-2">
         {COVER_COLORS.map((color) => (
@@ -227,16 +304,32 @@ function ModuleFields({
           disabled={busy}
           className="rounded-full bg-slate-800 px-4 py-2 text-sm font-extrabold text-white disabled:opacity-60"
         >
-          Save details
+          Save draft
         </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void onSave({ published: !mod.published })}
-          className="rounded-full bg-violet-100 px-4 py-2 text-sm font-extrabold text-violet-800"
-        >
-          {mod.published ? "Unpublish" : "Publish"}
-        </button>
+        {mod.published ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void onUnpublish()}
+            className="rounded-full bg-violet-100 px-4 py-2 text-sm font-extrabold text-violet-800"
+          >
+            Unpublish
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void onPublish()}
+            className="rounded-full bg-violet-100 px-4 py-2 text-sm font-extrabold text-violet-800"
+          >
+            Publish revision
+          </button>
+        )}
+        {mod.publishedRevisionId ? (
+          <p className="self-center text-xs font-bold text-slate-500">
+            Live revision: {mod.publishedRevisionId.slice(0, 8)}
+          </p>
+        ) : null}
       </div>
     </form>
   );
@@ -247,11 +340,13 @@ function SectionHeader({
   canDelete,
   onSave,
   onDelete,
+  onMove,
 }: {
   section: TeachModuleDetail["sections"][number];
   canDelete: boolean;
   onSave: (patch: Record<string, unknown>) => Promise<void>;
   onDelete: () => Promise<void>;
+  onMove: (direction: "up" | "down") => Promise<void>;
 }) {
   const [title, setTitle] = useState(section.title);
   const [subtitle, setSubtitle] = useState(section.subtitle);
@@ -267,6 +362,20 @@ function SectionHeader({
           onChange={(e) => setTitle(e.target.value)}
           className="min-w-0 flex-1 rounded-xl bg-slate-50 px-3 py-1.5 font-display text-xl font-semibold"
         />
+        <button
+          type="button"
+          onClick={() => void onMove("up")}
+          className="rounded-full bg-white px-3 py-1 text-xs font-extrabold text-slate-600 ring-1 ring-black/10"
+        >
+          Section up
+        </button>
+        <button
+          type="button"
+          onClick={() => void onMove("down")}
+          className="rounded-full bg-white px-3 py-1 text-xs font-extrabold text-slate-600 ring-1 ring-black/10"
+        >
+          Section down
+        </button>
         {canDelete ? (
           <button
             type="button"
@@ -291,6 +400,20 @@ function SectionHeader({
       </button>
     </div>
   );
+}
+
+function extractReadiness(payload: unknown) {
+  if (!payload || typeof payload !== "object") return null;
+  const message = (payload as { message?: unknown }).message;
+  if (message && typeof message === "object" && message && "readiness" in message) {
+    return (message as { readiness: { blockers: PublishIssue[]; warnings: PublishIssue[] } })
+      .readiness;
+  }
+  if ("readiness" in payload) {
+    return (payload as { readiness: { blockers: PublishIssue[]; warnings: PublishIssue[] } })
+      .readiness;
+  }
+  return null;
 }
 
 function AddLevel({

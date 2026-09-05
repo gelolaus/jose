@@ -32,8 +32,8 @@ export class StudentController {
   }
 
   @Post("levels/:id/complete")
-  complete(@Param("id") id: string) {
-    return this.curriculum.completeLevel(id);
+  complete(@Param("id") id: string, @Body() body: unknown) {
+    return this.curriculum.completeLevel(id, body);
   }
 
   @Post("levels/:id/miss")

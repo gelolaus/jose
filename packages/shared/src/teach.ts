@@ -12,6 +12,12 @@ export const teachModuleSchema = z.object({
   sortOrder: z.number().int(),
   sectionCount: z.number().int().nonnegative(),
   levelCount: z.number().int().nonnegative(),
+  ownerId: z.string().min(1).nullable(),
+  objectives: z.string().nullable(),
+  authorReviewedAt: z.number().int().nullable(),
+  publishedRevisionId: z.string().min(1).nullable(),
+  archivedAt: z.number().int().nullable(),
+  trashedAt: z.number().int().nullable(),
 });
 
 export const teachLevelSchema = z.object({
@@ -45,7 +51,8 @@ export const patchModuleBodySchema = z.object({
   title: z.string().trim().min(1).max(80).optional(),
   subtitle: z.string().trim().min(1).max(160).optional(),
   coverColor: hexColorSchema.optional(),
-  published: z.boolean().optional(),
+  objectives: z.string().trim().max(2000).nullable().optional(),
+  authorReviewed: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
 });
 
@@ -77,8 +84,39 @@ export const patchLevelBodySchema = z.object({
   title: z.string().trim().min(1).max(80).optional(),
 });
 
-export const moveBodySchema = z.object({
-  direction: z.enum(["up", "down"]),
+export const moveBodySchema = z
+  .object({
+    direction: z.enum(["up", "down"]).optional(),
+    targetSectionId: z.string().min(1).optional(),
+    beforeLevelId: z.string().min(1).nullable().optional(),
+    index: z.number().int().nonnegative().optional(),
+  })
+  .refine(
+    (body) =>
+      body.direction !== undefined ||
+      body.targetSectionId !== undefined ||
+      body.beforeLevelId !== undefined ||
+      body.index !== undefined,
+    { message: "Provide a move direction, target section, beforeLevelId, or index" },
+  );
+
+export const moveSectionBodySchema = z
+  .object({
+    direction: z.enum(["up", "down"]).optional(),
+    index: z.number().int().nonnegative().optional(),
+  })
+  .refine((body) => body.direction !== undefined || body.index !== undefined, {
+    message: "Provide a direction or index",
+  });
+
+export const bulkMoveBodySchema = z.object({
+  levelIds: z.array(z.string().min(1)).min(1).max(50),
+  targetSectionId: z.string().min(1),
+  beforeLevelId: z.string().min(1).nullable().optional(),
+});
+
+export const permanentDeleteBodySchema = z.object({
+  confirm: z.literal(true),
 });
 
 export const putLessonBodySchema = z.object({

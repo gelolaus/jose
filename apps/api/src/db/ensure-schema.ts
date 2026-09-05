@@ -1,4 +1,5 @@
 import type { Client } from "@libsql/client";
+import { runMigrations } from "./migrate";
 
 const STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS learners (
@@ -47,14 +48,14 @@ const STATEMENTS = [
   )`,
   `CREATE TABLE IF NOT EXISTS learner_progress (
     learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
-    level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+    level_id TEXT NOT NULL,
     completed_at INTEGER NOT NULL,
     PRIMARY KEY (learner_id, level_id)
   )`,
   `CREATE TABLE IF NOT EXISTS attempts (
     id TEXT PRIMARY KEY,
     learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
-    level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+    level_id TEXT NOT NULL,
     score INTEGER NOT NULL,
     max_score INTEGER NOT NULL,
     payload TEXT,
@@ -68,6 +69,17 @@ export async function ensureSchema(client: Client) {
     await client.execute(sql);
   }
   await ensureColumn(client, "learners", "hearts_updated_at", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(client, "modules", "owner_id", "TEXT");
+  await ensureColumn(client, "modules", "objectives", "TEXT");
+  await ensureColumn(client, "modules", "author_reviewed_at", "INTEGER");
+  await ensureColumn(client, "modules", "published_revision_id", "TEXT");
+  await ensureColumn(client, "modules", "archived_at", "INTEGER");
+  await ensureColumn(client, "modules", "trashed_at", "INTEGER");
+  await ensureColumn(client, "sections", "archived_at", "INTEGER");
+  await ensureColumn(client, "levels", "archived_at", "INTEGER");
+  await ensureColumn(client, "attempts", "content_revision_id", "TEXT");
+  await ensureColumn(client, "learner_progress", "content_revision_id", "TEXT");
+  await runMigrations(client);
 }
 
 async function ensureColumn(

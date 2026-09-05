@@ -29,12 +29,14 @@ export function GamePlayer({
   title,
   game,
   hearts: startHearts,
+  contentRevisionId,
 }: {
   levelId: string;
   moduleId: string;
   title: string;
   game: GameContent;
   hearts: number;
+  contentRevisionId?: string | null;
 }) {
   const router = useRouter();
   const [hearts, setHearts] = useState(startHearts);
@@ -94,6 +96,7 @@ export function GamePlayer({
         score: scored.score,
         maxScore: scored.maxScore,
         payload: { misses, stars: scored.stars },
+        contentRevisionId: contentRevisionId ?? undefined,
       });
       setResult(scored);
     } catch (err) {

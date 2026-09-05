@@ -81,6 +81,7 @@ export default async function PlayLevelPage({ params }: Props) {
           moduleId={moduleId}
           title={data.level.title}
           lesson={data.lesson}
+          contentRevisionId={data.contentRevisionId}
         />
       ) : null}
       {data.level.kind === "game" && data.game ? (
@@ -90,6 +91,7 @@ export default async function PlayLevelPage({ params }: Props) {
           title={data.level.title}
           game={data.game}
           hearts={data.learner.hearts}
+          contentRevisionId={data.contentRevisionId}
         />
       ) : null}
       {data.level.kind === "chest" && data.chest ? (

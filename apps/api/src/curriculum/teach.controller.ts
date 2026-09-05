@@ -7,85 +7,206 @@ import {
   Patch,
   Post,
   Put,
+  UseGuards,
 } from "@nestjs/common";
+import type { AuthUser } from "@jose/shared";
+import { AuthGuard, CurrentUser, requireTeacherOrAdmin } from "../auth/auth.guards";
 import { CurriculumService } from "./curriculum.service";
 
 @Controller("teach")
+@UseGuards(AuthGuard)
 export class TeachController {
   constructor(private readonly curriculum: CurriculumService) {}
 
   @Get("modules")
-  list() {
+  list(@CurrentUser() user: AuthUser) {
+    requireTeacherOrAdmin(user);
     return this.curriculum.listTeachModules();
   }
 
   @Post("modules")
-  create(@Body() body: unknown) {
-    return this.curriculum.createModule(body);
+  create(@CurrentUser() user: AuthUser, @Body() body: unknown) {
+    requireTeacherOrAdmin(user);
+    return this.curriculum.createModule(body, user);
   }
 
   @Get("modules/:id")
-  get(@Param("id") id: string) {
+  get(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    requireTeacherOrAdmin(user);
     return this.curriculum.getTeachModule(id);
   }
 
   @Patch("modules/:id")
-  patch(@Param("id") id: string, @Body() body: unknown) {
-    return this.curriculum.patchModule(id, body);
+  patch(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    requireTeacherOrAdmin(user);
+    return this.curriculum.patchModule(id, body, user);
   }
 
   @Delete("modules/:id")
-  remove(@Param("id") id: string) {
-    return this.curriculum.deleteModule(id);
+  remove(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    requireTeacherOrAdmin(user);
+    return this.curriculum.deleteModule(id, user);
+  }
+
+  @Post("modules/:id/restore")
+  restore(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    requireTeacherOrAdmin(user);
+    return this.curriculum.restoreModule(id, user);
+  }
+
+  @Post("modules/:id/permanent-delete")
+  permanentDelete(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    requireTeacherOrAdmin(user);
+    return this.curriculum.permanentDeleteModule(id, body, user);
+  }
+
+  @Get("modules/:id/readiness")
+  readiness(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    requireTeacherOrAdmin(user);
+    return this.curriculum.getPublishReadiness(id);
+  }
+
+  @Post("modules/:id/publish")
+  publish(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    requireTeacherOrAdmin(user);
+    return this.curriculum.publishModule(id, body, user);
+  }
+
+  @Post("modules/:id/unpublish")
+  unpublish(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    requireTeacherOrAdmin(user);
+    return this.curriculum.unpublishModule(id, user);
+  }
+
+  @Get("modules/:id/revisions")
+  revisions(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    requireTeacherOrAdmin(user);
+    return this.curriculum.listRevisions(id);
+  }
+
+  @Post("modules/:id/revisions/:revisionId/rollback")
+  rollback(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Param("revisionId") revisionId: string,
+  ) {
+    requireTeacherOrAdmin(user);
+    return this.curriculum.rollbackModule(id, revisionId, user);
   }
 
   @Post("modules/:id/sections")
-  addSection(@Param("id") id: string, @Body() body: unknown) {
+  addSection(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    requireTeacherOrAdmin(user);
     return this.curriculum.createSection(id, body);
   }
 
   @Patch("sections/:id")
-  patchSection(@Param("id") id: string, @Body() body: unknown) {
+  patchSection(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    requireTeacherOrAdmin(user);
     return this.curriculum.patchSection(id, body);
   }
 
   @Delete("sections/:id")
-  deleteSection(@Param("id") id: string) {
-    return this.curriculum.deleteSection(id);
+  deleteSection(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    requireTeacherOrAdmin(user);
+    return this.curriculum.deleteSection(id, user);
+  }
+
+  @Post("sections/:id/move")
+  moveSection(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    requireTeacherOrAdmin(user);
+    return this.curriculum.moveSection(id, body, user);
   }
 
   @Post("sections/:id/levels")
-  addLevel(@Param("id") id: string, @Body() body: unknown) {
+  addLevel(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    requireTeacherOrAdmin(user);
     return this.curriculum.createLevel(id, body);
   }
 
   @Get("levels/:id")
-  getLevel(@Param("id") id: string) {
+  getLevel(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    requireTeacherOrAdmin(user);
     return this.curriculum.getTeachLevel(id);
   }
 
   @Patch("levels/:id")
-  patchLevel(@Param("id") id: string, @Body() body: unknown) {
+  patchLevel(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    requireTeacherOrAdmin(user);
     return this.curriculum.patchLevel(id, body);
   }
 
   @Delete("levels/:id")
-  deleteLevel(@Param("id") id: string) {
-    return this.curriculum.deleteLevel(id);
+  deleteLevel(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    requireTeacherOrAdmin(user);
+    return this.curriculum.deleteLevel(id, user);
   }
 
   @Post("levels/:id/move")
-  move(@Param("id") id: string, @Body() body: unknown) {
-    return this.curriculum.moveLevel(id, body);
+  move(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    requireTeacherOrAdmin(user);
+    return this.curriculum.moveLevel(id, body, user);
+  }
+
+  @Post("levels/bulk-move")
+  bulkMove(@CurrentUser() user: AuthUser, @Body() body: unknown) {
+    requireTeacherOrAdmin(user);
+    return this.curriculum.bulkMoveLevels(body, user);
   }
 
   @Put("levels/:id/lesson")
-  putLesson(@Param("id") id: string, @Body() body: unknown) {
+  putLesson(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    requireTeacherOrAdmin(user);
     return this.curriculum.putLesson(id, body);
   }
 
   @Put("levels/:id/game")
-  putGame(@Param("id") id: string, @Body() body: unknown) {
+  putGame(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    requireTeacherOrAdmin(user);
     return this.curriculum.putGame(id, body);
   }
 }

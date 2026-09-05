@@ -41,12 +41,14 @@ export const playLevelResponseSchema = z.object({
   lesson: lessonContentSchema.optional(),
   game: gameContentSchema.optional(),
   chest: z.object({ message: z.string().min(1) }).optional(),
+  contentRevisionId: z.string().min(1).nullable().optional(),
 });
 
 export const attemptBodySchema = z.object({
   score: z.number().int().nonnegative(),
   maxScore: z.number().int().nonnegative(),
   payload: z.unknown().optional(),
+  contentRevisionId: z.string().min(1).optional(),
 });
 
 export const missResponseSchema = z.object({

@@ -1,5 +1,11 @@
-import { DEMO_LEARNER_ID, emptyGameContent, type GameContent } from "@jose/shared";
-import { and, eq, gte } from "drizzle-orm";
+import {
+  DEMO_LEARNER_ID,
+  DEMO_TEACHER_ID,
+  emptyGameContent,
+  type GameContent,
+} from "@jose/shared";
+import { and, eq, gte, isNull } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import type { JoseDb } from "./database.service";
 import {
   gameContent,
@@ -7,6 +13,7 @@ import {
   learnerProgress,
   lessonContent,
   levels,
+  moduleRevisions,
   modules,
   sections,
 } from "./schema";
@@ -421,14 +428,31 @@ function game(
 export async function seedIfEmpty(db: JoseDb) {
   const existing = await db.select({ id: modules.id }).from(modules).limit(1);
   if (existing.length === 0) {
-    await db.insert(learners).values({
-      id: DEMO_LEARNER_ID,
-      displayName: "Explorer",
-      streak: 3,
-      hearts: 5,
-      heartsUpdatedAt: now,
-      xp: 120,
-    });
+    const [learner] = await db
+      .select()
+      .from(learners)
+      .where(eq(learners.id, DEMO_LEARNER_ID));
+    if (!learner) {
+      await db.insert(learners).values({
+        id: DEMO_LEARNER_ID,
+        displayName: "Explorer",
+        streak: 3,
+        hearts: 5,
+        heartsUpdatedAt: now,
+        xp: 120,
+      });
+    } else {
+      await db
+        .update(learners)
+        .set({
+          displayName: "Explorer",
+          streak: 3,
+          hearts: 5,
+          heartsUpdatedAt: now,
+          xp: 120,
+        })
+        .where(eq(learners.id, DEMO_LEARNER_ID));
+    }
 
     await insertModule(db, {
       id: "rizal",
@@ -564,6 +588,7 @@ He boarded in Manila, wrote poems for school programs, and finished as one of th
 
   await ensureSeededGames(db);
   await ensureAteneoDays(db);
+  await ensurePublishedRevisions(db);
 }
 
 const EXTRAS: {
@@ -722,6 +747,99 @@ He boarded in Manila, wrote poems for school programs, and finished as one of th
   });
 }
 
+
+async function ensurePublishedRevisions(db: JoseDb) {
+  const rows = await db.select().from(modules);
+  for (const mod of rows) {
+    if (!mod.published || mod.publishedRevisionId) continue;
+    const sectionRows = await db
+      .select()
+      .from(sections)
+      .where(and(eq(sections.moduleId, mod.id), isNull(sections.archivedAt)));
+    sectionRows.sort((a, b) => a.sortOrder - b.sortOrder);
+    const sectionsSnap = [];
+    for (const section of sectionRows) {
+      const levelRows = await db
+        .select()
+        .from(levels)
+        .where(and(eq(levels.sectionId, section.id), isNull(levels.archivedAt)));
+      levelRows.sort((a, b) => a.sortOrder - b.sortOrder);
+      const levelsSnap = [];
+      for (const level of levelRows) {
+        let lesson = null;
+        let game = null;
+        if (level.kind === "lesson") {
+          const [content] = await db
+            .select()
+            .from(lessonContent)
+            .where(eq(lessonContent.levelId, level.id));
+          lesson = {
+            markdown: content?.markdown ?? "",
+            youtubeVideoId: content?.youtubeVideoId ?? null,
+          };
+        }
+        if (level.kind === "game") {
+          const [content] = await db
+            .select()
+            .from(gameContent)
+            .where(eq(gameContent.levelId, level.id));
+          game = JSON.parse(content?.json ?? "{}");
+        }
+        levelsSnap.push({
+          id: level.id,
+          title: level.title,
+          kind: level.kind,
+          gameType: level.gameType,
+          sortOrder: level.sortOrder,
+          lesson,
+          game,
+        });
+      }
+      sectionsSnap.push({
+        id: section.id,
+        title: section.title,
+        subtitle: section.subtitle,
+        themeColor: section.themeColor,
+        sortOrder: section.sortOrder,
+        levels: levelsSnap,
+      });
+    }
+    const revisionId = randomUUID();
+    await db.insert(moduleRevisions).values({
+      id: revisionId,
+      moduleId: mod.id,
+      revisionNumber: 1,
+      snapshotJson: JSON.stringify({
+        module: {
+          id: mod.id,
+          title: mod.title,
+          subtitle: mod.subtitle,
+          coverColor: mod.coverColor,
+          objectives:
+            mod.objectives ??
+            "Understand key events, people, and writings from this chapter.",
+        },
+        sections: sectionsSnap,
+      }),
+      createdAt: now,
+      createdBy: DEMO_TEACHER_ID,
+      publishedAt: now,
+      note: "Seeded revision",
+    });
+    await db
+      .update(modules)
+      .set({
+        publishedRevisionId: revisionId,
+        objectives:
+          mod.objectives ??
+          "Understand key events, people, and writings from this chapter.",
+        authorReviewedAt: mod.authorReviewedAt ?? now,
+        ownerId: mod.ownerId ?? DEMO_TEACHER_ID,
+      })
+      .where(eq(modules.id, mod.id));
+  }
+}
+
 async function insertModule(
   db: JoseDb,
   input: {
@@ -751,6 +869,12 @@ async function insertModule(
     featured: input.featured,
     createdAt: now,
     updatedAt: now,
+    ownerId: DEMO_TEACHER_ID,
+    objectives: "Understand key events, people, and writings from this chapter.",
+    authorReviewedAt: now,
+    publishedRevisionId: null,
+    archivedAt: null,
+    trashedAt: null,
   });
 
   for (const [sIndex, section] of input.sections.entries()) {

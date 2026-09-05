@@ -58,8 +58,8 @@ describe("CurriculumService", () => {
     expect(play.game?.type).toBe("quiz");
   });
 
-  it("refuses to delete the featured module", async () => {
-    await expect(service.deleteModule("rizal")).rejects.toThrow(/cannot be deleted/i);
+  it("refuses to archive the featured module", async () => {
+    await expect(service.deleteModule("rizal")).rejects.toThrow(/cannot be archived/i);
   });
 
   it("spends a heart on a miss and refills after a lesson", async () => {

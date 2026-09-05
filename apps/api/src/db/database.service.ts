@@ -6,6 +6,7 @@ import { dirname, resolve } from "node:path";
 import * as schema from "./schema";
 import { ensureSchema } from "./ensure-schema";
 import { seedIfEmpty } from "./seed";
+import { ensureBootstrapUsers } from "./bootstrap-users";
 
 export type JoseDb = LibSQLDatabase<typeof schema>;
 
@@ -25,6 +26,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     this.client = createClient({ url });
     this.db = drizzle(this.client, { schema });
     await ensureSchema(this.client);
+    await ensureBootstrapUsers(this.db);
     await seedIfEmpty(this.db);
   }
 

@@ -5,3 +5,7 @@ export * from "./games";
 export * from "./hearts";
 export * from "./modules";
 export * from "./teach";
+export * from "./auth";
+export * from "./publish";
+export * from "./classroom";
+export * from "./revisions";

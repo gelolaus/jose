@@ -1,14 +1,20 @@
 import {
+  DEMO_LEARNER_ID,
+  DEMO_TEACHER_ID,
+  JOSE_USER_HEADER,
   missResponseSchema,
   modulesResponseSchema,
   pathResponseSchema,
   playLevelResponseSchema,
+  publishReadinessSchema,
+  studentAssignmentSchema,
   teachLevelDetailSchema,
   teachModuleDetailSchema,
   teachModuleSchema,
   type ModulesResponse,
   type PathResponse,
   type PlayLevelResponse,
+  type PublishReadiness,
   type TeachLevelDetail,
   type TeachModule,
   type TeachModuleDetail,
@@ -18,6 +24,14 @@ const DEFAULT_API = "http://localhost:3001";
 
 export function getApiBaseUrl() {
   return process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || DEFAULT_API;
+}
+
+function teachHeaders(): Record<string, string> {
+  return { [JOSE_USER_HEADER]: DEMO_TEACHER_ID };
+}
+
+function studentHeaders(): Record<string, string> {
+  return { [JOSE_USER_HEADER]: DEMO_LEARNER_ID };
 }
 
 async function apiFetch(path: string, init?: RequestInit): Promise<unknown> {
@@ -35,7 +49,7 @@ async function apiFetch(path: string, init?: RequestInit): Promise<unknown> {
   const json: unknown = await res.json().catch(() => null);
   if (!res.ok) {
     const message = extractApiMessage(json) ?? `API returned ${res.status}`;
-    throw new ApiError(message, res.status, extractApiCode(json));
+    throw new ApiError(message, res.status, extractApiCode(json), json);
   }
   return json;
 }
@@ -45,6 +59,7 @@ export class ApiError extends Error {
     message: string,
     readonly status: number,
     readonly code?: string,
+    readonly payload?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
@@ -111,8 +126,14 @@ export async function fetchPlayLevel(
   }
 }
 
-export async function completeLevel(levelId: string) {
-  return apiFetch(`/levels/${levelId}/complete`, { method: "POST", body: "{}" });
+export async function completeLevel(
+  levelId: string,
+  body?: { contentRevisionId?: string | null },
+) {
+  return apiFetch(`/levels/${levelId}/complete`, {
+    method: "POST",
+    body: JSON.stringify(body ?? {}),
+  });
 }
 
 export async function recordMiss(levelId: string) {
@@ -125,7 +146,12 @@ export async function recordMiss(levelId: string) {
 
 export async function submitAttempt(
   levelId: string,
-  body: { score: number; maxScore: number; payload?: unknown },
+  body: {
+    score: number;
+    maxScore: number;
+    payload?: unknown;
+    contentRevisionId?: string | null;
+  },
 ) {
   return apiFetch(`/levels/${levelId}/attempts`, {
     method: "POST",
@@ -134,12 +160,12 @@ export async function submitAttempt(
 }
 
 export async function fetchTeachModules(): Promise<TeachModule[]> {
-  const json = await apiFetch("/teach/modules");
+  const json = await apiFetch("/teach/modules", { headers: teachHeaders() });
   return teachModuleSchema.array().parse(json);
 }
 
 export async function fetchTeachModule(id: string): Promise<TeachModuleDetail> {
-  const json = await apiFetch(`/teach/modules/${id}`);
+  const json = await apiFetch(`/teach/modules/${id}`, { headers: teachHeaders() });
   return teachModuleDetailSchema.parse(json);
 }
 
@@ -151,6 +177,7 @@ export async function createTeachModule(body: {
   const json = await apiFetch("/teach/modules", {
     method: "POST",
     body: JSON.stringify(body),
+    headers: teachHeaders(),
   });
   return teachModuleDetailSchema.parse(json);
 }
@@ -162,12 +189,36 @@ export async function patchTeachModule(
   const json = await apiFetch(`/teach/modules/${id}`, {
     method: "PATCH",
     body: JSON.stringify(body),
+    headers: teachHeaders(),
   });
   return teachModuleDetailSchema.parse(json);
 }
 
 export async function deleteTeachModule(id: string) {
-  await apiFetch(`/teach/modules/${id}`, { method: "DELETE" });
+  await apiFetch(`/teach/modules/${id}`, { method: "DELETE", headers: teachHeaders() });
+}
+
+export async function fetchPublishReadiness(id: string): Promise<PublishReadiness> {
+  const json = await apiFetch(`/teach/modules/${id}/readiness`, { headers: teachHeaders() });
+  return publishReadinessSchema.parse(json);
+}
+
+export async function publishTeachModule(id: string) {
+  const json = await apiFetch(`/teach/modules/${id}/publish`, {
+    method: "POST",
+    body: JSON.stringify({ authorReviewed: true }),
+    headers: teachHeaders(),
+  });
+  return json as { module: TeachModuleDetail };
+}
+
+export async function unpublishTeachModule(id: string): Promise<TeachModuleDetail> {
+  const json = await apiFetch(`/teach/modules/${id}/unpublish`, {
+    method: "POST",
+    body: "{}",
+    headers: teachHeaders(),
+  });
+  return teachModuleDetailSchema.parse(json);
 }
 
 export async function createTeachSection(
@@ -177,6 +228,7 @@ export async function createTeachSection(
   const json = await apiFetch(`/teach/modules/${moduleId}/sections`, {
     method: "POST",
     body: JSON.stringify(body),
+    headers: teachHeaders(),
   });
   return teachModuleDetailSchema.parse(json);
 }
@@ -188,12 +240,16 @@ export async function patchTeachSection(
   const json = await apiFetch(`/teach/sections/${id}`, {
     method: "PATCH",
     body: JSON.stringify(body),
+    headers: teachHeaders(),
   });
   return teachModuleDetailSchema.parse(json);
 }
 
 export async function deleteTeachSection(id: string) {
-  const json = await apiFetch(`/teach/sections/${id}`, { method: "DELETE" });
+  const json = await apiFetch(`/teach/sections/${id}`, {
+    method: "DELETE",
+    headers: teachHeaders(),
+  });
   return teachModuleDetailSchema.parse(json);
 }
 
@@ -204,12 +260,13 @@ export async function createTeachLevel(
   const json = await apiFetch(`/teach/sections/${sectionId}/levels`, {
     method: "POST",
     body: JSON.stringify(body),
+    headers: teachHeaders(),
   });
   return teachLevelDetailSchema.parse(json);
 }
 
 export async function fetchTeachLevel(id: string): Promise<TeachLevelDetail> {
-  const json = await apiFetch(`/teach/levels/${id}`);
+  const json = await apiFetch(`/teach/levels/${id}`, { headers: teachHeaders() });
   return teachLevelDetailSchema.parse(json);
 }
 
@@ -217,18 +274,35 @@ export async function patchTeachLevel(id: string, body: { title?: string }) {
   const json = await apiFetch(`/teach/levels/${id}`, {
     method: "PATCH",
     body: JSON.stringify(body),
+    headers: teachHeaders(),
   });
   return teachLevelDetailSchema.parse(json);
 }
 
 export async function deleteTeachLevel(id: string) {
-  await apiFetch(`/teach/levels/${id}`, { method: "DELETE" });
+  await apiFetch(`/teach/levels/${id}`, { method: "DELETE", headers: teachHeaders() });
 }
 
-export async function moveTeachLevel(id: string, direction: "up" | "down") {
+export async function moveTeachLevel(
+  id: string,
+  body: { direction?: "up" | "down"; targetSectionId?: string; index?: number },
+) {
   const json = await apiFetch(`/teach/levels/${id}/move`, {
     method: "POST",
-    body: JSON.stringify({ direction }),
+    body: JSON.stringify(body),
+    headers: teachHeaders(),
+  });
+  return teachModuleDetailSchema.parse(json);
+}
+
+export async function moveTeachSection(
+  id: string,
+  body: { direction?: "up" | "down"; index?: number },
+) {
+  const json = await apiFetch(`/teach/sections/${id}/move`, {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: teachHeaders(),
   });
   return teachModuleDetailSchema.parse(json);
 }
@@ -240,6 +314,7 @@ export async function putTeachLesson(
   const json = await apiFetch(`/teach/levels/${id}/lesson`, {
     method: "PUT",
     body: JSON.stringify(body),
+    headers: teachHeaders(),
   });
   return teachLevelDetailSchema.parse(json);
 }
@@ -248,8 +323,14 @@ export async function putTeachGame(id: string, body: unknown) {
   const json = await apiFetch(`/teach/levels/${id}/game`, {
     method: "PUT",
     body: JSON.stringify(body),
+    headers: teachHeaders(),
   });
   return teachLevelDetailSchema.parse(json);
+}
+
+export async function fetchMyAssignments() {
+  const json = await apiFetch("/assignments/mine", { headers: studentHeaders() });
+  return studentAssignmentSchema.array().parse(json);
 }
 
 export function findNode(path: PathResponse, nodeId: string) {
