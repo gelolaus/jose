@@ -1,6 +1,5 @@
-import { TeachLevelEditor } from "@/components/teach-level-editor";
-import { fetchTeachLevel, isNotFoundError } from "@/lib/path-api";
-import { notFound } from "next/navigation";
+import { fetchTeachModule, isNotFoundError } from "@/lib/path-api";
+import { notFound, redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -8,12 +7,11 @@ type Props = { params: Promise<{ moduleId: string; levelId: string }> };
 
 export default async function TeachLevelPage({ params }: Props) {
   const { moduleId, levelId } = await params;
-  let initial: Awaited<ReturnType<typeof fetchTeachLevel>>;
   try {
-    initial = await fetchTeachLevel(levelId);
+    await fetchTeachModule(moduleId);
   } catch (error) {
     if (isNotFoundError(error)) notFound();
     throw error;
   }
-  return <TeachLevelEditor moduleId={moduleId} initial={initial} />;
+  redirect(`/teach/modules/${moduleId}?level=${encodeURIComponent(levelId)}`);
 }

@@ -18,7 +18,8 @@ const STATEMENTS = [
     published INTEGER NOT NULL DEFAULT 0,
     featured INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
+    updated_at INTEGER NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0
   )`,
   `CREATE TABLE IF NOT EXISTS sections (
     id TEXT PRIMARY KEY,
@@ -34,16 +35,29 @@ const STATEMENTS = [
     title TEXT NOT NULL,
     kind TEXT NOT NULL,
     game_type TEXT,
-    sort_order INTEGER NOT NULL
+    sort_order INTEGER NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0
   )`,
   `CREATE TABLE IF NOT EXISTS lesson_content (
     level_id TEXT PRIMARY KEY REFERENCES levels(id) ON DELETE CASCADE,
     markdown TEXT NOT NULL,
-    youtube_video_id TEXT
+    youtube_video_id TEXT,
+    blocks_json TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS game_content (
     level_id TEXT PRIMARY KEY REFERENCES levels(id) ON DELETE CASCADE,
     json TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS teach_assets (
+    id TEXT PRIMARY KEY,
+    module_id TEXT NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    mime TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    alt TEXT NOT NULL,
+    attribution TEXT,
+    data_base64 TEXT NOT NULL,
+    created_at INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS learner_progress (
     learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
@@ -68,6 +82,9 @@ export async function ensureSchema(client: Client) {
     await client.execute(sql);
   }
   await ensureColumn(client, "learners", "hearts_updated_at", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(client, "modules", "revision", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(client, "levels", "revision", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(client, "lesson_content", "blocks_json", "TEXT");
 }
 
 async function ensureColumn(
