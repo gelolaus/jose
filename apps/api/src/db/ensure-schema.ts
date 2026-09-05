@@ -1,6 +1,15 @@
 import type { Client } from "@libsql/client";
 
 const STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS accounts (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'student',
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS learners (
     id TEXT PRIMARY KEY,
     display_name TEXT NOT NULL,
@@ -17,8 +26,16 @@ const STATEMENTS = [
     sort_order INTEGER NOT NULL,
     published INTEGER NOT NULL DEFAULT 0,
     featured INTEGER NOT NULL DEFAULT 0,
+    owner_account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS module_collaborators (
+    module_id TEXT NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    granted_by_account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (module_id, account_id)
   )`,
   `CREATE TABLE IF NOT EXISTS sections (
     id TEXT PRIMARY KEY,
@@ -68,6 +85,12 @@ export async function ensureSchema(client: Client) {
     await client.execute(sql);
   }
   await ensureColumn(client, "learners", "hearts_updated_at", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(
+    client,
+    "modules",
+    "owner_account_id",
+    "TEXT REFERENCES accounts(id) ON DELETE SET NULL",
+  );
 }
 
 async function ensureColumn(

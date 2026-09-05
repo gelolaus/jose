@@ -9,6 +9,7 @@ import {
   highlightSectionId,
   sectionProgress,
 } from "@/lib/profile-derived";
+import { useJoseAccount } from "@/lib/use-jose-account";
 import type { PathResponse } from "@jose/shared";
 import { Flame, Heart, Lock, Trophy, Zap } from "lucide-react";
 import Link from "next/link";
@@ -19,6 +20,7 @@ type ProfileShowcaseProps = {
 
 export function ProfileShowcase({ path }: ProfileShowcaseProps) {
   const identity = useExplorerIdentity(path.learner.displayName);
+  const { canTeach, loading: accountLoading } = useJoseAccount();
 
   const trophies = deriveTrophies(path);
   const activeSectionId = highlightSectionId(path);
@@ -43,12 +45,14 @@ export function ProfileShowcase({ path }: ProfileShowcaseProps) {
           >
             Edit explorer
           </Link>
-          <Link
-            href="/teach"
-            className="rounded-full bg-slate-800 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
-          >
-            Teacher studio
-          </Link>
+          {!accountLoading && canTeach ? (
+            <Link
+              href="/teach"
+              className="rounded-full bg-slate-800 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
+            >
+              Teacher studio
+            </Link>
+          ) : null}
         </div>
       </section>
 

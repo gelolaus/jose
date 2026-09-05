@@ -20,7 +20,9 @@ npm run dev
 
 - Web: http://localhost:3000/learn  
 - API: http://localhost:3001/health  
-- Teacher studio: Profile → Teacher studio, or http://localhost:3000/teach  
+- Teacher studio: Profile → Teacher studio (teachers/admins only), or http://localhost:3000/teach  
+
+Teacher and admin access are enforced on the API. Bootstrap the first admin once with `JOSE_SESSION_SECRET`, `JOSE_ADMIN_BOOTSTRAP_EMAIL`, and `JOSE_ADMIN_BOOTSTRAP_TOKEN`, then `POST /auth/admin/bootstrap`. Promote teachers with `POST /admin/accounts/role` (admin session required). An `@apc.edu.ph` address never grants teacher access by itself.
 
 The API creates `apps/api/data/jose.sqlite` and seeds **Work and Life of Rizal** plus the **Ateneo days** deep dive on first boot.
 

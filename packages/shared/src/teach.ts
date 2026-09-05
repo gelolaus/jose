@@ -12,6 +12,7 @@ export const teachModuleSchema = z.object({
   sortOrder: z.number().int(),
   sectionCount: z.number().int().nonnegative(),
   levelCount: z.number().int().nonnegative(),
+  ownerAccountId: z.string().nullable(),
 });
 
 export const teachLevelSchema = z.object({

@@ -31,6 +31,7 @@ import {
   pathPosition,
   putGameBodySchema,
   putLessonBodySchema,
+  type AuthAccount,
   type GameType,
   type Learner,
   type ModulesResponse,
@@ -41,7 +42,7 @@ import {
   type TeachModule,
   type TeachModuleDetail,
 } from "@jose/shared";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { DatabaseService } from "../db/database.service";
 import {
   attempts,
@@ -50,6 +51,7 @@ import {
   learnerProgress,
   lessonContent,
   levels,
+  moduleCollaborators,
   modules,
   sections,
 } from "../db/schema";
@@ -242,13 +244,29 @@ export class CurriculumService {
     return { completed: true, firstTime: first, learner };
   }
 
-  async listTeachModules(): Promise<TeachModule[]> {
+  async listTeachModules(account: AuthAccount): Promise<TeachModule[]> {
     const rows = await this.db
       .select()
       .from(modules)
       .orderBy(desc(modules.featured), asc(modules.sortOrder));
     const result: TeachModule[] = [];
     for (const row of rows) {
+      if (account.role !== "admin") {
+        const isOwner = row.ownerAccountId === account.id;
+        if (!isOwner) {
+          const [grant] = await this.db
+            .select()
+            .from(moduleCollaborators)
+            .where(
+              and(
+                eq(moduleCollaborators.moduleId, row.id),
+                eq(moduleCollaborators.accountId, account.id),
+              ),
+            )
+            .limit(1);
+          if (!grant) continue;
+        }
+      }
       result.push(await this.toTeachModule(row));
     }
     return result;
@@ -287,7 +305,7 @@ export class CurriculumService {
     return { ...summary, sections: detailSections };
   }
 
-  async createModule(body: unknown) {
+  async createModule(body: unknown, account: AuthAccount) {
     const data = parseBody(createModuleBodySchema, body);
     const id = randomUUID();
     const sectionId = randomUUID();
@@ -301,6 +319,7 @@ export class CurriculumService {
       sortOrder: maxSort + 1,
       published: false,
       featured: false,
+      ownerAccountId: account.id,
       createdAt: t,
       updatedAt: t,
     });
@@ -313,6 +332,33 @@ export class CurriculumService {
       sortOrder: 0,
     });
     return this.getTeachModule(id);
+  }
+
+  async addModuleCollaborator(
+    moduleId: string,
+    accountId: string,
+    grantedByAccountId: string,
+  ) {
+    await this.requireModule(moduleId);
+    await this.db
+      .insert(moduleCollaborators)
+      .values({
+        moduleId,
+        accountId,
+        grantedByAccountId,
+        createdAt: Date.now(),
+      })
+      .onConflictDoNothing();
+    return { ok: true, moduleId, accountId };
+  }
+
+  async requireSectionPublic(sectionId: string) {
+    return this.requireSection(sectionId);
+  }
+
+  async moduleIdForLevel(levelId: string) {
+    const ctx = await this.levelContext(levelId);
+    return ctx.module.id;
   }
 
   async patchModule(moduleId: string, body: unknown) {
@@ -726,6 +772,7 @@ export class CurriculumService {
       sortOrder: row.sortOrder,
       sectionCount: sectionRows.length,
       levelCount: ordered.length,
+      ownerAccountId: row.ownerAccountId ?? null,
     };
   }
 

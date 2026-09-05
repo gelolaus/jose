@@ -749,6 +749,7 @@ async function insertModule(
     sortOrder: input.sortOrder,
     published: input.published,
     featured: input.featured,
+    ownerAccountId: null,
     createdAt: now,
     updatedAt: now,
   });

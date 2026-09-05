@@ -5,6 +5,16 @@ import {
   text,
 } from "drizzle-orm/sqlite-core";
 
+export const accounts = sqliteTable("accounts", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  role: text("role").notNull().default("student"),
+  status: text("status").notNull().default("active"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
 export const learners = sqliteTable("learners", {
   id: text("id").primaryKey(),
   displayName: text("display_name").notNull(),
@@ -22,9 +32,31 @@ export const modules = sqliteTable("modules", {
   sortOrder: integer("sort_order").notNull(),
   published: integer("published", { mode: "boolean" }).notNull().default(false),
   featured: integer("featured", { mode: "boolean" }).notNull().default(false),
+  ownerAccountId: text("owner_account_id").references(() => accounts.id, {
+    onDelete: "set null",
+  }),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });
+
+export const moduleCollaborators = sqliteTable(
+  "module_collaborators",
+  {
+    moduleId: text("module_id")
+      .notNull()
+      .references(() => modules.id, { onDelete: "cascade" }),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    grantedByAccountId: text("granted_by_account_id").references(() => accounts.id, {
+      onDelete: "set null",
+    }),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.moduleId, table.accountId] }),
+  }),
+);
 
 export const sections = sqliteTable("sections", {
   id: text("id").primaryKey(),

@@ -13,6 +13,7 @@ import {
   type TeachModule,
   type TeachModuleDetail,
 } from "@jose/shared";
+import { getJoseSessionToken } from "./jose-session";
 
 const DEFAULT_API = "http://localhost:3001";
 
@@ -27,9 +28,14 @@ async function apiFetch(path: string, init?: RequestInit): Promise<unknown> {
   if (init?.body) {
     headers["content-type"] = "application/json";
   }
+  const token = getJoseSessionToken();
+  if (token && !headers.Authorization && !headers.authorization) {
+    headers.Authorization = `Bearer ${token}`;
+  }
   const res = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
     cache: "no-store",
+    credentials: "include",
     headers,
   });
   const json: unknown = await res.json().catch(() => null);
