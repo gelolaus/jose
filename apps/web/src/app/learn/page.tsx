@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/learning-shell";
 import { ModuleGrid } from "@/components/module-grid";
+import { PresentationToggle } from "@/components/presentation-toggle";
 import { TopBar } from "@/components/top-bar";
 import { fetchModules } from "@/lib/path-api";
 import type { Metadata } from "next";
@@ -17,7 +18,11 @@ export default async function LearnPage() {
   if (!result.ok) {
     return (
       <AppShell>
-        <NapState title="Modules are napping" error={result.error} href="/learn" />
+        <UnavailableState
+          title="Modules are temporarily unavailable"
+          error={result.error}
+          href="/learn"
+        />
       </AppShell>
     );
   }
@@ -27,20 +32,28 @@ export default async function LearnPage() {
   return (
     <AppShell
       topBar={
-        <TopBar
-          courseTitle="Work and Life of Rizal"
-          streak={data.learner.streak}
-          hearts={data.learner.hearts}
-          xp={data.learner.xp}
-        />
+        <div>
+          <TopBar
+            courseTitle="Work and Life of Rizal"
+            streak={data.learner.streak}
+            hearts={data.learner.hearts}
+            xp={data.learner.xp}
+          />
+          <div className="flex justify-end border-b border-[var(--jose-rule)] bg-[var(--jose-paper)]/80 px-4 py-2 lg:hidden">
+            <PresentationToggle compact />
+          </div>
+        </div>
       }
     >
-      <ModuleGrid modules={data.modules} />
+      <ModuleGrid
+        modules={data.modules}
+        continueLearning={data.continueLearning}
+      />
     </AppShell>
   );
 }
 
-export function NapState({
+export function UnavailableState({
   title,
   error,
   href,
@@ -51,20 +64,29 @@ export function NapState({
 }) {
   return (
     <div className="mx-auto flex min-h-full max-w-2xl flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-      <p className="font-display text-3xl font-semibold text-slate-800 md:text-4xl">
+      <p className="font-display text-3xl font-semibold text-[var(--jose-ink)] md:text-4xl">
         {title}
       </p>
-      <p className="text-base font-semibold text-slate-600">{error}</p>
-      <p className="text-sm text-slate-500">
-        Start the API with{" "}
-        <code className="rounded bg-slate-100 px-1.5 py-0.5">npm run dev:api</code>
+      <p className="text-base text-[var(--jose-ink-muted)]">{error}</p>
+      <p className="text-sm text-stone-500">
+        Please try again in a moment. If this keeps happening, contact your teacher
+        or support with the time of the error.
       </p>
       <Link
         href={href}
-        className="rounded-full bg-violet-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-md"
+        className="rounded-xl bg-[var(--jose-ink)] px-5 py-2.5 text-sm font-semibold text-[var(--jose-paper)] shadow-md"
       >
         Retry
       </Link>
     </div>
   );
+}
+
+/** @deprecated Use UnavailableState — kept for existing imports during transition. */
+export function NapState(props: {
+  title: string;
+  error: string;
+  href: string;
+}) {
+  return <UnavailableState {...props} />;
 }

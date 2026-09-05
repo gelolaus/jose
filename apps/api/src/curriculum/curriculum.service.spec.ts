@@ -2,12 +2,18 @@ import { Test, type TestingModule } from "@nestjs/testing";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { modulesResponseSchema, pathResponseSchema, HEARTS_EMPTY_CODE } from "@jose/shared";
+import {
+  modulesResponseSchema,
+  pathResponseSchema,
+  practiceReviewResponseSchema,
+  profileStatsResponseSchema,
+  HEARTS_EMPTY_CODE,
+} from "@jose/shared";
 import { AppModule } from "../app.module";
 import { CurriculumService } from "./curriculum.service";
 import { DatabaseService } from "../db/database.service";
 import { eq } from "drizzle-orm";
-import { learners } from "../db/schema";
+import { learners, learningMisses } from "../db/schema";
 import { HttpException } from "@nestjs/common";
 
 describe("CurriculumService", () => {
@@ -41,11 +47,14 @@ describe("CurriculumService", () => {
     const body = modulesResponseSchema.parse(await service.listPublishedModules());
     expect(body.modules.some((m) => m.id === "rizal" && m.featured)).toBe(true);
     expect(body.modules.some((m) => m.id === "ateneo-days")).toBe(true);
+    expect(body.continueLearning?.kind).toBe("resume");
+    expect(body.continueLearning?.href).toMatch(/^\/learn\//);
   });
 
   it("returns a schema-valid featured path", async () => {
     const path = pathResponseSchema.parse(await service.getFeaturedPath());
     expect(path.sections.length).toBeGreaterThan(0);
+    expect(path.sections[0]?.objectives).toEqual([]);
   });
 
   it("unlocks the next Ateneo days level only after the first is finished", async () => {
@@ -56,39 +65,49 @@ describe("CurriculumService", () => {
     const play = await service.getPlayLevel("ateneo-quiz");
     expect(play.level.kind).toBe("game");
     expect(play.game?.type).toBe("quiz");
+    expect(play.nextLevelId).toBeTruthy();
   });
 
   it("refuses to delete the featured module", async () => {
     await expect(service.deleteModule("rizal")).rejects.toThrow(/cannot be deleted/i);
   });
 
-  it("spends a heart on a miss and refills after a lesson", async () => {
-    await service.completeLevel("ateneo-welcome");
-    await database.db
-      .update(learners)
-      .set({ hearts: 5, heartsUpdatedAt: Date.now() })
-      .where(eq(learners.id, "demo-student"));
-    const before = await service.getLearner();
-    await service.recordMiss("ateneo-quiz");
-    const afterMiss = await service.getLearner();
-    expect(afterMiss.hearts).toBe(before.hearts - 1);
-
-    await database.db
-      .update(learners)
-      .set({ hearts: 1, heartsUpdatedAt: Date.now() })
-      .where(eq(learners.id, "demo-student"));
-    await service.completeLevel("edu-binan");
-    expect((await service.getLearner()).hearts).toBe(5);
-  });
-
-  it("blocks starting a game at zero hearts", async () => {
+  it("keeps core learning open at zero hearts and records misses for practice", async () => {
     await service.completeLevel("ateneo-welcome");
     await database.db
       .update(learners)
       .set({ hearts: 0, heartsUpdatedAt: Date.now() })
       .where(eq(learners.id, "demo-student"));
+
+    const play = await service.getPlayLevel("ateneo-quiz");
+    expect(play.level.id).toBe("ateneo-quiz");
+
+    const before = await service.getLearner();
+    await service.recordMiss("ateneo-quiz");
+    const after = await service.getLearner();
+    expect(after.hearts).toBe(before.hearts);
+
+    const misses = await database.db
+      .select()
+      .from(learningMisses)
+      .where(eq(learningMisses.levelId, "ateneo-quiz"));
+    expect(misses.length).toBeGreaterThan(0);
+  });
+
+  it("still spends hearts only in arcade challenge mode", async () => {
+    await database.db
+      .update(learners)
+      .set({ hearts: 2, heartsUpdatedAt: Date.now() })
+      .where(eq(learners.id, "demo-student"));
+    await service.recordArcadeMiss();
+    expect((await service.getLearner()).hearts).toBe(1);
+
+    await database.db
+      .update(learners)
+      .set({ hearts: 0, heartsUpdatedAt: Date.now() })
+      .where(eq(learners.id, "demo-student"));
     try {
-      await service.getPlayLevel("ateneo-quiz");
+      await service.recordArcadeMiss();
       throw new Error("expected HEARTS_EMPTY");
     } catch (error) {
       expect(error).toBeInstanceOf(HttpException);
@@ -96,9 +115,33 @@ describe("CurriculumService", () => {
         code: HEARTS_EMPTY_CODE,
       });
     }
-    await database.db
-      .update(learners)
-      .set({ hearts: 5, heartsUpdatedAt: Date.now() })
-      .where(eq(learners.id, "demo-student"));
+  });
+
+  it("builds different practice queues from different misses", async () => {
+    await database.db.delete(learningMisses);
+    await service.completeLevel("ateneo-welcome");
+    await service.recordMiss("ateneo-quiz");
+    const review = practiceReviewResponseSchema.parse(
+      await service.getPracticeReview(),
+    );
+    expect(review.items.some((i) => i.levelId === "ateneo-quiz")).toBe(true);
+    expect(review.rules.length).toBeGreaterThan(0);
+
+    const saved = await service.submitPracticeAttempt({
+      levelId: "ateneo-quiz",
+      score: 1,
+      maxScore: 1,
+    });
+    expect(saved.marksAssignmentComplete).toBe(false);
+  });
+
+  it("aggregates honest profile stats and keeps achievements monotonic", async () => {
+    const stats = profileStatsResponseSchema.parse(await service.getProfileStats());
+    expect(stats.totals.completedLevels).toBeGreaterThan(0);
+    expect(stats.modules.length).toBeGreaterThan(1);
+    expect(stats.achievements.some((a) => a.id === "on-the-path" && a.unlocked)).toBe(
+      true,
+    );
+    expect(stats.rules.hearts).toMatch(/arcade/i);
   });
 });

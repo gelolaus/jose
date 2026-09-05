@@ -26,6 +26,31 @@ export class StudentController {
     return this.curriculum.getFeaturedPath();
   }
 
+  @Get("continue")
+  getContinue() {
+    return this.curriculum.getContinueLearning();
+  }
+
+  @Get("profile/stats")
+  getProfileStats() {
+    return this.curriculum.getProfileStats();
+  }
+
+  @Get("practice/review")
+  getPracticeReview() {
+    return this.curriculum.getPracticeReview();
+  }
+
+  @Post("practice/attempts")
+  practiceAttempt(@Body() body: unknown) {
+    return this.curriculum.submitPracticeAttempt(body);
+  }
+
+  @Post("arcade/miss")
+  arcadeMiss() {
+    return this.curriculum.recordArcadeMiss();
+  }
+
   @Get("levels/:id")
   getLevel(@Param("id") id: string) {
     return this.curriculum.getPlayLevel(id);

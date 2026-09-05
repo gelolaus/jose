@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { continueLearningSchema } from "./continue";
 import { gameContentSchema, lessonContentSchema } from "./games";
 import {
   gameTypeSchema,
@@ -17,11 +18,15 @@ export const moduleCardSchema = z.object({
   published: z.boolean(),
   completedCount: z.number().int().nonnegative(),
   totalCount: z.number().int().nonnegative(),
+  nextLevelId: z.string().min(1).nullable(),
+  nextLevelTitle: z.string().min(1).nullable(),
+  nextSectionTitle: z.string().min(1).nullable(),
 });
 
 export const modulesResponseSchema = z.object({
   learner: learnerSchema,
   modules: z.array(moduleCardSchema),
+  continueLearning: continueLearningSchema.nullable(),
 });
 
 export const playLevelMetaSchema = z.object({
@@ -41,12 +46,16 @@ export const playLevelResponseSchema = z.object({
   lesson: lessonContentSchema.optional(),
   game: gameContentSchema.optional(),
   chest: z.object({ message: z.string().min(1) }).optional(),
+  nextLevelId: z.string().min(1).nullable(),
+  mapHref: z.string().min(1),
 });
 
 export const attemptBodySchema = z.object({
   score: z.number().int().nonnegative(),
   maxScore: z.number().int().nonnegative(),
   payload: z.unknown().optional(),
+  /** learning = core path (unlimited); arcade_challenge spends optional hearts */
+  mode: z.enum(["learning", "arcade_challenge"]).optional(),
 });
 
 export const missResponseSchema = z.object({
@@ -57,6 +66,8 @@ export const attemptResultSchema = z.object({
   completed: z.boolean(),
   firstTime: z.boolean(),
   learner: learnerSchema,
+  nextLevelId: z.string().min(1).nullable(),
+  continueHref: z.string().min(1),
 });
 
 export type ModuleCard = z.infer<typeof moduleCardSchema>;

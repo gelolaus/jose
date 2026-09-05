@@ -11,16 +11,25 @@ import {
   DEMO_LEARNER_ID,
   HEARTS_EMPTY_CODE,
   MAX_HEARTS,
+  PRACTICE_RULES,
+  PROFILE_RULES,
   applyHeartDrip,
+  applyQualifyingActivity,
   attemptBodySchema,
+  buildPracticeQueue,
   createLevelBodySchema,
   createModuleBodySchema,
   createSectionBodySchema,
+  deriveAchievements,
   deriveLevelStatuses,
   emptyGameContent,
+  emptyLessonEditorial,
   gameContentSchema,
   isLevelLocked,
+  lessonEditorialSchema,
   moveBodySchema,
+  nextLevelAfter,
+  nextReviewAt,
   nodeIconFor,
   parseGameContent,
   coerceGameContent,
@@ -29,28 +38,39 @@ import {
   patchModuleBodySchema,
   patchSectionBodySchema,
   pathPosition,
+  pickContinueLearning,
+  practiceAttemptBodySchema,
   putGameBodySchema,
   putLessonBodySchema,
+  type ContinueCandidate,
+  type ContinueLearning,
   type GameType,
   type Learner,
+  type LessonEditorial,
   type ModulesResponse,
   type NodeKind,
   type PathResponse,
   type PlayLevelResponse,
+  type PracticeReviewResponse,
+  type ProfileStatsResponse,
   type TeachLevelDetail,
   type TeachModule,
   type TeachModuleDetail,
 } from "@jose/shared";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { DatabaseService } from "../db/database.service";
 import {
   attempts,
   gameContent,
+  learnerAchievements,
   learners,
   learnerProgress,
+  learningMisses,
   lessonContent,
   levels,
   modules,
+  practiceAttempts,
+  practiceReviews,
   sections,
 } from "../db/schema";
 
@@ -93,11 +113,38 @@ export class CurriculumService {
       .where(eq(modules.published, true))
       .orderBy(desc(modules.featured), asc(modules.sortOrder));
 
+    const completed = await this.completedSet();
     const cards = [];
+    const continueCandidates: ContinueCandidate[] = [];
+
     for (const row of rows) {
       const ordered = await this.orderedLevelIds(row.id);
-      const completed = await this.completedSet();
       const completedCount = ordered.filter((id) => completed.has(id)).length;
+      const statuses = deriveLevelStatuses(ordered, completed);
+      const currentId =
+        ordered.find((id) => statuses[id] === "current") ??
+        ordered[ordered.length - 1] ??
+        null;
+      let nextLevelTitle: string | null = null;
+      let nextSectionTitle: string | null = null;
+      let nextKind: NodeKind = "lesson";
+      if (currentId) {
+        const ctx = await this.levelContext(currentId);
+        nextLevelTitle = ctx.level.title;
+        nextSectionTitle = ctx.section.title;
+        nextKind = ctx.level.kind as NodeKind;
+        continueCandidates.push({
+          moduleId: row.id,
+          moduleTitle: row.title,
+          featured: row.featured,
+          sectionTitle: ctx.section.title,
+          levelId: currentId,
+          levelTitle: ctx.level.title,
+          levelKind: nextKind,
+          completedCount,
+          totalCount: ordered.length,
+        });
+      }
       cards.push({
         id: row.id,
         title: row.title,
@@ -107,9 +154,17 @@ export class CurriculumService {
         published: row.published,
         completedCount,
         totalCount: ordered.length,
+        nextLevelId: currentId,
+        nextLevelTitle,
+        nextSectionTitle,
       });
     }
-    return { learner, modules: cards };
+
+    return {
+      learner,
+      modules: cards,
+      continueLearning: pickContinueLearning(continueCandidates),
+    };
   }
 
   async getModulePath(moduleId: string): Promise<PathResponse> {
@@ -140,9 +195,7 @@ export class CurriculumService {
     const statuses = deriveLevelStatuses(ordered, completed);
     const status = statuses[levelId] ?? "current";
     const learner = await this.syncedLearner();
-    if (ctx.level.kind === "game" && learner.hearts <= 0) {
-      throw this.heartsEmpty();
-    }
+    // Core path learning is unlimited — hearts never block coursework.
 
     const payload: PlayLevelResponse = {
       learner,
@@ -156,6 +209,8 @@ export class CurriculumService {
         sectionTitle: ctx.section.title,
         gameType: (ctx.level.gameType as GameType | null) ?? null,
       },
+      nextLevelId: nextLevelAfter(ordered, levelId),
+      mapHref: `/learn/${ctx.module.id}`,
     };
 
     if (ctx.level.kind === "lesson") {
@@ -166,6 +221,7 @@ export class CurriculumService {
       payload.lesson = {
         markdown: content?.markdown ?? "",
         youtubeVideoId: content?.youtubeVideoId ?? null,
+        editorial: this.parseLessonEditorial(content?.editorialJson),
       };
     } else if (ctx.level.kind === "game") {
       const [content] = await this.db
@@ -188,11 +244,21 @@ export class CurriculumService {
     }
     await this.ensureUnlocked(ctx.module.id, levelId);
     const first = await this.markComplete(levelId);
-    if (ctx.level.kind === "lesson") {
-      await this.refillHearts();
-    }
+    // No heart refill on lesson complete — hearts are arcade-only.
+    await this.touchQualifyingActivity();
+    await this.syncAchievements();
     const learner = await this.getLearner();
-    return { completed: true, firstTime: first, learner };
+    const ordered = await this.orderedLevelIds(ctx.module.id);
+    const nextId = nextLevelAfter(ordered, levelId);
+    return {
+      completed: true,
+      firstTime: first,
+      learner,
+      nextLevelId: nextId,
+      continueHref: nextId
+        ? `/learn/${ctx.module.id}/${nextId}`
+        : `/learn/${ctx.module.id}`,
+    };
   }
 
   async recordMiss(levelId: string) {
@@ -201,6 +267,18 @@ export class CurriculumService {
       throw new BadRequestException("Misses are only for game levels");
     }
     await this.ensureUnlocked(ctx.module.id, levelId);
+    // Learning mode: record for practice, never spend hearts or lock out.
+    await this.db.insert(learningMisses).values({
+      id: randomUUID(),
+      learnerId: DEMO_LEARNER_ID,
+      levelId,
+      createdAt: Date.now(),
+    });
+    return { learner: await this.getLearner() };
+  }
+
+  /** Optional arcade challenge miss — spends a heart. Not used for path learning. */
+  async recordArcadeMiss() {
     const learner = await this.syncedLearner();
     if (learner.hearts <= 0) {
       throw this.heartsEmpty();
@@ -224,10 +302,7 @@ export class CurriculumService {
       throw new BadRequestException("Attempts are only for game levels");
     }
     await this.ensureUnlocked(ctx.module.id, levelId);
-    const learnerBefore = await this.syncedLearner();
-    if (learnerBefore.hearts <= 0) {
-      throw this.heartsEmpty();
-    }
+    // Path attempts never require hearts.
     await this.db.insert(attempts).values({
       id: randomUUID(),
       learnerId: DEMO_LEARNER_ID,
@@ -238,8 +313,265 @@ export class CurriculumService {
       createdAt: Date.now(),
     });
     const first = await this.markComplete(levelId);
+    await this.touchQualifyingActivity();
+    await this.syncAchievements();
     const learner = await this.getLearner();
-    return { completed: true, firstTime: first, learner };
+    const ordered = await this.orderedLevelIds(ctx.module.id);
+    const nextId = nextLevelAfter(ordered, levelId);
+    return {
+      completed: true,
+      firstTime: first,
+      learner,
+      nextLevelId: nextId,
+      continueHref: nextId
+        ? `/learn/${ctx.module.id}/${nextId}`
+        : `/learn/${ctx.module.id}`,
+    };
+  }
+
+  async getPracticeReview(): Promise<PracticeReviewResponse> {
+    const now = Date.now();
+    const missRows = await this.db
+      .select()
+      .from(learningMisses)
+      .where(eq(learningMisses.learnerId, DEMO_LEARNER_ID))
+      .orderBy(desc(learningMisses.createdAt));
+    const progressRows = await this.db
+      .select()
+      .from(learnerProgress)
+      .where(eq(learnerProgress.learnerId, DEMO_LEARNER_ID));
+    const reviewRows = await this.db
+      .select()
+      .from(practiceReviews)
+      .where(eq(practiceReviews.learnerId, DEMO_LEARNER_ID));
+
+    const levelMeta: PracticeReviewResponse extends never
+      ? never
+      : Parameters<typeof buildPracticeQueue>[0]["levelMeta"] = {};
+
+    const published = await this.db
+      .select()
+      .from(modules)
+      .where(eq(modules.published, true));
+    for (const mod of published) {
+      const sectionRows = await this.db
+        .select()
+        .from(sections)
+        .where(eq(sections.moduleId, mod.id));
+      for (const section of sectionRows) {
+        const levelRows = await this.db
+          .select()
+          .from(levels)
+          .where(eq(levels.sectionId, section.id));
+        for (const level of levelRows) {
+          let tags: string[] = [];
+          try {
+            tags = JSON.parse(level.instructorTagsJson || "[]") as string[];
+          } catch {
+            tags = [];
+          }
+          levelMeta[level.id] = {
+            moduleId: mod.id,
+            moduleTitle: mod.title,
+            sectionTitle: section.title,
+            title: level.title,
+            kind: level.kind as NodeKind,
+            gameType: (level.gameType as GameType | null) ?? null,
+            instructorTags: tags,
+          };
+        }
+      }
+    }
+
+    const items = buildPracticeQueue({
+      now,
+      misses: missRows.map((m) => ({
+        levelId: m.levelId,
+        createdAt: m.createdAt,
+      })),
+      completions: progressRows.map((p) => ({
+        levelId: p.levelId,
+        completedAt: p.completedAt,
+      })),
+      reviews: reviewRows.map((r) => ({
+        levelId: r.levelId,
+        reviewCount: r.reviewCount,
+        nextDueAt: r.nextDueAt,
+      })),
+      levelMeta,
+    });
+
+    return {
+      items,
+      rules: [...PRACTICE_RULES],
+      emptyMessage:
+        items.length === 0
+          ? "Complete a path game or make a mistake to unlock personalized practice."
+          : "Your review set is ready.",
+    };
+  }
+
+  async submitPracticeAttempt(body: unknown) {
+    const data = parseBody(practiceAttemptBodySchema, body);
+    const ctx = await this.levelContext(data.levelId);
+    if (ctx.level.kind !== "game") {
+      throw new BadRequestException("Practice is only for game levels");
+    }
+    if (!ctx.module.published) {
+      throw new NotFoundException("Level not found");
+    }
+    const completed = await this.completedSet();
+    const [miss] = await this.db
+      .select()
+      .from(learningMisses)
+      .where(
+        and(
+          eq(learningMisses.learnerId, DEMO_LEARNER_ID),
+          eq(learningMisses.levelId, data.levelId),
+        ),
+      )
+      .limit(1);
+    if (!completed.has(data.levelId) && !miss) {
+      throw new ForbiddenException(
+        "Practice unlocks after you meet this activity on the path",
+      );
+    }
+    const now = Date.now();
+    await this.db.insert(practiceAttempts).values({
+      id: randomUUID(),
+      learnerId: DEMO_LEARNER_ID,
+      levelId: data.levelId,
+      score: data.score,
+      maxScore: data.maxScore,
+      payload: data.payload === undefined ? null : JSON.stringify(data.payload),
+      createdAt: now,
+    });
+
+    const [existing] = await this.db
+      .select()
+      .from(practiceReviews)
+      .where(
+        and(
+          eq(practiceReviews.learnerId, DEMO_LEARNER_ID),
+          eq(practiceReviews.levelId, data.levelId),
+        ),
+      );
+    const reviewCount = (existing?.reviewCount ?? 0) + 1;
+    const nextDueAt = nextReviewAt(existing?.reviewCount ?? 0, now);
+    if (existing) {
+      await this.db
+        .update(practiceReviews)
+        .set({ reviewCount, nextDueAt, updatedAt: now })
+        .where(
+          and(
+            eq(practiceReviews.learnerId, DEMO_LEARNER_ID),
+            eq(practiceReviews.levelId, data.levelId),
+          ),
+        );
+    } else {
+      await this.db.insert(practiceReviews).values({
+        learnerId: DEMO_LEARNER_ID,
+        levelId: data.levelId,
+        reviewCount,
+        nextDueAt,
+        updatedAt: now,
+      });
+    }
+
+    await this.touchQualifyingActivity();
+    return {
+      saved: true as const,
+      marksAssignmentComplete: false as const,
+      learner: await this.getLearner(),
+    };
+  }
+
+  async getProfileStats(): Promise<ProfileStatsResponse> {
+    const learner = await this.getLearner();
+    const published = await this.db
+      .select()
+      .from(modules)
+      .where(eq(modules.published, true))
+      .orderBy(desc(modules.featured), asc(modules.sortOrder));
+    const completed = await this.completedSet();
+    const moduleSummaries = [];
+    let totalLevels = 0;
+    let completedLevels = 0;
+    let chestsOpened = 0;
+    let anyChapterFullyComplete = false;
+    let allPublishedComplete = published.length > 0;
+
+    for (const mod of published) {
+      const ordered = await this.orderedLevelIds(mod.id);
+      const done = ordered.filter((id) => completed.has(id)).length;
+      totalLevels += ordered.length;
+      completedLevels += done;
+      if (done < ordered.length) allPublishedComplete = false;
+
+      const sectionRows = await this.db
+        .select()
+        .from(sections)
+        .where(eq(sections.moduleId, mod.id))
+        .orderBy(asc(sections.sortOrder));
+      for (const section of sectionRows) {
+        const levelRows = await this.db
+          .select()
+          .from(levels)
+          .where(eq(levels.sectionId, section.id));
+        if (
+          levelRows.length > 0 &&
+          levelRows.every((l) => completed.has(l.id))
+        ) {
+          anyChapterFullyComplete = true;
+        }
+        for (const level of levelRows) {
+          if (level.kind === "chest" && completed.has(level.id)) {
+            chestsOpened += 1;
+          }
+        }
+      }
+
+      moduleSummaries.push({
+        moduleId: mod.id,
+        title: mod.title,
+        featured: mod.featured,
+        completedCount: done,
+        totalCount: ordered.length,
+        coverColor: mod.coverColor,
+      });
+    }
+
+    await this.syncAchievements();
+    const earnedRows = await this.db
+      .select()
+      .from(learnerAchievements)
+      .where(eq(learnerAchievements.learnerId, DEMO_LEARNER_ID));
+    const previouslyEarned = new Set(earnedRows.map((r) => r.achievementId));
+    const earnedAtById = new Map(
+      earnedRows.map((r) => [r.achievementId, r.earnedAt] as const),
+    );
+
+    const achievements = deriveAchievements({
+      hasAnyProgress: completedLevels > 0,
+      chestsOpened,
+      anyChapterFullyComplete,
+      allPublishedComplete,
+      previouslyEarned,
+      earnedAtById,
+    });
+
+    return {
+      learner,
+      modules: moduleSummaries,
+      totals: { completedLevels, totalLevels, chestsOpened },
+      achievements,
+      rules: { ...PROFILE_RULES },
+    };
+  }
+
+  async getContinueLearning(): Promise<{ continueLearning: ContinueLearning | null }> {
+    const listed = await this.listPublishedModules();
+    return { continueLearning: listed.continueLearning };
   }
 
   async listTeachModules(): Promise<TeachModule[]> {
@@ -426,6 +758,12 @@ export class CurriculumService {
         levelId: id,
         markdown: `## ${data.title}\n\nWrite the lesson here.`,
         youtubeVideoId: null,
+        editorialJson: JSON.stringify({
+          ...emptyLessonEditorial(),
+          contentGaps: [
+            "Author objectives, citations, vocabulary, and instructor review before publishing.",
+          ],
+        }),
       });
     } else {
       await this.db.insert(gameContent).values({
@@ -509,6 +847,7 @@ export class CurriculumService {
         levelId,
         markdown: data.markdown,
         youtubeVideoId,
+        editorialJson: JSON.stringify(emptyLessonEditorial()),
       })
       .onConflictDoUpdate({
         target: lessonContent.levelId,
@@ -547,6 +886,7 @@ export class CurriculumService {
       lesson = {
         markdown: content?.markdown ?? "",
         youtubeVideoId: content?.youtubeVideoId ?? null,
+        editorial: this.parseLessonEditorial(content?.editorialJson),
       };
     }
     if (ctx.level.kind === "game") {
@@ -593,6 +933,9 @@ export class CurriculumService {
         title: section.title,
         subtitle: section.subtitle,
         themeColor: section.themeColor,
+        objectives: this.parseStringArray(section.objectivesJson),
+        instructorReviewStatus: (section.instructorReviewStatus ||
+          "unreviewed") as "unreviewed" | "needs_revision" | "reviewed",
         nodes: levelRows.map((level) => {
           const kind = level.kind as NodeKind;
           const status = statuses[level.id] ?? "locked";
@@ -678,6 +1021,126 @@ export class CurriculumService {
     return true;
   }
 
+  private async touchQualifyingActivity() {
+    const row = await this.requireLearner();
+    const update = applyQualifyingActivity(
+      row.streak,
+      row.lastActivityDay ?? null,
+      Date.now(),
+    );
+    if (!update.changed && row.lastActivityDay === update.lastActivityDay) {
+      return;
+    }
+    await this.db
+      .update(learners)
+      .set({
+        streak: update.streak,
+        lastActivityDay: update.lastActivityDay,
+      })
+      .where(eq(learners.id, DEMO_LEARNER_ID));
+  }
+
+  private async syncAchievements() {
+    const stats = await this.achievementEvidence();
+    const now = Date.now();
+    for (const achievement of deriveAchievements(stats)) {
+      if (!achievement.unlocked) continue;
+      if (stats.previouslyEarned.has(achievement.id)) continue;
+      await this.db
+        .insert(learnerAchievements)
+        .values({
+          learnerId: DEMO_LEARNER_ID,
+          achievementId: achievement.id,
+          earnedAt: now,
+        })
+        .onConflictDoNothing();
+    }
+  }
+
+  private async achievementEvidence() {
+    const completed = await this.completedSet();
+    const published = await this.db
+      .select()
+      .from(modules)
+      .where(eq(modules.published, true));
+    let totalLevels = 0;
+    let completedLevels = 0;
+    let chestsOpened = 0;
+    let anyChapterFullyComplete = false;
+    let allPublishedComplete = published.length > 0;
+
+    for (const mod of published) {
+      const ordered = await this.orderedLevelIds(mod.id);
+      totalLevels += ordered.length;
+      completedLevels += ordered.filter((id) => completed.has(id)).length;
+      if (ordered.some((id) => !completed.has(id))) {
+        allPublishedComplete = false;
+      }
+      const sectionRows = await this.db
+        .select()
+        .from(sections)
+        .where(eq(sections.moduleId, mod.id));
+      for (const section of sectionRows) {
+        const levelRows = await this.db
+          .select()
+          .from(levels)
+          .where(eq(levels.sectionId, section.id));
+        if (
+          levelRows.length > 0 &&
+          levelRows.every((l) => completed.has(l.id))
+        ) {
+          anyChapterFullyComplete = true;
+        }
+        for (const level of levelRows) {
+          if (level.kind === "chest" && completed.has(level.id)) {
+            chestsOpened += 1;
+          }
+        }
+      }
+    }
+
+    const earnedRows = await this.db
+      .select()
+      .from(learnerAchievements)
+      .where(eq(learnerAchievements.learnerId, DEMO_LEARNER_ID));
+
+    return {
+      hasAnyProgress: completedLevels > 0,
+      chestsOpened,
+      anyChapterFullyComplete,
+      allPublishedComplete: allPublishedComplete && totalLevels > 0,
+      previouslyEarned: new Set(earnedRows.map((r) => r.achievementId)),
+      earnedAtById: new Map(
+        earnedRows.map((r) => [r.achievementId, r.earnedAt] as const),
+      ),
+    };
+  }
+
+  private parseLessonEditorial(raw: string | null | undefined): LessonEditorial {
+    if (!raw) return emptyLessonEditorial();
+    try {
+      const parsed = lessonEditorialSchema.safeParse({
+        ...emptyLessonEditorial(),
+        ...JSON.parse(raw),
+      });
+      return parsed.success ? parsed.data : emptyLessonEditorial();
+    } catch {
+      return emptyLessonEditorial();
+    }
+  }
+
+  private parseStringArray(raw: string | null | undefined): string[] {
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return Array.isArray(parsed)
+        ? parsed.filter((item): item is string => typeof item === "string")
+        : [];
+    } catch {
+      return [];
+    }
+  }
+
   private async publishProblems(moduleId: string): Promise<string[]> {
     const detail = await this.getTeachModule(moduleId);
     const problems: string[] = [];
@@ -750,19 +1213,13 @@ export class CurriculumService {
     };
   }
 
-  private async refillHearts() {
-    await this.db
-      .update(learners)
-      .set({ hearts: MAX_HEARTS, heartsUpdatedAt: Date.now() })
-      .where(eq(learners.id, DEMO_LEARNER_ID));
-  }
-
   private heartsEmpty() {
     return new HttpException(
       {
         statusCode: HttpStatus.FORBIDDEN,
         code: HEARTS_EMPTY_CODE,
-        message: "You're out of hearts. Read a lesson or wait a bit.",
+        message:
+          "Arcade challenge lives are empty. Core learning stays open — try a lesson or practice without challenge mode.",
       },
       HttpStatus.FORBIDDEN,
     );
@@ -834,6 +1291,15 @@ export class CurriculumService {
   private async deleteLevelRows(ids: string[]) {
     if (ids.length === 0) return;
     await this.db.delete(attempts).where(inArray(attempts.levelId, ids));
+    await this.db
+      .delete(practiceAttempts)
+      .where(inArray(practiceAttempts.levelId, ids));
+    await this.db
+      .delete(practiceReviews)
+      .where(inArray(practiceReviews.levelId, ids));
+    await this.db
+      .delete(learningMisses)
+      .where(inArray(learningMisses.levelId, ids));
     await this.db
       .delete(learnerProgress)
       .where(inArray(learnerProgress.levelId, ids));

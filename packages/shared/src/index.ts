@@ -5,3 +5,8 @@ export * from "./games";
 export * from "./hearts";
 export * from "./modules";
 export * from "./teach";
+export * from "./streak";
+export * from "./continue";
+export * from "./editorial";
+export * from "./practice";
+export * from "./profile-stats";

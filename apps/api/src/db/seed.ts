@@ -55,9 +55,11 @@ Rizal studied philosophy and later medicine at UST. He was unhappy with how Fili
 That frustration is one reason he left for Madrid.`,
   "edu-madrid": `## Studies in Madrid
 
-In Madrid he finished medicine and took up philosophy and letters. He joined other Filipinos who wanted reform, not a carnival.
+In Madrid he finished medicine and took up philosophy and letters. He joined other Filipinos who sought colonial reform through civic and literary work.
 
-Europe is where *Noli Me Tangere* takes shape.`,
+Europe is where *Noli Me Tangere* takes shape.
+
+> Editorial note: precise organizations, publications, and contested interpretations still need APC RIZLIFE–aligned sourcing.`,
   "travel-paris": `## Paris days
 
 Rizal trained in ophthalmology in Paris and moved through artist and scientist circles. He was far from home but still writing for Filipinos.`,
@@ -81,9 +83,11 @@ In 1892 Rizal founded **La Liga Filipina** in Manila — a civic league, not a r
 The Liga’s short life still matters: it tried legal, organized work inside the colony.`,
   arrest: `## Arrest & trial
 
-After 1896, Rizal was tried for rebellion, sedition, and illegal association. The court in Manila was not a fair fight.
+Rizal was tried for rebellion, sedition, and illegal association. The court in Manila was not a fair fight.
 
-He wrote from Fort Santiago while the trial ran.`,
+He wrote from Fort Santiago while the trial ran.
+
+> Editorial note: supply exact trial dates, charges, and primary-source citations from the APC RIZLIFE syllabus. Label disputed courtroom narratives.`,
   "mi-ultimo": `## Mi Último Adiós
 
 The poem *Mi Último Adiós* was hidden in a lamp and given to his family. It is a farewell to the country, not a speech for the court.
@@ -424,10 +428,11 @@ export async function seedIfEmpty(db: JoseDb) {
     await db.insert(learners).values({
       id: DEMO_LEARNER_ID,
       displayName: "Explorer",
-      streak: 3,
+      streak: 0,
       hearts: 5,
       heartsUpdatedAt: now,
-      xp: 120,
+      xp: 50,
+      lastActivityDay: null,
     });
 
     await insertModule(db, {
@@ -761,6 +766,10 @@ async function insertModule(
       subtitle: section.subtitle,
       themeColor: section.themeColor,
       sortOrder: sIndex,
+      objectivesJson: "[]",
+      instructorReviewStatus: "unreviewed",
+      scaffoldingDefault: "standard",
+      keyVocabularyJson: "[]",
     });
     for (const [lIndex, level] of section.levels.entries()) {
       await db.insert(levels).values({
@@ -770,12 +779,32 @@ async function insertModule(
         kind: level.kind,
         gameType: level.gameType ?? null,
         sortOrder: lIndex,
+        instructorTagsJson: "[]",
       });
       if (level.kind === "lesson") {
+        const gaps = [
+          "Map this lesson to APC RIZLIFE syllabus codes.",
+          "Add measurable objectives, vocabulary, and citations.",
+          "Record instructor historical-accuracy review.",
+        ];
+        if (level.id === "arrest" || level.id === "edu-madrid") {
+          gaps.push(
+            "Replace remaining seed summary with source-backed teaching.",
+          );
+        }
         await db.insert(lessonContent).values({
           levelId: level.id,
           markdown: level.markdown ?? `## ${level.title}`,
           youtubeVideoId: null,
+          editorialJson: JSON.stringify({
+            objectives: [],
+            keyVocabulary: [],
+            citations: [],
+            interpretationNotes: [],
+            deeperAnalysisMarkdown: null,
+            scaffoldingLevel: "standard",
+            contentGaps: gaps,
+          }),
         });
       }
       if (level.kind === "game") {

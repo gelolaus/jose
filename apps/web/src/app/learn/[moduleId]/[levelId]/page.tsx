@@ -1,12 +1,10 @@
-import { HEARTS_EMPTY_CODE } from "@jose/shared";
-import { NapState } from "@/app/learn/page";
+import { UnavailableState } from "@/app/learn/page";
 import { ChestPlayer } from "@/components/chest-player";
 import { GamePlayer } from "@/components/game-player";
-import { HeartsBreak } from "@/components/games/game-stage";
 import { AppShell } from "@/components/learning-shell";
 import { LessonPlayer } from "@/components/lesson-player";
 import { fetchPlayLevel } from "@/lib/path-api";
-import { ArrowLeft, Heart } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -27,18 +25,11 @@ export default async function PlayLevelPage({ params }: Props) {
   const result = await fetchPlayLevel(levelId);
 
   if (!result.ok) {
-    if (result.status === 403 && result.code === HEARTS_EMPTY_CODE) {
-      return (
-        <AppShell>
-          <HeartsBreak moduleId={moduleId} />
-        </AppShell>
-      );
-    }
     if (result.status === 403) redirect(`/learn/${moduleId}`);
     if (result.status === 404) notFound();
     return (
       <AppShell>
-        <NapState
+        <UnavailableState
           title="Can't load this level"
           error={result.error}
           href={`/learn/${moduleId}`}
@@ -55,21 +46,20 @@ export default async function PlayLevelPage({ params }: Props) {
   return (
     <AppShell
       topBar={
-        <header className="border-b border-black/5 bg-white/95 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
+        <header className="border-b border-[var(--jose-rule)] bg-[var(--jose-paper)]/95 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
             <Link
-              href={`/learn/${moduleId}`}
-              className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-extrabold text-slate-700"
+              href={data.mapHref}
+              className="inline-flex items-center gap-2 rounded-xl bg-stone-100 px-4 py-2 text-sm font-semibold text-stone-700"
             >
-              <ArrowLeft className="size-4" strokeWidth={2.5} aria-hidden />
+              <ArrowLeft className="size-4" strokeWidth={2.25} aria-hidden />
               Path
             </Link>
-            <p className="truncate font-display text-lg font-semibold tracking-tight text-slate-800 md:text-xl">
+            <p className="truncate font-display text-lg font-semibold tracking-tight text-[var(--jose-ink)] md:text-xl">
               {data.level.sectionTitle}
             </p>
-            <span className="inline-flex items-center gap-1 text-sm font-extrabold text-rose-500">
-              <Heart className="size-4 fill-rose-500" strokeWidth={2.4} aria-hidden />
-              {data.learner.hearts}
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-teal-800">
+              Unlimited learning
             </span>
           </div>
         </header>
@@ -81,6 +71,7 @@ export default async function PlayLevelPage({ params }: Props) {
           moduleId={moduleId}
           title={data.level.title}
           lesson={data.lesson}
+          nextLevelId={data.nextLevelId}
         />
       ) : null}
       {data.level.kind === "game" && data.game ? (
@@ -89,7 +80,7 @@ export default async function PlayLevelPage({ params }: Props) {
           moduleId={moduleId}
           title={data.level.title}
           game={data.game}
-          hearts={data.learner.hearts}
+          nextLevelId={data.nextLevelId}
         />
       ) : null}
       {data.level.kind === "chest" && data.chest ? (
@@ -98,6 +89,7 @@ export default async function PlayLevelPage({ params }: Props) {
           moduleId={moduleId}
           title={data.level.title}
           message={data.chest.message}
+          nextLevelId={data.nextLevelId}
         />
       ) : null}
     </AppShell>

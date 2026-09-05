@@ -1,14 +1,20 @@
 import {
+  attemptResultSchema,
   missResponseSchema,
   modulesResponseSchema,
   pathResponseSchema,
   playLevelResponseSchema,
+  practiceAttemptResultSchema,
+  practiceReviewResponseSchema,
+  profileStatsResponseSchema,
   teachLevelDetailSchema,
   teachModuleDetailSchema,
   teachModuleSchema,
   type ModulesResponse,
   type PathResponse,
   type PlayLevelResponse,
+  type PracticeReviewResponse,
+  type ProfileStatsResponse,
   type TeachLevelDetail,
   type TeachModule,
   type TeachModuleDetail,
@@ -112,7 +118,11 @@ export async function fetchPlayLevel(
 }
 
 export async function completeLevel(levelId: string) {
-  return apiFetch(`/levels/${levelId}/complete`, { method: "POST", body: "{}" });
+  const json = await apiFetch(`/levels/${levelId}/complete`, {
+    method: "POST",
+    body: "{}",
+  });
+  return attemptResultSchema.parse(json);
 }
 
 export async function recordMiss(levelId: string) {
@@ -125,12 +135,53 @@ export async function recordMiss(levelId: string) {
 
 export async function submitAttempt(
   levelId: string,
-  body: { score: number; maxScore: number; payload?: unknown },
+  body: {
+    score: number;
+    maxScore: number;
+    payload?: unknown;
+    mode?: "learning" | "arcade_challenge";
+  },
 ) {
-  return apiFetch(`/levels/${levelId}/attempts`, {
+  const json = await apiFetch(`/levels/${levelId}/attempts`, {
     method: "POST",
     body: JSON.stringify(body),
   });
+  return attemptResultSchema.parse(json);
+}
+
+export async function fetchPracticeReview(): Promise<
+  { ok: true; data: PracticeReviewResponse } | { ok: false; error: string }
+> {
+  try {
+    const json = await apiFetch("/practice/review");
+    return { ok: true, data: practiceReviewResponseSchema.parse(json) };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
+export async function submitPracticeAttempt(body: {
+  levelId: string;
+  score: number;
+  maxScore: number;
+  payload?: unknown;
+}) {
+  const json = await apiFetch("/practice/attempts", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return practiceAttemptResultSchema.parse(json);
+}
+
+export async function fetchProfileStats(): Promise<
+  { ok: true; data: ProfileStatsResponse } | { ok: false; error: string }
+> {
+  try {
+    const json = await apiFetch("/profile/stats");
+    return { ok: true, data: profileStatsResponseSchema.parse(json) };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
 }
 
 export async function fetchTeachModules(): Promise<TeachModule[]> {

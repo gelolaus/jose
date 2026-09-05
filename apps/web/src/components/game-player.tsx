@@ -1,19 +1,17 @@
 "use client";
 
 import { hintFor, labelFor } from "@/lib/game-copy";
-import { ApiError, recordMiss, submitAttempt } from "@/lib/path-api";
+import { recordMiss, submitAttempt } from "@/lib/path-api";
 import {
-  HEARTS_EMPTY_CODE,
   firstTryScore,
   pieceCount,
   type GameContent,
 } from "@jose/shared";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { BlankGame } from "./games/blank-game";
 import {
   GameFrame,
-  HeartsBreak,
   StarCelebration,
   WhySheet,
 } from "./games/game-stage";
@@ -28,23 +26,22 @@ export function GamePlayer({
   moduleId,
   title,
   game,
-  hearts: startHearts,
+  nextLevelId,
 }: {
   levelId: string;
   moduleId: string;
   title: string;
   game: GameContent;
-  hearts: number;
+  hearts?: number;
+  nextLevelId?: string | null;
 }) {
   const router = useRouter();
-  const [hearts, setHearts] = useState(startHearts);
   const [why, setWhy] = useState<WhyPayload | null>(null);
-  const [empty, setEmpty] = useState(startHearts <= 0);
-  const pendingEmpty = useRef(false);
   const [result, setResult] = useState<{
     score: number;
     maxScore: number;
     stars: number;
+    continueHref?: string;
   } | null>(null);
   const [nonce, setNonce] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -52,31 +49,15 @@ export function GamePlayer({
 
   async function onMiss(
     payload: WhyPayload | null,
-    opts?: { hold?: boolean },
   ): Promise<"ok" | "empty"> {
     setBusy(true);
     setError(null);
     try {
-      const parsed = await recordMiss(levelId);
-      setHearts(parsed.learner.hearts);
+      await recordMiss(levelId);
       if (payload) setWhy(payload);
-      if (parsed.learner.hearts <= 0) {
-        if (payload) pendingEmpty.current = true;
-        else if (!opts?.hold) setEmpty(true);
-        return "empty";
-      }
+      // Learning mode never empties hearts / locks coursework.
       return "ok";
     } catch (err) {
-      if (err instanceof ApiError && err.code === HEARTS_EMPTY_CODE) {
-        setHearts(0);
-        if (payload) {
-          setWhy(payload);
-          pendingEmpty.current = true;
-        } else if (!opts?.hold) {
-          setEmpty(true);
-        }
-        return "empty";
-      }
       setError(err instanceof Error ? err.message : "Could not save the miss");
       if (payload) setWhy(payload);
       return "ok";
@@ -90,22 +71,31 @@ export function GamePlayer({
     setError(null);
     const scored = firstTryScore(pieceCount(game), misses);
     try {
-      await submitAttempt(levelId, {
+      const saved = await submitAttempt(levelId, {
         score: scored.score,
         maxScore: scored.maxScore,
         payload: { misses, stars: scored.stars },
+        mode: "learning",
       });
-      setResult(scored);
+      setResult({
+        ...scored,
+        continueHref:
+          saved.continueHref ??
+          (nextLevelId
+            ? `/learn/${moduleId}/${nextLevelId}`
+            : `/learn/${moduleId}`),
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save score");
-      setResult(scored);
+      setResult({
+        ...scored,
+        continueHref: nextLevelId
+          ? `/learn/${moduleId}/${nextLevelId}`
+          : `/learn/${moduleId}`,
+      });
     } finally {
       setBusy(false);
     }
-  }
-
-  if (empty) {
-    return <HeartsBreak moduleId={moduleId} />;
   }
 
   if (result) {
@@ -121,7 +111,7 @@ export function GamePlayer({
           setNonce((n) => n + 1);
         }}
         onContinue={() => {
-          router.push(`/learn/${moduleId}`);
+          router.push(result.continueHref ?? `/learn/${moduleId}`);
           router.refresh();
         }}
       />
@@ -132,20 +122,23 @@ export function GamePlayer({
     <>
       <GameFrame
         title={title}
-        hint={hintFor(game.type)}
-        hearts={hearts}
-        showHearts
+        hint={`${hintFor(game.type)} Mistakes never lock required coursework.`}
+        hearts={0}
+        showHearts={false}
         progress={labelFor(game.type)}
         wide={game.type === "timeline"}
       >
-        {error ? <p className="mb-4 text-sm font-bold text-rose-600" role="alert">{error}</p> : null}
+        {error ? (
+          <p className="mb-4 text-sm font-semibold text-rose-700" role="alert">
+            {error}
+          </p>
+        ) : null}
         <GameSwitch
           key={nonce}
           game={game}
           disabled={busy || Boolean(why)}
           onMiss={onMiss}
           onFinish={onFinish}
-          onHeartsEmpty={() => setEmpty(true)}
         />
       </GameFrame>
       {why ? (
@@ -153,10 +146,6 @@ export function GamePlayer({
           why={why}
           onDismiss={() => {
             setWhy(null);
-            if (pendingEmpty.current) {
-              pendingEmpty.current = false;
-              setEmpty(true);
-            }
           }}
         />
       ) : null}

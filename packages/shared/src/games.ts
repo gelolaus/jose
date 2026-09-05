@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  emptyLessonEditorial,
+  lessonEditorialSchema,
+} from "./editorial";
 
 const nonEmpty = z.string().trim().min(1);
 const optionalWhy = z.string().trim().max(280).optional();
@@ -101,6 +105,7 @@ export type GameContent = z.infer<typeof gameContentSchema>;
 export const lessonContentSchema = z.object({
   markdown: z.string(),
   youtubeVideoId: z.string().regex(/^[A-Za-z0-9_-]{11}$/).nullable(),
+  editorial: lessonEditorialSchema.default(emptyLessonEditorial()),
 });
 
 export type LessonContent = z.infer<typeof lessonContentSchema>;

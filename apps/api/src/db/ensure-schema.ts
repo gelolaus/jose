@@ -7,7 +7,8 @@ const STATEMENTS = [
     streak INTEGER NOT NULL,
     hearts INTEGER NOT NULL,
     hearts_updated_at INTEGER NOT NULL DEFAULT 0,
-    xp INTEGER NOT NULL
+    xp INTEGER NOT NULL,
+    last_activity_day TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS modules (
     id TEXT PRIMARY KEY,
@@ -26,7 +27,11 @@ const STATEMENTS = [
     title TEXT NOT NULL,
     subtitle TEXT NOT NULL,
     theme_color TEXT NOT NULL,
-    sort_order INTEGER NOT NULL
+    sort_order INTEGER NOT NULL,
+    objectives_json TEXT NOT NULL DEFAULT '[]',
+    instructor_review_status TEXT NOT NULL DEFAULT 'unreviewed',
+    scaffolding_default TEXT NOT NULL DEFAULT 'standard',
+    key_vocabulary_json TEXT NOT NULL DEFAULT '[]'
   )`,
   `CREATE TABLE IF NOT EXISTS levels (
     id TEXT PRIMARY KEY,
@@ -34,12 +39,14 @@ const STATEMENTS = [
     title TEXT NOT NULL,
     kind TEXT NOT NULL,
     game_type TEXT,
-    sort_order INTEGER NOT NULL
+    sort_order INTEGER NOT NULL,
+    instructor_tags_json TEXT NOT NULL DEFAULT '[]'
   )`,
   `CREATE TABLE IF NOT EXISTS lesson_content (
     level_id TEXT PRIMARY KEY REFERENCES levels(id) ON DELETE CASCADE,
     markdown TEXT NOT NULL,
-    youtube_video_id TEXT
+    youtube_video_id TEXT,
+    editorial_json TEXT NOT NULL DEFAULT '{}'
   )`,
   `CREATE TABLE IF NOT EXISTS game_content (
     level_id TEXT PRIMARY KEY REFERENCES levels(id) ON DELETE CASCADE,
@@ -60,6 +67,35 @@ const STATEMENTS = [
     payload TEXT,
     created_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS learning_misses (
+    id TEXT PRIMARY KEY,
+    learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+    level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS practice_attempts (
+    id TEXT PRIMARY KEY,
+    learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+    level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+    score INTEGER NOT NULL,
+    max_score INTEGER NOT NULL,
+    payload TEXT,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS practice_reviews (
+    learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+    level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+    review_count INTEGER NOT NULL DEFAULT 0,
+    next_due_at INTEGER,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (learner_id, level_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS learner_achievements (
+    learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+    achievement_id TEXT NOT NULL,
+    earned_at INTEGER NOT NULL,
+    PRIMARY KEY (learner_id, achievement_id)
+  )`,
 ];
 
 export async function ensureSchema(client: Client) {
@@ -68,6 +104,23 @@ export async function ensureSchema(client: Client) {
     await client.execute(sql);
   }
   await ensureColumn(client, "learners", "hearts_updated_at", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(client, "learners", "last_activity_day", "TEXT");
+  await ensureColumn(client, "sections", "objectives_json", "TEXT NOT NULL DEFAULT '[]'");
+  await ensureColumn(
+    client,
+    "sections",
+    "instructor_review_status",
+    "TEXT NOT NULL DEFAULT 'unreviewed'",
+  );
+  await ensureColumn(
+    client,
+    "sections",
+    "scaffolding_default",
+    "TEXT NOT NULL DEFAULT 'standard'",
+  );
+  await ensureColumn(client, "sections", "key_vocabulary_json", "TEXT NOT NULL DEFAULT '[]'");
+  await ensureColumn(client, "levels", "instructor_tags_json", "TEXT NOT NULL DEFAULT '[]'");
+  await ensureColumn(client, "lesson_content", "editorial_json", "TEXT NOT NULL DEFAULT '{}'");
 }
 
 async function ensureColumn(

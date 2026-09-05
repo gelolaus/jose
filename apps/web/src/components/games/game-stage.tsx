@@ -157,7 +157,8 @@ export function HeartsBreak({
       <Heart className="size-16 fill-rose-200 text-rose-300" strokeWidth={2} aria-hidden />
       <p className="font-display text-3xl font-semibold text-slate-800">Take a break</p>
       <p className="text-base font-semibold text-slate-600">
-        Out of hearts. Read a lesson to fill them, or wait — they come back slowly.
+        Out of arcade challenge lives. Core learning and required coursework stay
+        open — continue a lesson, use Practice, or wait for challenge lives to refill.
       </p>
       <Link
         href={`/learn/${moduleId}`}
