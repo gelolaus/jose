@@ -1,4 +1,14 @@
-import { DEMO_LEARNER_ID, emptyGameContent, type GameContent } from "@jose/shared";
+import {
+  DEMO_LEARNER_ID,
+  emptyCaseFilesGame,
+  emptyChestContent,
+  emptyDapitanGame,
+  emptyDispatchesGame,
+  emptyEditorialGame,
+  emptyGameContent,
+  type ChestContent,
+  type GameContent,
+} from "@jose/shared";
 import { and, eq, gte } from "drizzle-orm";
 import type { JoseDb } from "./database.service";
 import {
@@ -17,9 +27,10 @@ type SeedLevel = {
   id: string;
   title: string;
   kind: "lesson" | "game" | "chest";
-  gameType?: "quiz" | "memory" | "timeline" | "blank" | "sort";
+  gameType?: GameContent["type"];
   markdown?: string;
   game?: GameContent;
+  chest?: ChestContent;
 };
 
 const RIZAL_LESSONS: Record<string, string> = {
@@ -418,6 +429,44 @@ function game(
   };
 }
 
+function chest(id: string, title: string, content: ChestContent): SeedLevel {
+  return {
+    id,
+    title,
+    kind: "chest",
+    chest: content,
+  };
+}
+
+function draftChest(
+  id: string,
+  title: string,
+  kind: ChestContent["artifact"]["kind"],
+  coverId: string | null,
+): ChestContent {
+  const base = emptyChestContent();
+  return {
+    ...base,
+    message: `You opened ${title}. Collect a revisitable journal artifact.`,
+    achievementCriteria: "Complete this chest stop once to earn the artifact.",
+    journalCoverId: coverId,
+    artifact: {
+      ...base.artifact,
+      id: `${id}-artifact`,
+      title: `${title} (draft artifact)`,
+      kind,
+      summary:
+        "Draft reward for the journal. Replace with an approved map, excerpt, cover, or illustration before classroom publish.",
+      provenance:
+        "Teacher must supply provenance (archive, edition, or public-domain citation).",
+      body: "[Paste an instructor-approved excerpt or description. Do not invent quotations.]",
+      approvalStatus: "draft",
+      teacherInstructions:
+        "Approve provenance and body text, set approvalStatus to approved, then publish.",
+    },
+  };
+}
+
 export async function seedIfEmpty(db: JoseDb) {
   const existing = await db.select({ id: modules.id }).from(modules).limit(1);
   if (existing.length === 0) {
@@ -449,7 +498,11 @@ export async function seedIfEmpty(db: JoseDb) {
             lesson("childhood-family", "The Mercado family"),
             lesson("childhood-stories", "Stories from Teodora"),
             game("childhood-timeline", "Put the years in order", CHILDHOOD_TIMELINE),
-            { id: "childhood-chest", title: "Childhood treasure", kind: "chest" },
+            chest(
+              "childhood-chest",
+              "Childhood treasure",
+              draftChest("childhood-chest", "Childhood treasure", "illustration", "cover-calamba"),
+            ),
           ],
         },
         {
@@ -474,7 +527,11 @@ export async function seedIfEmpty(db: JoseDb) {
             lesson("travel-paris", "Paris days"),
             lesson("travel-germany", "Germany & science"),
             game("travel-memory", "Match the cities", TRAVELS_MEMORY),
-            { id: "travel-chest", title: "Traveler's chest", kind: "chest" },
+            chest(
+              "travel-chest",
+              "Traveler's chest",
+              draftChest("travel-chest", "Traveler's chest", "map", "cover-europe"),
+            ),
           ],
         },
         {
@@ -499,7 +556,11 @@ export async function seedIfEmpty(db: JoseDb) {
             lesson("mi-ultimo", "Mi Último Adiós"),
             lesson("bagumbayan", "Bagumbayan"),
             game("martyrdom-blank", "Finish the farewell", MARTYRDOM_BLANK),
-            { id: "legacy-chest", title: "Legacy chest", kind: "chest" },
+            chest(
+              "legacy-chest",
+              "Legacy chest",
+              draftChest("legacy-chest", "Legacy chest", "excerpt", "cover-adios"),
+            ),
           ],
         },
       ],
@@ -564,6 +625,7 @@ He boarded in Manila, wrote poems for school programs, and finished as one of th
 
   await ensureSeededGames(db);
   await ensureAteneoDays(db);
+  await ensureChestArtifacts(db);
 }
 
 const EXTRAS: {
@@ -628,6 +690,34 @@ const EXTRAS: {
     afterId: "ateneo-blank",
     title: "This school or later?",
     game: ATENEO_SORT,
+  },
+  {
+    id: "novels-case-files",
+    sectionId: "novels",
+    afterId: "novels-sort",
+    title: "Rizal Case Files (draft)",
+    game: emptyCaseFilesGame(),
+  },
+  {
+    id: "travel-dispatches",
+    sectionId: "travels",
+    afterId: "travel-chest",
+    title: "Dispatches from Europe (draft)",
+    game: emptyDispatchesGame(),
+  },
+  {
+    id: "novels-editorial",
+    sectionId: "novels",
+    afterId: "novels-case-files",
+    title: "Editorial Room (draft)",
+    game: emptyEditorialGame(),
+  },
+  {
+    id: "legacy-dapitan",
+    sectionId: "martyrdom",
+    afterId: "legacy-chest",
+    title: "Dapitan Workshop (draft)",
+    game: emptyDapitanGame(),
   },
 ];
 
@@ -784,6 +874,56 @@ async function insertModule(
         );
         await db.insert(gameContent).values({ levelId: level.id, json });
       }
+      if (level.kind === "chest") {
+        const json = JSON.stringify(
+          level.chest ??
+            draftChest(level.id, level.title, "excerpt", null),
+        );
+        await db.insert(gameContent).values({ levelId: level.id, json });
+      }
     }
+  }
+}
+
+async function ensureChestArtifacts(db: JoseDb) {
+  const chests = [
+    {
+      id: "childhood-chest",
+      title: "Childhood treasure",
+      kind: "illustration" as const,
+      coverId: "cover-calamba",
+    },
+    {
+      id: "travel-chest",
+      title: "Traveler's chest",
+      kind: "map" as const,
+      coverId: "cover-europe",
+    },
+    {
+      id: "legacy-chest",
+      title: "Legacy chest",
+      kind: "excerpt" as const,
+      coverId: "cover-adios",
+    },
+  ];
+  for (const chestLevel of chests) {
+    const [level] = await db
+      .select({ id: levels.id })
+      .from(levels)
+      .where(eq(levels.id, chestLevel.id))
+      .limit(1);
+    if (!level) continue;
+    const [content] = await db
+      .select()
+      .from(gameContent)
+      .where(eq(gameContent.levelId, chestLevel.id))
+      .limit(1);
+    if (content) continue;
+    await db.insert(gameContent).values({
+      levelId: chestLevel.id,
+      json: JSON.stringify(
+        draftChest(chestLevel.id, chestLevel.title, chestLevel.kind, chestLevel.coverId),
+      ),
+    });
   }
 }

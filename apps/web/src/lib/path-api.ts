@@ -1,4 +1,6 @@
 import {
+  artifactsResponseSchema,
+  attemptResultSchema,
   missResponseSchema,
   modulesResponseSchema,
   pathResponseSchema,
@@ -6,6 +8,8 @@ import {
   teachLevelDetailSchema,
   teachModuleDetailSchema,
   teachModuleSchema,
+  type ArtifactsResponse,
+  type ChestContent,
   type ModulesResponse,
   type PathResponse,
   type PlayLevelResponse,
@@ -112,7 +116,16 @@ export async function fetchPlayLevel(
 }
 
 export async function completeLevel(levelId: string) {
-  return apiFetch(`/levels/${levelId}/complete`, { method: "POST", body: "{}" });
+  const json = await apiFetch(`/levels/${levelId}/complete`, {
+    method: "POST",
+    body: "{}",
+  });
+  return attemptResultSchema.parse(json);
+}
+
+export async function fetchArtifacts(): Promise<ArtifactsResponse> {
+  const json = await apiFetch("/artifacts");
+  return artifactsResponseSchema.parse(json);
 }
 
 export async function recordMiss(levelId: string) {
@@ -246,6 +259,14 @@ export async function putTeachLesson(
 
 export async function putTeachGame(id: string, body: unknown) {
   const json = await apiFetch(`/teach/levels/${id}/game`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+  return teachLevelDetailSchema.parse(json);
+}
+
+export async function putTeachChest(id: string, body: ChestContent) {
+  const json = await apiFetch(`/teach/levels/${id}/chest`, {
     method: "PUT",
     body: JSON.stringify(body),
   });

@@ -22,6 +22,10 @@ const GAME_TYPES: { id: GameType; label: string }[] = [
   { id: "timeline", label: "Timeline" },
   { id: "blank", label: "Fill the blank" },
   { id: "sort", label: "Sort" },
+  { id: "case-files", label: "Case Files" },
+  { id: "dispatches", label: "Dispatches" },
+  { id: "editorial", label: "Editorial Room" },
+  { id: "dapitan", label: "Dapitan Workshop" },
 ];
 
 export function TeachModuleEditor({ initial }: { initial: TeachModuleDetail }) {
@@ -121,14 +125,12 @@ export function TeachModuleEditor({ initial }: { initial: TeachModuleDetail }) {
                     >
                       Down
                     </button>
-                    {level.kind === "chest" ? null : (
-                      <Link
-                        href={`/teach/modules/${mod.id}/levels/${level.id}`}
-                        className="rounded-full bg-violet-600 px-3 py-1 text-xs font-extrabold text-white"
-                      >
-                        Edit
-                      </Link>
-                    )}
+                    <Link
+                      href={`/teach/modules/${mod.id}/levels/${level.id}`}
+                      className="rounded-full bg-violet-600 px-3 py-1 text-xs font-extrabold text-white"
+                    >
+                      Edit
+                    </Link>
                     <button
                       type="button"
                       onClick={async () => {

@@ -1,4 +1,13 @@
-import { gameTypeSchema, parseGameContent, type GameContent, type GameType } from "@jose/shared";
+import {
+  emptyCaseFilesGame,
+  emptyDapitanGame,
+  emptyDispatchesGame,
+  emptyEditorialGame,
+  gameTypeSchema,
+  parseGameContent,
+  type GameContent,
+  type GameType,
+} from "@jose/shared";
 
 export type LabGame = {
   type: GameType;
@@ -206,6 +215,38 @@ export const LAB_GAMES: LabGame[] = [
         },
       ],
     }),
+  },
+  {
+    type: "case-files",
+    title: "Case Files",
+    blurb: "Inspect documents, tag evidence, defend a conclusion.",
+    how: "Open each source, tag evidence into the tray, pick a conclusion, and write short reasoning. Draft packs need teacher-approved excerpts.",
+    color: "#0F766E",
+    game: emptyCaseFilesGame(),
+  },
+  {
+    type: "dispatches",
+    title: "Dispatches from Europe",
+    blurb: "Walk a schematic route and send short dispatches.",
+    how: "Use the place list (or map). Each stop unlocks after the previous objective. No external map service required.",
+    color: "#0369A1",
+    game: emptyDispatchesGame(),
+  },
+  {
+    type: "editorial",
+    title: "Editorial Room",
+    blurb: "Assemble a coherent editorial from argument slots.",
+    how: "Place claim, evidence, counterargument, and conclusion. More than one accepted structure can succeed.",
+    color: "#C2410C",
+    game: emptyEditorialGame(),
+  },
+  {
+    type: "dapitan",
+    title: "Dapitan Workshop",
+    blurb: "Allocate invented resources and explain tradeoffs.",
+    how: "Spend labeled game resources across turns, undo freely, then read the sourced debrief. No timers.",
+    color: "#0F766E",
+    game: emptyDapitanGame(),
   },
 ];
 

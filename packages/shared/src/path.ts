@@ -10,6 +10,10 @@ export const gameTypeSchema = z.enum([
   "timeline",
   "blank",
   "sort",
+  "case-files",
+  "dispatches",
+  "editorial",
+  "dapitan",
 ]);
 
 export const hexColorSchema = z.string().regex(/^#[0-9A-Fa-f]{6}$/);

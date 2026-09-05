@@ -17,11 +17,13 @@ import {
   createModuleBodySchema,
   createSectionBodySchema,
   deriveLevelStatuses,
+  emptyChestContent,
   emptyGameContent,
   gameContentSchema,
   isLevelLocked,
   moveBodySchema,
   nodeIconFor,
+  parseChestContent,
   parseGameContent,
   coerceGameContent,
   parseYoutubeVideoId,
@@ -29,8 +31,11 @@ import {
   patchModuleBodySchema,
   patchSectionBodySchema,
   pathPosition,
+  putChestBodySchema,
   putGameBodySchema,
   putLessonBodySchema,
+  type ArtifactsResponse,
+  type ChestContent,
   type GameType,
   type Learner,
   type ModulesResponse,
@@ -41,12 +46,13 @@ import {
   type TeachModule,
   type TeachModuleDetail,
 } from "@jose/shared";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { DatabaseService } from "../db/database.service";
 import {
   attempts,
   gameContent,
   learners,
+  learnerArtifacts,
   learnerProgress,
   lessonContent,
   levels,
@@ -174,9 +180,7 @@ export class CurriculumService {
         .where(eq(gameContent.levelId, levelId));
       payload.game = parseGameContent(JSON.parse(content?.json ?? "{}"));
     } else {
-      payload.chest = {
-        message: `You opened ${ctx.level.title}! Keep walking the path.`,
-      };
+      payload.chest = await this.readChestContent(levelId, ctx.level.title);
     }
     return payload;
   }
@@ -188,11 +192,43 @@ export class CurriculumService {
     }
     await this.ensureUnlocked(ctx.module.id, levelId);
     const first = await this.markComplete(levelId);
+    let artifactAwarded = false;
     if (ctx.level.kind === "lesson") {
       await this.refillHearts();
     }
+    if (ctx.level.kind === "chest") {
+      artifactAwarded = await this.awardChestArtifact(levelId, ctx.level.title);
+    }
     const learner = await this.getLearner();
-    return { completed: true, firstTime: first, learner };
+    return { completed: true, firstTime: first, learner, artifactAwarded };
+  }
+
+  async listArtifacts(): Promise<ArtifactsResponse> {
+    const rows = await this.db
+      .select()
+      .from(learnerArtifacts)
+      .where(eq(learnerArtifacts.learnerId, DEMO_LEARNER_ID))
+      .orderBy(asc(learnerArtifacts.earnedAt));
+    const artifacts = rows.map((row) => ({
+      artifactId: row.artifactId,
+      title: row.title,
+      kind: row.kind as ArtifactsResponse["artifacts"][number]["kind"],
+      summary: row.summary,
+      provenance: row.provenance,
+      body: row.body,
+      imageUrl: row.imageUrl,
+      journalCoverId: row.journalCoverId,
+      sourceLevelId: row.sourceLevelId,
+      earnedAt: row.earnedAt,
+    }));
+    const journalCovers = [
+      ...new Set(
+        artifacts
+          .map((item) => item.journalCoverId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    return { artifacts, journalCovers };
   }
 
   async recordMiss(levelId: string) {
@@ -535,10 +571,28 @@ export class CurriculumService {
     return this.getTeachLevel(levelId);
   }
 
+  async putChest(levelId: string, body: unknown) {
+    const ctx = await this.levelContext(levelId);
+    if (ctx.level.kind !== "chest") {
+      throw new BadRequestException("This level is not a chest");
+    }
+    const data = parseBody(putChestBodySchema, body);
+    await this.db
+      .insert(gameContent)
+      .values({ levelId, json: JSON.stringify(data) })
+      .onConflictDoUpdate({
+        target: gameContent.levelId,
+        set: { json: JSON.stringify(data) },
+      });
+    await this.touchModule(ctx.module.id);
+    return this.getTeachLevel(levelId);
+  }
+
   async getTeachLevel(levelId: string): Promise<TeachLevelDetail> {
     const ctx = await this.levelContext(levelId);
     let lesson: TeachLevelDetail["lesson"] = null;
     let game: TeachLevelDetail["game"] = null;
+    let chest: TeachLevelDetail["chest"] = null;
     if (ctx.level.kind === "lesson") {
       const [content] = await this.db
         .select()
@@ -556,6 +610,9 @@ export class CurriculumService {
         .where(eq(gameContent.levelId, levelId));
       game = parseGameContent(JSON.parse(content?.json ?? "{}"));
     }
+    if (ctx.level.kind === "chest") {
+      chest = await this.readChestContent(levelId, ctx.level.title);
+    }
     return {
       id: ctx.level.id,
       title: ctx.level.title,
@@ -566,6 +623,7 @@ export class CurriculumService {
       sectionId: ctx.section.id,
       lesson,
       game,
+      chest,
     };
   }
 
@@ -678,6 +736,75 @@ export class CurriculumService {
     return true;
   }
 
+  private async readChestContent(
+    levelId: string,
+    levelTitle: string,
+  ): Promise<ChestContent> {
+    const [content] = await this.db
+      .select()
+      .from(gameContent)
+      .where(eq(gameContent.levelId, levelId));
+    if (!content?.json) {
+      const fallback = emptyChestContent();
+      return {
+        ...fallback,
+        message: `You opened ${levelTitle}! A journal artifact draft is ready for teacher approval.`,
+        artifact: {
+          ...fallback.artifact,
+          id: `${levelId}-artifact`,
+          title: `${levelTitle} artifact (draft)`,
+        },
+      };
+    }
+    try {
+      return parseChestContent(JSON.parse(content.json));
+    } catch {
+      const fallback = emptyChestContent();
+      return {
+        ...fallback,
+        message: `You opened ${levelTitle}! Replace this draft artifact before publishing.`,
+        artifact: {
+          ...fallback.artifact,
+          id: `${levelId}-artifact`,
+          title: `${levelTitle} artifact (draft)`,
+        },
+      };
+    }
+  }
+
+  /** Returns true only when a new artifact row is inserted. */
+  private async awardChestArtifact(
+    levelId: string,
+    levelTitle: string,
+  ): Promise<boolean> {
+    const chest = await this.readChestContent(levelId, levelTitle);
+    const [existing] = await this.db
+      .select()
+      .from(learnerArtifacts)
+      .where(
+        and(
+          eq(learnerArtifacts.learnerId, DEMO_LEARNER_ID),
+          eq(learnerArtifacts.artifactId, chest.artifact.id),
+        ),
+      )
+      .limit(1);
+    if (existing) return false;
+    await this.db.insert(learnerArtifacts).values({
+      learnerId: DEMO_LEARNER_ID,
+      artifactId: chest.artifact.id,
+      title: chest.artifact.title,
+      kind: chest.artifact.kind,
+      summary: chest.artifact.summary,
+      provenance: chest.artifact.provenance,
+      body: chest.artifact.body ?? null,
+      imageUrl: chest.artifact.imageUrl ?? null,
+      journalCoverId: chest.journalCoverId ?? null,
+      sourceLevelId: levelId,
+      earnedAt: Date.now(),
+    });
+    return true;
+  }
+
   private async publishProblems(moduleId: string): Promise<string[]> {
     const detail = await this.getTeachModule(moduleId);
     const problems: string[] = [];
@@ -687,7 +814,6 @@ export class CurriculumService {
         continue;
       }
       for (const level of section.levels) {
-        if (level.kind === "chest") continue;
         if (level.kind === "lesson") {
           const [content] = await this.db
             .select()
@@ -704,6 +830,18 @@ export class CurriculumService {
             coerceGameContent(JSON.parse(content?.json ?? "{}")),
           );
           if (!parsed.success) problems.push(level.title);
+          else if (
+            "approvalStatus" in parsed.data &&
+            parsed.data.approvalStatus === "draft"
+          ) {
+            problems.push(`${level.title} (draft content awaiting approval)`);
+          }
+        }
+        if (level.kind === "chest") {
+          const chest = await this.readChestContent(level.id, level.title);
+          if (chest.artifact.approvalStatus === "draft") {
+            problems.push(`${level.title} (draft artifact awaiting approval)`);
+          }
         }
       }
     }

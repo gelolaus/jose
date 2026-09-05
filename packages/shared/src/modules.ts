@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { chestContentSchema } from "./artifacts";
 import { gameContentSchema, lessonContentSchema } from "./games";
 import {
   gameTypeSchema,
@@ -40,7 +41,7 @@ export const playLevelResponseSchema = z.object({
   learner: learnerSchema,
   lesson: lessonContentSchema.optional(),
   game: gameContentSchema.optional(),
-  chest: z.object({ message: z.string().min(1) }).optional(),
+  chest: chestContentSchema.optional(),
 });
 
 export const attemptBodySchema = z.object({
@@ -57,6 +58,7 @@ export const attemptResultSchema = z.object({
   completed: z.boolean(),
   firstTime: z.boolean(),
   learner: learnerSchema,
+  artifactAwarded: z.boolean().optional(),
 });
 
 export type ModuleCard = z.infer<typeof moduleCardSchema>;

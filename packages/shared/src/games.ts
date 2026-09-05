@@ -1,4 +1,14 @@
 import { z } from "zod";
+import {
+  caseFilesGameSchema,
+  dapitanGameSchema,
+  dispatchesGameSchema,
+  editorialGameSchema,
+  emptyCaseFilesGame,
+  emptyDapitanGame,
+  emptyDispatchesGame,
+  emptyEditorialGame,
+} from "./advanced-games";
 
 const nonEmpty = z.string().trim().min(1);
 const optionalWhy = z.string().trim().max(280).optional();
@@ -88,6 +98,10 @@ export const gameContentSchema = z.union([
   timelineGameSchema,
   blankGameSchema,
   sortGameSchema,
+  caseFilesGameSchema,
+  dispatchesGameSchema,
+  editorialGameSchema,
+  dapitanGameSchema,
 ]);
 
 export type QuizGame = z.infer<typeof quizGameSchema>;
@@ -181,6 +195,14 @@ export function emptyGameContent(
           { id: "i2", label: "Item 2", bucketId: "b" },
         ],
       };
+    case "case-files":
+      return emptyCaseFilesGame();
+    case "dispatches":
+      return emptyDispatchesGame();
+    case "editorial":
+      return emptyEditorialGame();
+    case "dapitan":
+      return emptyDapitanGame();
     default: {
       const neverType: never = type;
       throw new Error(`Unknown game type ${neverType}`);
@@ -218,5 +240,13 @@ export function pieceCount(game: GameContent): number {
       return game.items.length;
     case "sort":
       return game.items.length;
+    case "case-files":
+      return game.rubric.length;
+    case "dispatches":
+      return game.stops.length;
+    case "editorial":
+      return game.slots.length;
+    case "dapitan":
+      return game.turns;
   }
 }

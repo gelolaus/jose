@@ -32,7 +32,17 @@ describe("gameContentSchema", () => {
   });
 
   it("builds a valid empty template for each type", () => {
-    for (const type of ["quiz", "memory", "timeline", "blank", "sort"] as const) {
+    for (const type of [
+      "quiz",
+      "memory",
+      "timeline",
+      "blank",
+      "sort",
+      "case-files",
+      "dispatches",
+      "editorial",
+      "dapitan",
+    ] as const) {
       expect(gameContentSchema.parse(emptyGameContent(type)).type).toBe(type);
     }
   });

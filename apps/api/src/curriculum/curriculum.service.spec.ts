@@ -101,4 +101,21 @@ describe("CurriculumService", () => {
       .set({ hearts: 5, heartsUpdatedAt: Date.now() })
       .where(eq(learners.id, "demo-student"));
   });
+
+  it("awards a journal artifact once and does not duplicate on repeat", async () => {
+    const play = await service.getPlayLevel("childhood-chest");
+    expect(play.chest?.artifact.id).toBeTruthy();
+    expect(play.chest?.artifact.provenance.length).toBeGreaterThan(10);
+
+    const first = await service.completeLevel("childhood-chest");
+    expect(first.artifactAwarded).toBe(true);
+    const listed = await service.listArtifacts();
+    expect(listed.artifacts.some((a) => a.sourceLevelId === "childhood-chest")).toBe(
+      true,
+    );
+
+    const second = await service.completeLevel("childhood-chest");
+    expect(second.artifactAwarded).toBe(false);
+    expect((await service.listArtifacts()).artifacts.filter((a) => a.artifactId === play.chest!.artifact.id)).toHaveLength(1);
+  });
 });

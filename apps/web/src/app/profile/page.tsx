@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/learning-shell";
 import { ProfileShowcase } from "@/components/profile-showcase";
-import { fetchDemoPath } from "@/lib/path-api";
+import { fetchArtifacts, fetchDemoPath } from "@/lib/path-api";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -12,6 +12,7 @@ export const metadata: Metadata = {
 
 export default async function ProfilePage() {
   const result = await fetchDemoPath();
+  const artifactsResult = await fetchArtifacts().catch(() => null);
 
   if (!result.ok) {
     return (
@@ -40,7 +41,10 @@ export default async function ProfilePage() {
 
   return (
     <AppShell>
-      <ProfileShowcase path={result.data} />
+      <ProfileShowcase
+        path={result.data}
+        artifacts={artifactsResult ?? { artifacts: [], journalCovers: [] }}
+      />
     </AppShell>
   );
 }

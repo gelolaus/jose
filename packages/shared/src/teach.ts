@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { chestContentSchema } from "./artifacts";
 import { gameContentSchema, lessonContentSchema } from "./games";
 import { gameTypeSchema, hexColorSchema, nodeKindSchema } from "./path";
 
@@ -88,11 +89,14 @@ export const putLessonBodySchema = z.object({
 
 export const putGameBodySchema = gameContentSchema;
 
+export const putChestBodySchema = chestContentSchema;
+
 export const teachLevelDetailSchema = teachLevelSchema.extend({
   moduleId: z.string().min(1),
   sectionId: z.string().min(1),
   lesson: lessonContentSchema.nullable(),
   game: gameContentSchema.nullable(),
+  chest: chestContentSchema.nullable(),
 });
 
 export type TeachModule = z.infer<typeof teachModuleSchema>;

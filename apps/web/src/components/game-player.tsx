@@ -11,6 +11,10 @@ import {
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { BlankGame } from "./games/blank-game";
+import { CaseFilesGame } from "./games/case-files-game";
+import { DapitanGame } from "./games/dapitan-game";
+import { DispatchesGame } from "./games/dispatches-game";
+import { EditorialGame } from "./games/editorial-game";
 import {
   GameFrame,
   HeartsBreak,
@@ -136,7 +140,13 @@ export function GamePlayer({
         hearts={hearts}
         showHearts
         progress={labelFor(game.type)}
-        wide={game.type === "timeline"}
+        wide={
+          game.type === "timeline" ||
+          game.type === "case-files" ||
+          game.type === "dispatches" ||
+          game.type === "editorial" ||
+          game.type === "dapitan"
+        }
       >
         {error ? <p className="mb-4 text-sm font-bold text-rose-600" role="alert">{error}</p> : null}
         <GameSwitch
@@ -233,6 +243,50 @@ export function GameSwitch({
     case "sort":
       return (
         <SortGame
+          game={game}
+          mode={mode}
+          disabled={Boolean(disabled)}
+          onMiss={onMiss}
+          onFinish={onFinish}
+          onChange={onChange as ((g: typeof game) => void) | undefined}
+        />
+      );
+    case "case-files":
+      return (
+        <CaseFilesGame
+          game={game}
+          mode={mode}
+          disabled={Boolean(disabled)}
+          onMiss={onMiss}
+          onFinish={onFinish}
+          onChange={onChange as ((g: typeof game) => void) | undefined}
+        />
+      );
+    case "dispatches":
+      return (
+        <DispatchesGame
+          game={game}
+          mode={mode}
+          disabled={Boolean(disabled)}
+          onMiss={onMiss}
+          onFinish={onFinish}
+          onChange={onChange as ((g: typeof game) => void) | undefined}
+        />
+      );
+    case "editorial":
+      return (
+        <EditorialGame
+          game={game}
+          mode={mode}
+          disabled={Boolean(disabled)}
+          onMiss={onMiss}
+          onFinish={onFinish}
+          onChange={onChange as ((g: typeof game) => void) | undefined}
+        />
+      );
+    case "dapitan":
+      return (
+        <DapitanGame
           game={game}
           mode={mode}
           disabled={Boolean(disabled)}

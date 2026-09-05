@@ -92,3 +92,27 @@ export const attempts = sqliteTable("attempts", {
   payload: text("payload"),
   createdAt: integer("created_at").notNull(),
 });
+
+export const learnerArtifacts = sqliteTable(
+  "learner_artifacts",
+  {
+    learnerId: text("learner_id")
+      .notNull()
+      .references(() => learners.id, { onDelete: "cascade" }),
+    artifactId: text("artifact_id").notNull(),
+    title: text("title").notNull(),
+    kind: text("kind").notNull(),
+    summary: text("summary").notNull(),
+    provenance: text("provenance").notNull(),
+    body: text("body"),
+    imageUrl: text("image_url"),
+    journalCoverId: text("journal_cover_id"),
+    sourceLevelId: text("source_level_id")
+      .notNull()
+      .references(() => levels.id, { onDelete: "cascade" }),
+    earnedAt: integer("earned_at").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.learnerId, table.artifactId] }),
+  }),
+);

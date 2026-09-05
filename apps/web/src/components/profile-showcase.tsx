@@ -9,15 +9,16 @@ import {
   highlightSectionId,
   sectionProgress,
 } from "@/lib/profile-derived";
-import type { PathResponse } from "@jose/shared";
-import { Flame, Heart, Lock, Trophy, Zap } from "lucide-react";
+import type { ArtifactsResponse, PathResponse } from "@jose/shared";
+import { BookOpen, Flame, Heart, Lock, Trophy, Zap } from "lucide-react";
 import Link from "next/link";
 
 type ProfileShowcaseProps = {
   path: PathResponse;
+  artifacts?: ArtifactsResponse;
 };
 
-export function ProfileShowcase({ path }: ProfileShowcaseProps) {
+export function ProfileShowcase({ path, artifacts }: ProfileShowcaseProps) {
   const identity = useExplorerIdentity(path.learner.displayName);
 
   const trophies = deriveTrophies(path);
@@ -98,6 +99,54 @@ export function ProfileShowcase({ path }: ProfileShowcaseProps) {
             );
           })}
         </ul>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-display text-2xl font-semibold tracking-tight text-slate-800">
+          Journal artifacts
+        </h2>
+        <p className="text-sm font-semibold text-slate-500">
+          Revisitable finds from path chests — no loot boxes
+        </p>
+        {artifacts && artifacts.artifacts.length > 0 ? (
+          <ul className="flex flex-col gap-2.5">
+            {artifacts.artifacts.map((artifact) => (
+              <li
+                key={artifact.artifactId}
+                className="rounded-3xl bg-white px-4 py-4 ring-1 ring-black/5"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
+                    <BookOpen className="size-5" strokeWidth={2.4} aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-extrabold text-slate-800">
+                      {artifact.title}
+                    </p>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      {artifact.kind}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-slate-600">
+                      {artifact.summary}
+                    </p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">
+                      {artifact.provenance}
+                    </p>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="rounded-3xl bg-white/70 px-4 py-4 text-sm font-semibold text-slate-500 ring-1 ring-black/5">
+            Open a path chest to collect your first journal artifact.
+          </p>
+        )}
+        {artifacts && artifacts.journalCovers.length > 0 ? (
+          <p className="text-xs font-bold text-violet-700">
+            Cosmetic covers unlocked: {artifacts.journalCovers.join(", ")}
+          </p>
+        ) : null}
       </section>
 
       <section className="space-y-3 pb-4">

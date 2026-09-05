@@ -60,6 +60,20 @@ const STATEMENTS = [
     payload TEXT,
     created_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS learner_artifacts (
+    learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+    artifact_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    provenance TEXT NOT NULL,
+    body TEXT,
+    image_url TEXT,
+    journal_cover_id TEXT,
+    source_level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+    earned_at INTEGER NOT NULL,
+    PRIMARY KEY (learner_id, artifact_id)
+  )`,
 ];
 
 export async function ensureSchema(client: Client) {

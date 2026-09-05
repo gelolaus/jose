@@ -97,7 +97,7 @@ export default async function PlayLevelPage({ params }: Props) {
           levelId={levelId}
           moduleId={moduleId}
           title={data.level.title}
-          message={data.chest.message}
+          chest={data.chest}
         />
       ) : null}
     </AppShell>

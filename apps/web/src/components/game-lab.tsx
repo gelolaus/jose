@@ -10,7 +10,7 @@ import type { WhyPayload } from "@/components/games/play-types";
 import { hintFor, labelFor } from "@/lib/game-copy";
 import { LAB_GAMES, type LabGame } from "@/lib/lab-games";
 import { firstTryScore, pieceCount } from "@jose/shared";
-import { ArrowLeft, Boxes, HelpCircle, Layers, ListOrdered, PenLine } from "lucide-react";
+import { ArrowLeft, Boxes, FileSearch, HelpCircle, Layers, ListOrdered, Map, PenLine, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
@@ -22,6 +22,10 @@ const ICONS: Record<LabGame["type"], LucideIcon> = {
   memory: Layers,
   sort: Boxes,
   blank: PenLine,
+  "case-files": FileSearch,
+  dispatches: Map,
+  editorial: PenLine,
+  dapitan: Wrench,
 };
 
 export function GameLabHub() {
@@ -134,7 +138,13 @@ export function GameLabPlay({ entry }: { entry: LabGame }) {
         title={entry.title}
         hint={hintFor(entry.type)}
         progress={labelFor(entry.type)}
-        wide={entry.type === "timeline"}
+        wide={
+          entry.type === "timeline" ||
+          entry.type === "case-files" ||
+          entry.type === "dispatches" ||
+          entry.type === "editorial" ||
+          entry.type === "dapitan"
+        }
       >
         <GameSwitch
           key={nonce}

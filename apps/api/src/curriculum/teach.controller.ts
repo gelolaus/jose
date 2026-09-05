@@ -88,4 +88,9 @@ export class TeachController {
   putGame(@Param("id") id: string, @Body() body: unknown) {
     return this.curriculum.putGame(id, body);
   }
+
+  @Put("levels/:id/chest")
+  putChest(@Param("id") id: string, @Body() body: unknown) {
+    return this.curriculum.putChest(id, body);
+  }
 }

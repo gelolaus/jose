@@ -45,4 +45,9 @@ export class StudentController {
   attempt(@Param("id") id: string, @Body() body: unknown) {
     return this.curriculum.submitAttempt(id, body);
   }
+
+  @Get("artifacts")
+  artifacts() {
+    return this.curriculum.listArtifacts();
+  }
 }

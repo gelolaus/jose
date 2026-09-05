@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { hintFor } from "./game-copy";
+import { hintFor, labelFor } from "./game-copy";
 
-describe("hintFor", () => {
-  it("tells sort players to Check after placing every chip", () => {
+describe("game-copy", () => {
+  it("covers classic boards", () => {
     expect(hintFor("sort")).toBe("Put every chip in a chest, then Check.");
+    expect(labelFor("quiz")).toBe("Quiz");
   });
 
-  it("tells timeline players to Check after filling every stop", () => {
-    expect(hintFor("timeline")).toBe("Put every event on its stop, then Check.");
+  it("covers advanced investigation boards", () => {
+    expect(labelFor("case-files")).toBe("Case Files");
+    expect(labelFor("dispatches")).toBe("Dispatches");
+    expect(labelFor("editorial")).toBe("Editorial");
+    expect(labelFor("dapitan")).toBe("Dapitan");
+    expect(hintFor("dispatches")).toMatch(/list/i);
+    expect(hintFor("dapitan")).toMatch(/timer/i);
   });
 });
