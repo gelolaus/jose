@@ -9,6 +9,7 @@ import {
   writeExplorerIdentity,
   type AvatarId,
 } from "@/lib/explorer-identity";
+import { clearAccountScopedClientState } from "@/lib/attempt-draft";
 import {
   notifyExplorerIdentityChanged,
   useExplorerIdentity,
@@ -142,6 +143,19 @@ function ProfileEditFields({
           Cancel
         </button>
       </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          clearAccountScopedClientState();
+          notifyExplorerIdentityChanged();
+          router.push("/profile");
+          router.refresh();
+        }}
+        className="text-sm font-extrabold text-slate-500 underline-offset-2 hover:underline"
+      >
+        Clear this device
+      </button>
     </form>
   );
 }

@@ -125,7 +125,12 @@ export async function recordMiss(levelId: string) {
 
 export async function submitAttempt(
   levelId: string,
-  body: { score: number; maxScore: number; payload?: unknown },
+  body: {
+    score: number;
+    maxScore: number;
+    clientAttemptId: string;
+    payload?: unknown;
+  },
 ) {
   return apiFetch(`/levels/${levelId}/attempts`, {
     method: "POST",

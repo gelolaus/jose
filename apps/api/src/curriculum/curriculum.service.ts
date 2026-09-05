@@ -41,7 +41,7 @@ import {
   type TeachModule,
   type TeachModuleDetail,
 } from "@jose/shared";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { asc, desc, eq, and, inArray } from "drizzle-orm";
 import { DatabaseService } from "../db/database.service";
 import {
   attempts,
@@ -224,19 +224,39 @@ export class CurriculumService {
       throw new BadRequestException("Attempts are only for game levels");
     }
     await this.ensureUnlocked(ctx.module.id, levelId);
+
+    const existing = await this.findAttemptByClientId(data.clientAttemptId);
+    if (existing) {
+      if (existing.levelId !== levelId) {
+        throw new BadRequestException("clientAttemptId already used for another level");
+      }
+      const learner = await this.getLearner();
+      return { completed: true, firstTime: false, learner };
+    }
+
     const learnerBefore = await this.syncedLearner();
     if (learnerBefore.hearts <= 0) {
       throw this.heartsEmpty();
     }
-    await this.db.insert(attempts).values({
-      id: randomUUID(),
-      learnerId: DEMO_LEARNER_ID,
-      levelId,
-      score: data.score,
-      maxScore: data.maxScore,
-      payload: data.payload === undefined ? null : JSON.stringify(data.payload),
-      createdAt: Date.now(),
-    });
+    try {
+      await this.db.insert(attempts).values({
+        id: randomUUID(),
+        learnerId: DEMO_LEARNER_ID,
+        levelId,
+        score: data.score,
+        maxScore: data.maxScore,
+        payload: data.payload === undefined ? null : JSON.stringify(data.payload),
+        clientAttemptId: data.clientAttemptId,
+        createdAt: Date.now(),
+      });
+    } catch {
+      const raced = await this.findAttemptByClientId(data.clientAttemptId);
+      if (raced && raced.levelId === levelId) {
+        const learner = await this.getLearner();
+        return { completed: true, firstTime: false, learner };
+      }
+      throw new BadRequestException("Could not record attempt");
+    }
     const first = await this.markComplete(levelId);
     const learner = await this.getLearner();
     return { completed: true, firstTime: first, learner };
@@ -676,6 +696,20 @@ export class CurriculumService {
       .set({ xp: learner.xp + FIRST_COMPLETE_XP })
       .where(eq(learners.id, DEMO_LEARNER_ID));
     return true;
+  }
+
+  private async findAttemptByClientId(clientAttemptId: string) {
+    const [row] = await this.db
+      .select()
+      .from(attempts)
+      .where(
+        and(
+          eq(attempts.learnerId, DEMO_LEARNER_ID),
+          eq(attempts.clientAttemptId, clientAttemptId),
+        ),
+      )
+      .limit(1);
+    return row ?? null;
   }
 
   private async publishProblems(moduleId: string): Promise<string[]> {

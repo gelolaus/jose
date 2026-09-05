@@ -90,5 +90,6 @@ export const attempts = sqliteTable("attempts", {
   score: integer("score").notNull(),
   maxScore: integer("max_score").notNull(),
   payload: text("payload"),
+  clientAttemptId: text("client_attempt_id"),
   createdAt: integer("created_at").notNull(),
 });

@@ -9,7 +9,10 @@ export type MissOpts = {
 
 export type PlayBoardProps = {
   disabled: boolean;
-  onMiss: (why: WhyPayload | null, opts?: MissOpts) => Promise<"ok" | "empty">;
+  onMiss: (
+    why: WhyPayload | null,
+    opts?: MissOpts,
+  ) => Promise<"ok" | "empty" | "unsynced">;
   onFinish: (score: number, maxScore: number, misses: number) => void;
   onHeartsEmpty?: () => void;
 };

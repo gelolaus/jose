@@ -58,6 +58,7 @@ const STATEMENTS = [
     score INTEGER NOT NULL,
     max_score INTEGER NOT NULL,
     payload TEXT,
+    client_attempt_id TEXT,
     created_at INTEGER NOT NULL
   )`,
 ];
@@ -68,6 +69,12 @@ export async function ensureSchema(client: Client) {
     await client.execute(sql);
   }
   await ensureColumn(client, "learners", "hearts_updated_at", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(client, "attempts", "client_attempt_id", "TEXT");
+  await client.execute(
+    `CREATE UNIQUE INDEX IF NOT EXISTS attempts_learner_client_attempt_uidx
+     ON attempts(learner_id, client_attempt_id)
+     WHERE client_attempt_id IS NOT NULL`,
+  );
 }
 
 async function ensureColumn(

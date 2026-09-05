@@ -101,4 +101,30 @@ describe("CurriculumService", () => {
       .set({ hearts: 5, heartsUpdatedAt: Date.now() })
       .where(eq(learners.id, "demo-student"));
   });
+
+  it("reconciles duplicate clientAttemptId finishes without awarding XP twice", async () => {
+    await service.completeLevel("ateneo-welcome");
+    await database.db
+      .update(learners)
+      .set({ hearts: 5, heartsUpdatedAt: Date.now(), xp: 0 })
+      .where(eq(learners.id, "demo-student"));
+
+    const clientAttemptId = "55555555-5555-4555-8555-555555555555";
+    const body = {
+      score: 1,
+      maxScore: 1,
+      clientAttemptId,
+      payload: { misses: 0, stars: 3 },
+    };
+    const first = await service.submitAttempt("ateneo-quiz", body);
+    const midXp = (await service.getLearner()).xp;
+    expect(first.firstTime).toBe(true);
+    expect(midXp).toBeGreaterThan(0);
+
+    const second = await service.submitAttempt("ateneo-quiz", body);
+    const endXp = (await service.getLearner()).xp;
+    expect(second.completed).toBe(true);
+    expect(second.firstTime).toBe(false);
+    expect(endXp).toBe(midXp);
+  });
 });

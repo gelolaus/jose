@@ -46,6 +46,8 @@ export const playLevelResponseSchema = z.object({
 export const attemptBodySchema = z.object({
   score: z.number().int().nonnegative(),
   maxScore: z.number().int().nonnegative(),
+  /** Client-generated id so reconnect/retry can reconcile without duplicating XP. */
+  clientAttemptId: z.string().uuid(),
   payload: z.unknown().optional(),
 });
 

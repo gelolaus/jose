@@ -64,7 +64,7 @@ export function GameEditor({
           score={preview.score}
           maxScore={preview.maxScore}
           stars={preview.stars}
-          onRetry={() => {
+          onPlayAgain={() => {
             setPreview(null);
             setPlayKey((n) => n + 1);
           }}

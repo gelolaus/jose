@@ -88,9 +88,12 @@ export function StarCelebration({
   maxScore,
   stars,
   error,
-  onRetry,
+  statusLabel,
+  onRetrySave,
+  onPlayAgain,
   onContinue,
-  retryLabel = "Retry",
+  retrySaveLabel = "Retry saving",
+  playAgainLabel = "Play again",
   continueLabel = "Continue",
 }: {
   title: string;
@@ -98,9 +101,12 @@ export function StarCelebration({
   maxScore: number;
   stars: number;
   error?: string | null;
-  onRetry: () => void;
+  statusLabel?: string | null;
+  onRetrySave?: () => void;
+  onPlayAgain: () => void;
   onContinue: () => void;
-  retryLabel?: string;
+  retrySaveLabel?: string;
+  playAgainLabel?: string;
   continueLabel?: string;
 }) {
   return (
@@ -126,14 +132,28 @@ export function StarCelebration({
         <span className="text-2xl text-slate-400">/{maxScore}</span>
       </p>
       <p className="text-base font-semibold text-slate-600">{title}</p>
+      {statusLabel ? (
+        <p className="text-sm font-extrabold text-slate-500" aria-live="polite">
+          {statusLabel}
+        </p>
+      ) : null}
       {error ? <p className="text-sm font-bold text-rose-600" role="alert">{error}</p> : null}
-      <div className="mt-2 flex w-full flex-col gap-2 sm:flex-row">
+      <div className="mt-2 flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
+        {onRetrySave ? (
+          <button
+            type="button"
+            onClick={onRetrySave}
+            className="flex-1 rounded-full bg-amber-500 px-5 py-3 text-sm font-extrabold text-white shadow-md"
+          >
+            {retrySaveLabel}
+          </button>
+        ) : null}
         <button
           type="button"
-          onClick={onRetry}
+          onClick={onPlayAgain}
           className="flex-1 rounded-full bg-slate-100 px-5 py-3 text-sm font-extrabold text-slate-700"
         >
-          {retryLabel}
+          {playAgainLabel}
         </button>
         <button
           type="button"

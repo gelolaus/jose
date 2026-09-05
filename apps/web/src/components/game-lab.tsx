@@ -90,12 +90,12 @@ export function GameLabPlay({ entry }: { entry: LabGame }) {
         score={result.score}
         maxScore={result.maxScore}
         stars={result.stars}
-        onRetry={() => {
+        onPlayAgain={() => {
           setResult(null);
           setNonce((n) => n + 1);
         }}
         onContinue={() => router.push("/practice")}
-        retryLabel="Play again"
+        playAgainLabel="Play again"
         continueLabel="All games"
       />
     );
