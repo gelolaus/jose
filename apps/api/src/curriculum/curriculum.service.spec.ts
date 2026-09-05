@@ -69,7 +69,7 @@ describe("CurriculumService", () => {
       .set({ hearts: 5, heartsUpdatedAt: Date.now() })
       .where(eq(learners.id, "demo-student"));
     const before = await service.getLearner();
-    await service.recordMiss("ateneo-quiz");
+    await service.recordMiss("ateneo-quiz", { idempotencyKey: "hearts-miss-1" });
     const afterMiss = await service.getLearner();
     expect(afterMiss.hearts).toBe(before.hearts - 1);
 

@@ -37,8 +37,8 @@ export class StudentController {
   }
 
   @Post("levels/:id/miss")
-  miss(@Param("id") id: string) {
-    return this.curriculum.recordMiss(id);
+  miss(@Param("id") id: string, @Body() body: unknown) {
+    return this.curriculum.recordMiss(id, body);
   }
 
   @Post("levels/:id/attempts")

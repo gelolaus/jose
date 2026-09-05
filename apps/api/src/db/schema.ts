@@ -92,3 +92,21 @@ export const attempts = sqliteTable("attempts", {
   payload: text("payload"),
   createdAt: integer("created_at").notNull(),
 });
+
+/** Idempotency receipts for heart-spending miss mutations. */
+export const missReceipts = sqliteTable(
+  "miss_receipts",
+  {
+    learnerId: text("learner_id")
+      .notNull()
+      .references(() => learners.id, { onDelete: "cascade" }),
+    idempotencyKey: text("idempotency_key").notNull(),
+    levelId: text("level_id")
+      .notNull()
+      .references(() => levels.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.learnerId, table.idempotencyKey] }),
+  }),
+);

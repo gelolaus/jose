@@ -60,10 +60,19 @@ const STATEMENTS = [
     payload TEXT,
     created_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS miss_receipts (
+    learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+    idempotency_key TEXT NOT NULL,
+    level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (learner_id, idempotency_key)
+  )`,
 ];
 
 export async function ensureSchema(client: Client) {
   await client.execute("PRAGMA foreign_keys = ON");
+  await client.execute("PRAGMA journal_mode = WAL");
+  await client.execute("PRAGMA busy_timeout = 5000");
   for (const sql of STATEMENTS) {
     await client.execute(sql);
   }

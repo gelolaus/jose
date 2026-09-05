@@ -20,6 +20,7 @@ import {
   emptyGameContent,
   gameContentSchema,
   isLevelLocked,
+  missBodySchema,
   moveBodySchema,
   nodeIconFor,
   parseGameContent,
@@ -41,8 +42,8 @@ import {
   type TeachModule,
   type TeachModuleDetail,
 } from "@jose/shared";
-import { asc, desc, eq, inArray } from "drizzle-orm";
-import { DatabaseService } from "../db/database.service";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { DatabaseService, type JoseDb } from "../db/database.service";
 import {
   attempts,
   gameContent,
@@ -51,10 +52,21 @@ import {
   lessonContent,
   levels,
   modules,
+  missReceipts,
   sections,
 } from "../db/schema";
 
 const FIRST_COMPLETE_XP = 10;
+
+/** Steps where tests may inject failures mid-mutation. */
+export type MutationFaultStep =
+  | "after-module-row"
+  | "after-section-row"
+  | "after-level-row"
+  | "after-level-content"
+  | "after-first-sort-swap"
+  | "after-progress-insert"
+  | "after-attempt-insert";
 
 function parseBody<T>(
   schema: {
@@ -77,8 +89,42 @@ function parseBody<T>(
 export class CurriculumService {
   constructor(private readonly database: DatabaseService) {}
 
+  /** Test-only hook invoked between mutation steps for failure injection. */
+  private mutationFault?: (step: MutationFaultStep) => void | Promise<void>;
+
+  /**
+   * Serialize writers on the shared libSQL connection. Concurrent HTTP
+   * handlers still race at the service layer; conflict-aware SQL keeps
+   * those races correct once they enter the queue.
+   */
+  private writeTail: Promise<void> = Promise.resolve();
+
+  /** @internal testing */
+  setMutationFault(hook?: (step: MutationFaultStep) => void | Promise<void>) {
+    this.mutationFault = hook;
+  }
+
   private get db() {
     return this.database.db;
+  }
+
+  private async maybeFault(step: MutationFaultStep) {
+    await this.mutationFault?.(step);
+  }
+
+  private enqueueWrite<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.writeTail.then(fn, fn);
+    this.writeTail = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  private runTx<T>(fn: (tx: JoseDb) => Promise<T>): Promise<T> {
+    return this.enqueueWrite(() =>
+      this.db.transaction((tx) => fn(tx as unknown as JoseDb)),
+    );
   }
 
   async getLearner(): Promise<Learner> {
@@ -187,33 +233,63 @@ export class CurriculumService {
       throw new BadRequestException("Finish the game to complete this level");
     }
     await this.ensureUnlocked(ctx.module.id, levelId);
-    const first = await this.markComplete(levelId);
-    if (ctx.level.kind === "lesson") {
-      await this.refillHearts();
-    }
+    const first = await this.runTx(async (tx) => {
+      const awarded = await this.markComplete(levelId, tx);
+      if (ctx.level.kind === "lesson") {
+        await this.refillHearts(tx);
+      }
+      return awarded;
+    });
     const learner = await this.getLearner();
     return { completed: true, firstTime: first, learner };
   }
 
-  async recordMiss(levelId: string) {
+  async recordMiss(levelId: string, body: unknown = {}) {
+    const data = parseBody(missBodySchema, body);
     const ctx = await this.levelContext(levelId);
     if (ctx.level.kind !== "game") {
       throw new BadRequestException("Misses are only for game levels");
     }
     await this.ensureUnlocked(ctx.module.id, levelId);
-    const learner = await this.syncedLearner();
-    if (learner.hearts <= 0) {
-      throw this.heartsEmpty();
-    }
-    const leavingFull = learner.hearts >= MAX_HEARTS;
-    const row = await this.requireLearner();
-    await this.db
-      .update(learners)
-      .set({
-        hearts: learner.hearts - 1,
-        heartsUpdatedAt: leavingFull ? Date.now() : row.heartsUpdatedAt,
-      })
-      .where(eq(learners.id, DEMO_LEARNER_ID));
+
+    await this.runTx(async (tx) => {
+      await this.syncLearnerHearts(tx);
+      const inserted = await tx
+        .insert(missReceipts)
+        .values({
+          learnerId: DEMO_LEARNER_ID,
+          idempotencyKey: data.idempotencyKey,
+          levelId,
+          createdAt: Date.now(),
+        })
+        .onConflictDoNothing()
+        .returning({ key: missReceipts.idempotencyKey });
+
+      if (inserted.length === 0) {
+        return;
+      }
+
+      const [row] = await tx
+        .select()
+        .from(learners)
+        .where(eq(learners.id, DEMO_LEARNER_ID));
+      if (!row || row.hearts <= 0) {
+        throw this.heartsEmpty();
+      }
+      const leavingFull = row.hearts >= MAX_HEARTS;
+      const updated = await tx
+        .update(learners)
+        .set({
+          hearts: sql`${learners.hearts} - 1`,
+          heartsUpdatedAt: leavingFull ? Date.now() : row.heartsUpdatedAt,
+        })
+        .where(and(eq(learners.id, DEMO_LEARNER_ID), sql`${learners.hearts} > 0`))
+        .returning({ hearts: learners.hearts });
+      if (updated.length === 0) {
+        throw this.heartsEmpty();
+      }
+    });
+
     return { learner: await this.getLearner() };
   }
 
@@ -228,16 +304,19 @@ export class CurriculumService {
     if (learnerBefore.hearts <= 0) {
       throw this.heartsEmpty();
     }
-    await this.db.insert(attempts).values({
-      id: randomUUID(),
-      learnerId: DEMO_LEARNER_ID,
-      levelId,
-      score: data.score,
-      maxScore: data.maxScore,
-      payload: data.payload === undefined ? null : JSON.stringify(data.payload),
-      createdAt: Date.now(),
+    const first = await this.runTx(async (tx) => {
+      await tx.insert(attempts).values({
+        id: randomUUID(),
+        learnerId: DEMO_LEARNER_ID,
+        levelId,
+        score: data.score,
+        maxScore: data.maxScore,
+        payload: data.payload === undefined ? null : JSON.stringify(data.payload),
+        createdAt: Date.now(),
+      });
+      await this.maybeFault("after-attempt-insert");
+      return this.markComplete(levelId, tx);
     });
-    const first = await this.markComplete(levelId);
     const learner = await this.getLearner();
     return { completed: true, firstTime: first, learner };
   }
@@ -293,24 +372,28 @@ export class CurriculumService {
     const sectionId = randomUUID();
     const t = Date.now();
     const maxSort = await this.maxModuleSort();
-    await this.db.insert(modules).values({
-      id,
-      title: data.title,
-      subtitle: data.subtitle,
-      coverColor: data.coverColor,
-      sortOrder: maxSort + 1,
-      published: false,
-      featured: false,
-      createdAt: t,
-      updatedAt: t,
-    });
-    await this.db.insert(sections).values({
-      id: sectionId,
-      moduleId: id,
-      title: "Levels",
-      subtitle: "Start adding lessons and games",
-      themeColor: data.coverColor,
-      sortOrder: 0,
+    await this.runTx(async (tx) => {
+      await tx.insert(modules).values({
+        id,
+        title: data.title,
+        subtitle: data.subtitle,
+        coverColor: data.coverColor,
+        sortOrder: maxSort + 1,
+        published: false,
+        featured: false,
+        createdAt: t,
+        updatedAt: t,
+      });
+      await this.maybeFault("after-module-row");
+      await tx.insert(sections).values({
+        id: sectionId,
+        moduleId: id,
+        title: "Levels",
+        subtitle: "Start adding lessons and games",
+        themeColor: data.coverColor,
+        sortOrder: 0,
+      });
+      await this.maybeFault("after-section-row");
     });
     return this.getTeachModule(id);
   }
@@ -345,9 +428,11 @@ export class CurriculumService {
     if (mod.featured) {
       throw new BadRequestException("The Life of Rizal module cannot be deleted");
     }
-    await this.deleteLevelsByModule(moduleId);
-    await this.db.delete(sections).where(eq(sections.moduleId, moduleId));
-    await this.db.delete(modules).where(eq(modules.id, moduleId));
+    await this.runTx(async (tx) => {
+      await this.deleteLevelsByModule(moduleId, tx);
+      await tx.delete(sections).where(eq(sections.moduleId, moduleId));
+      await tx.delete(modules).where(eq(modules.id, moduleId));
+    });
     return { ok: true };
   }
 
@@ -355,19 +440,22 @@ export class CurriculumService {
     await this.requireModule(moduleId);
     const data = parseBody(createSectionBodySchema, body);
     const id = randomUUID();
-    const siblings = await this.db
-      .select()
-      .from(sections)
-      .where(eq(sections.moduleId, moduleId));
-    await this.db.insert(sections).values({
-      id,
-      moduleId,
-      title: data.title,
-      subtitle: data.subtitle,
-      themeColor: data.themeColor,
-      sortOrder: siblings.length,
+    await this.runTx(async (tx) => {
+      const siblings = await tx
+        .select()
+        .from(sections)
+        .where(eq(sections.moduleId, moduleId));
+      await tx.insert(sections).values({
+        id,
+        moduleId,
+        title: data.title,
+        subtitle: data.subtitle,
+        themeColor: data.themeColor,
+        sortOrder: siblings.length,
+      });
+      await this.maybeFault("after-section-row");
+      await this.touchModule(moduleId, tx);
     });
-    await this.touchModule(moduleId);
     return this.getTeachModule(moduleId);
   }
 
@@ -395,13 +483,18 @@ export class CurriculumService {
     if (siblings.length <= 1) {
       throw new BadRequestException("A module needs at least one section");
     }
-    const levelRows = await this.db
-      .select()
-      .from(levels)
-      .where(eq(levels.sectionId, sectionId));
-    await this.deleteLevelRows(levelRows.map((l) => l.id));
-    await this.db.delete(sections).where(eq(sections.id, sectionId));
-    await this.touchModule(section.moduleId);
+    await this.runTx(async (tx) => {
+      const levelRows = await tx
+        .select()
+        .from(levels)
+        .where(eq(levels.sectionId, sectionId));
+      await this.deleteLevelRows(
+        levelRows.map((l) => l.id),
+        tx,
+      );
+      await tx.delete(sections).where(eq(sections.id, sectionId));
+      await this.touchModule(section.moduleId, tx);
+    });
     return this.getTeachModule(section.moduleId);
   }
 
@@ -409,31 +502,35 @@ export class CurriculumService {
     const section = await this.requireSection(sectionId);
     const data = parseBody(createLevelBodySchema, body);
     const id = randomUUID();
-    const siblings = await this.db
-      .select()
-      .from(levels)
-      .where(eq(levels.sectionId, sectionId));
-    await this.db.insert(levels).values({
-      id,
-      sectionId,
-      title: data.title,
-      kind: data.kind,
-      gameType: data.kind === "game" ? data.gameType! : null,
-      sortOrder: siblings.length,
+    await this.runTx(async (tx) => {
+      const siblings = await tx
+        .select()
+        .from(levels)
+        .where(eq(levels.sectionId, sectionId));
+      await tx.insert(levels).values({
+        id,
+        sectionId,
+        title: data.title,
+        kind: data.kind,
+        gameType: data.kind === "game" ? data.gameType! : null,
+        sortOrder: siblings.length,
+      });
+      await this.maybeFault("after-level-row");
+      if (data.kind === "lesson") {
+        await tx.insert(lessonContent).values({
+          levelId: id,
+          markdown: `## ${data.title}\n\nWrite the lesson here.`,
+          youtubeVideoId: null,
+        });
+      } else {
+        await tx.insert(gameContent).values({
+          levelId: id,
+          json: JSON.stringify(emptyGameContent(data.gameType!)),
+        });
+      }
+      await this.maybeFault("after-level-content");
+      await this.touchModule(section.moduleId, tx);
     });
-    if (data.kind === "lesson") {
-      await this.db.insert(lessonContent).values({
-        levelId: id,
-        markdown: `## ${data.title}\n\nWrite the lesson here.`,
-        youtubeVideoId: null,
-      });
-    } else {
-      await this.db.insert(gameContent).values({
-        levelId: id,
-        json: JSON.stringify(emptyGameContent(data.gameType!)),
-      });
-    }
-    await this.touchModule(section.moduleId);
     return this.getTeachLevel(id);
   }
 
@@ -458,35 +555,40 @@ export class CurriculumService {
     if (siblings.length <= 1) {
       throw new BadRequestException("A section needs at least one level");
     }
-    await this.deleteLevelRows([levelId]);
-    await this.touchModule(ctx.module.id);
+    await this.runTx(async (tx) => {
+      await this.deleteLevelRows([levelId], tx);
+      await this.touchModule(ctx.module.id, tx);
+    });
     return { ok: true };
   }
 
   async moveLevel(levelId: string, body: unknown) {
     const data = parseBody(moveBodySchema, body);
     const ctx = await this.levelContext(levelId);
-    const siblings = await this.db
-      .select()
-      .from(levels)
-      .where(eq(levels.sectionId, ctx.section.id))
-      .orderBy(asc(levels.sortOrder));
-    const index = siblings.findIndex((row) => row.id === levelId);
-    const swapWith = data.direction === "up" ? index - 1 : index + 1;
-    if (index < 0 || swapWith < 0 || swapWith >= siblings.length) {
-      return this.getTeachModule(ctx.module.id);
-    }
-    const a = siblings[index]!;
-    const b = siblings[swapWith]!;
-    await this.db
-      .update(levels)
-      .set({ sortOrder: b.sortOrder })
-      .where(eq(levels.id, a.id));
-    await this.db
-      .update(levels)
-      .set({ sortOrder: a.sortOrder })
-      .where(eq(levels.id, b.id));
-    await this.touchModule(ctx.module.id);
+    await this.runTx(async (tx) => {
+      const siblings = await tx
+        .select()
+        .from(levels)
+        .where(eq(levels.sectionId, ctx.section.id))
+        .orderBy(asc(levels.sortOrder));
+      const index = siblings.findIndex((row) => row.id === levelId);
+      const swapWith = data.direction === "up" ? index - 1 : index + 1;
+      if (index < 0 || swapWith < 0 || swapWith >= siblings.length) {
+        return;
+      }
+      const a = siblings[index]!;
+      const b = siblings[swapWith]!;
+      await tx
+        .update(levels)
+        .set({ sortOrder: b.sortOrder })
+        .where(eq(levels.id, a.id));
+      await this.maybeFault("after-first-sort-swap");
+      await tx
+        .update(levels)
+        .set({ sortOrder: a.sortOrder })
+        .where(eq(levels.id, b.id));
+      await this.touchModule(ctx.module.id, tx);
+    });
     return this.getTeachModule(ctx.module.id);
   }
 
@@ -662,18 +764,23 @@ export class CurriculumService {
     }
   }
 
-  private async markComplete(levelId: string): Promise<boolean> {
-    const completed = await this.completedSet();
-    if (completed.has(levelId)) return false;
-    await this.db.insert(learnerProgress).values({
-      learnerId: DEMO_LEARNER_ID,
-      levelId,
-      completedAt: Date.now(),
-    });
-    const learner = await this.requireLearner();
-    await this.db
+  private async markComplete(levelId: string, executor: JoseDb = this.db): Promise<boolean> {
+    const inserted = await executor
+      .insert(learnerProgress)
+      .values({
+        learnerId: DEMO_LEARNER_ID,
+        levelId,
+        completedAt: Date.now(),
+      })
+      .onConflictDoNothing()
+      .returning({ levelId: learnerProgress.levelId });
+    if (inserted.length === 0) {
+      return false;
+    }
+    await this.maybeFault("after-progress-insert");
+    await executor
       .update(learners)
-      .set({ xp: learner.xp + FIRST_COMPLETE_XP })
+      .set({ xp: sql`${learners.xp} + ${FIRST_COMPLETE_XP}` })
       .where(eq(learners.id, DEMO_LEARNER_ID));
     return true;
   }
@@ -730,10 +837,24 @@ export class CurriculumService {
   }
 
   private async syncedLearner(): Promise<Learner> {
-    const row = await this.requireLearner();
+    return this.enqueueWrite(async () => {
+      await this.syncLearnerHearts(this.db);
+      const row = await this.requireLearner();
+      return {
+        id: row.id,
+        displayName: row.displayName,
+        streak: row.streak,
+        hearts: row.hearts,
+        xp: row.xp,
+      };
+    });
+  }
+
+  private async syncLearnerHearts(executor: JoseDb) {
+    const row = await this.requireLearner(executor);
     const dripped = applyHeartDrip(row.hearts, row.heartsUpdatedAt, Date.now());
     if (dripped.changed) {
-      await this.db
+      await executor
         .update(learners)
         .set({
           hearts: dripped.hearts,
@@ -741,17 +862,10 @@ export class CurriculumService {
         })
         .where(eq(learners.id, DEMO_LEARNER_ID));
     }
-    return {
-      id: row.id,
-      displayName: row.displayName,
-      streak: row.streak,
-      hearts: dripped.hearts,
-      xp: row.xp,
-    };
   }
 
-  private async refillHearts() {
-    await this.db
+  private async refillHearts(executor: JoseDb = this.db) {
+    await executor
       .update(learners)
       .set({ hearts: MAX_HEARTS, heartsUpdatedAt: Date.now() })
       .where(eq(learners.id, DEMO_LEARNER_ID));
@@ -768,8 +882,8 @@ export class CurriculumService {
     );
   }
 
-  private async requireLearner() {
-    const [row] = await this.db
+  private async requireLearner(executor: JoseDb = this.db) {
+    const [row] = await executor
       .select()
       .from(learners)
       .where(eq(learners.id, DEMO_LEARNER_ID));
@@ -808,37 +922,38 @@ export class CurriculumService {
     return rows.reduce((max, row) => Math.max(max, row.sortOrder), -1);
   }
 
-  private async touchModule(moduleId: string) {
-    await this.db
+  private async touchModule(moduleId: string, executor: JoseDb = this.db) {
+    await executor
       .update(modules)
       .set({ updatedAt: Date.now() })
       .where(eq(modules.id, moduleId));
   }
 
-  private async deleteLevelsByModule(moduleId: string) {
-    const sectionRows = await this.db
+  private async deleteLevelsByModule(moduleId: string, executor: JoseDb = this.db) {
+    const sectionRows = await executor
       .select()
       .from(sections)
       .where(eq(sections.moduleId, moduleId));
     const ids: string[] = [];
     for (const section of sectionRows) {
-      const levelRows = await this.db
+      const levelRows = await executor
         .select()
         .from(levels)
         .where(eq(levels.sectionId, section.id));
       ids.push(...levelRows.map((l) => l.id));
     }
-    await this.deleteLevelRows(ids);
+    await this.deleteLevelRows(ids, executor);
   }
 
-  private async deleteLevelRows(ids: string[]) {
+  private async deleteLevelRows(ids: string[], executor: JoseDb = this.db) {
     if (ids.length === 0) return;
-    await this.db.delete(attempts).where(inArray(attempts.levelId, ids));
-    await this.db
+    await executor.delete(attempts).where(inArray(attempts.levelId, ids));
+    await executor.delete(missReceipts).where(inArray(missReceipts.levelId, ids));
+    await executor
       .delete(learnerProgress)
       .where(inArray(learnerProgress.levelId, ids));
-    await this.db.delete(lessonContent).where(inArray(lessonContent.levelId, ids));
-    await this.db.delete(gameContent).where(inArray(gameContent.levelId, ids));
-    await this.db.delete(levels).where(inArray(levels.id, ids));
+    await executor.delete(lessonContent).where(inArray(lessonContent.levelId, ids));
+    await executor.delete(gameContent).where(inArray(gameContent.levelId, ids));
+    await executor.delete(levels).where(inArray(levels.id, ids));
   }
 }

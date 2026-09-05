@@ -49,6 +49,11 @@ export const attemptBodySchema = z.object({
   payload: z.unknown().optional(),
 });
 
+export const missBodySchema = z.object({
+  /** Stable key so retries of the same miss do not spend another heart. */
+  idempotencyKey: z.string().trim().min(1).max(128),
+});
+
 export const missResponseSchema = z.object({
   learner: learnerSchema,
 });
@@ -63,4 +68,5 @@ export type ModuleCard = z.infer<typeof moduleCardSchema>;
 export type ModulesResponse = z.infer<typeof modulesResponseSchema>;
 export type PlayLevelResponse = z.infer<typeof playLevelResponseSchema>;
 export type AttemptBody = z.infer<typeof attemptBodySchema>;
+export type MissBody = z.infer<typeof missBodySchema>;
 export type MissResponse = z.infer<typeof missResponseSchema>;

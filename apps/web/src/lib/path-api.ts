@@ -115,10 +115,13 @@ export async function completeLevel(levelId: string) {
   return apiFetch(`/levels/${levelId}/complete`, { method: "POST", body: "{}" });
 }
 
-export async function recordMiss(levelId: string) {
+export async function recordMiss(
+  levelId: string,
+  idempotencyKey: string = crypto.randomUUID(),
+) {
   const json = await apiFetch(`/levels/${levelId}/miss`, {
     method: "POST",
-    body: "{}",
+    body: JSON.stringify({ idempotencyKey }),
   });
   return missResponseSchema.parse(json);
 }
