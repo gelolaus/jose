@@ -60,6 +60,10 @@ const STATEMENTS = [
     payload TEXT,
     created_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS seed_history (
+    id TEXT PRIMARY KEY,
+    applied_at INTEGER NOT NULL
+  )`,
 ];
 
 export async function ensureSchema(client: Client) {

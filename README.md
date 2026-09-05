@@ -15,6 +15,7 @@ Module grid + Duolingo-style levels (Next.js) and NestJS API with local SQLite (
 ```bash
 npm install
 npm run build --workspace=@jose/shared
+npm run db:seed -- --demo
 npm run dev
 ```
 
@@ -22,7 +23,19 @@ npm run dev
 - API: http://localhost:3001/health  
 - Teacher studio: Profile → Teacher studio, or http://localhost:3000/teach  
 
-The API creates `apps/api/data/jose.sqlite` and seeds **Work and Life of Rizal** plus the **Ateneo days** deep dive on first boot.
+The API opens `apps/api/data/jose.sqlite` (or `JOSE_DATABASE_URL`) and ensures the schema on boot. **It does not seed content on startup.**
+
+### Seeding (explicit, versioned)
+
+```bash
+# Curriculum only (Rizal path + Ateneo days). Safe to re-run; history is recorded.
+npm run db:seed
+
+# Opt in to the shared demo learner (prefab XP / streak / progress) for local play.
+npm run db:seed -- --demo
+```
+
+Seed application is tracked in `seed_history`. Re-running or restarting the API will not restore editorial deletions or invent learner achievements. Production accounts should be created with honest defaults (`createHonestLearner`: 0 XP, 0 streak, no progress).
 
 ## Tests
 

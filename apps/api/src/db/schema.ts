@@ -92,3 +92,9 @@ export const attempts = sqliteTable("attempts", {
   payload: text("payload"),
   createdAt: integer("created_at").notNull(),
 });
+
+/** Records which versioned seed scripts have already been applied. */
+export const seedHistory = sqliteTable("seed_history", {
+  id: text("id").primaryKey(),
+  appliedAt: integer("applied_at").notNull(),
+});

@@ -6,6 +6,7 @@ import { modulesResponseSchema, pathResponseSchema, HEARTS_EMPTY_CODE } from "@j
 import { AppModule } from "../app.module";
 import { CurriculumService } from "./curriculum.service";
 import { DatabaseService } from "../db/database.service";
+import { applyPendingSeeds } from "../db/seed";
 import { eq } from "drizzle-orm";
 import { learners } from "../db/schema";
 import { HttpException } from "@nestjs/common";
@@ -25,6 +26,7 @@ describe("CurriculumService", () => {
     await moduleRef.init();
     service = moduleRef.get(CurriculumService);
     database = moduleRef.get(DatabaseService);
+    await applyPendingSeeds(database.db, { includeDemo: true });
   });
 
   afterAll(async () => {
