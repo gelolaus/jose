@@ -3,11 +3,54 @@ import {
   primaryKey,
   sqliteTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  role: text("role").notNull().default("student"),
+  createdAt: integer("created_at").notNull(),
+  suspendedAt: integer("suspended_at"),
+});
+
+export const externalIdentities = sqliteTable(
+  "external_identities",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    issuer: text("issuer").notNull(),
+    subject: text("subject").notNull(),
+    emailNormalized: text("email_normalized"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => ({
+    providerSubjectUnique: uniqueIndex("external_identities_provider_issuer_subject").on(
+      table.provider,
+      table.issuer,
+      table.subject,
+    ),
+  }),
+);
+
+export const sessions = sqliteTable("sessions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: integer("expires_at").notNull(),
+  createdAt: integer("created_at").notNull(),
+  revokedAt: integer("revoked_at"),
+});
 
 export const learners = sqliteTable("learners", {
   id: text("id").primaryKey(),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
   displayName: text("display_name").notNull(),
+  avatarId: text("avatar_id").notNull().default("compass"),
   streak: integer("streak").notNull(),
   hearts: integer("hearts").notNull(),
   heartsUpdatedAt: integer("hearts_updated_at").notNull().default(0),

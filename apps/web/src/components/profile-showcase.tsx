@@ -1,6 +1,12 @@
 "use client";
 
 import { ExplorerAvatar } from "@/components/explorer-avatar";
+import { logout } from "@/lib/auth-api";
+import {
+  DEFAULT_AVATAR_ID,
+  isAvatarId,
+  type AvatarId,
+} from "@/lib/explorer-identity";
 import {
   useExplorerIdentity,
 } from "@/lib/use-explorer-identity";
@@ -12,6 +18,8 @@ import {
 import type { PathResponse } from "@jose/shared";
 import { Flame, Heart, Lock, Trophy, Zap } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 type ProfileShowcaseProps = {
   path: PathResponse;
@@ -19,18 +27,35 @@ type ProfileShowcaseProps = {
 
 export function ProfileShowcase({ path }: ProfileShowcaseProps) {
   const identity = useExplorerIdentity(path.learner.displayName);
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+  const serverAvatar: AvatarId =
+    path.learner.avatarId && isAvatarId(path.learner.avatarId)
+      ? path.learner.avatarId
+      : identity.avatarId || DEFAULT_AVATAR_ID;
+  const displayName = path.learner.displayName || identity.displayName;
 
   const trophies = deriveTrophies(path);
   const activeSectionId = highlightSectionId(path);
   const { streak, hearts, xp } = path.learner;
 
+  async function onSignOut() {
+    setSigningOut(true);
+    try {
+      await logout();
+      router.refresh();
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-5 py-8 sm:px-8 sm:py-10">
       <section className="flex flex-col items-center gap-4 text-center">
-        <ExplorerAvatar avatarId={identity.avatarId} floating />
+        <ExplorerAvatar avatarId={serverAvatar} floating />
         <div className="space-y-1.5">
           <h1 className="font-display text-4xl font-semibold tracking-tight text-slate-800 md:text-5xl">
-            {identity.displayName}
+            {displayName}
           </h1>
           <p className="text-base font-semibold text-slate-500 md:text-lg">
             Rizal path explorer
@@ -49,6 +74,14 @@ export function ProfileShowcase({ path }: ProfileShowcaseProps) {
           >
             Teacher studio
           </Link>
+          <button
+            type="button"
+            onClick={onSignOut}
+            disabled={signingOut}
+            className="rounded-full bg-white px-6 py-3 text-base font-extrabold text-slate-600 shadow-sm ring-1 ring-black/10 transition active:translate-y-0.5 disabled:opacity-60"
+          >
+            {signingOut ? "Signing out…" : "Sign out"}
+          </button>
         </div>
       </section>
 

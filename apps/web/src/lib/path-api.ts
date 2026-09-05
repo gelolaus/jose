@@ -1,4 +1,5 @@
 import {
+  SESSION_COOKIE_NAME,
   missResponseSchema,
   modulesResponseSchema,
   pathResponseSchema,
@@ -17,19 +18,46 @@ import {
 const DEFAULT_API = "http://localhost:3001";
 
 export function getApiBaseUrl() {
-  return process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || DEFAULT_API;
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
+  }
+  // Browser: same-origin `/api` rewrite so the session cookie stays on the web origin.
+  if (typeof window !== "undefined") {
+    return "/api";
+  }
+  return (
+    process.env.JOSE_INTERNAL_API_URL?.replace(/\/$/, "") || DEFAULT_API
+  );
 }
 
-async function apiFetch(path: string, init?: RequestInit): Promise<unknown> {
+async function sessionCookieHeader(): Promise<string | undefined> {
+  if (typeof window !== "undefined") return undefined;
+  try {
+    const { cookies } = await import("next/headers");
+    const store = await cookies();
+    const session = store.get(SESSION_COOKIE_NAME);
+    if (!session?.value) return undefined;
+    return `${SESSION_COOKIE_NAME}=${session.value}`;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function apiFetch(path: string, init?: RequestInit): Promise<unknown> {
   const headers: Record<string, string> = {
     ...(init?.headers as Record<string, string> | undefined),
   };
   if (init?.body) {
     headers["content-type"] = "application/json";
   }
+  const cookie = await sessionCookieHeader();
+  if (cookie && !headers.cookie) {
+    headers.cookie = cookie;
+  }
   const res = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
     cache: "no-store",
+    credentials: "include",
     headers,
   });
   const json: unknown = await res.json().catch(() => null);

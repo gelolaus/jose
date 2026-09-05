@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/learning-shell";
+import { ProfileAuthPanel } from "@/components/profile-auth-panel";
 import { ProfileShowcase } from "@/components/profile-showcase";
 import { fetchDemoPath } from "@/lib/path-api";
 import type { Metadata } from "next";
@@ -40,6 +41,7 @@ export default async function ProfilePage() {
 
   return (
     <AppShell>
+      <ProfileAuthPanel />
       <ProfileShowcase path={result.data} />
     </AppShell>
   );

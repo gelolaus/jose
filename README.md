@@ -30,7 +30,15 @@ The API creates `apps/api/data/jose.sqlite` and seeds **Work and Life of Rizal**
 npm test
 ```
 
-## Docs
+## Accounts & sessions
+
+Learner progress is keyed by the verified server session (`jose_session` HttpOnly cookie), never by a client-supplied learner id.
+
+- **Demo mode** (`JOSE_DEMO_MODE=true`): anonymous traffic uses the isolated `demo-student` row.
+- **Dev login** (`JOSE_DEV_LOGIN=true`): Profile → sign in with a stable account key to create a separate learner.
+- **Microsoft Entra**: disabled until `JOSE_MS_CLIENT_ID`, `JOSE_MS_CLIENT_SECRET`, and `JOSE_MS_REDIRECT_URI` are all set (see `apps/api/.env.example`).
+
+Browser calls go through the Next.js `/api` rewrite so the session cookie stays same-origin.
 
 - Modules / lessons / games: `docs/superpowers/specs/2026-08-15-rizal-modules-lessons-games-design.md`
 - Game stage (playable boards): `docs/superpowers/specs/2026-08-23-game-stage-design.md`

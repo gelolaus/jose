@@ -423,7 +423,9 @@ export async function seedIfEmpty(db: JoseDb) {
   if (existing.length === 0) {
     await db.insert(learners).values({
       id: DEMO_LEARNER_ID,
+      userId: null,
       displayName: "Explorer",
+      avatarId: "compass",
       streak: 3,
       hearts: 5,
       heartsUpdatedAt: now,

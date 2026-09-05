@@ -1,18 +1,15 @@
 "use client";
 
 import { ExplorerAvatar } from "@/components/explorer-avatar";
+import { patchProfile } from "@/lib/auth-api";
 import { AVATAR_CATALOG } from "@/lib/avatar-catalog";
 import {
   DEFAULT_DISPLAY_NAME,
   isAvatarId,
   normalizeDisplayName,
-  writeExplorerIdentity,
   type AvatarId,
 } from "@/lib/explorer-identity";
-import {
-  notifyExplorerIdentityChanged,
-  useExplorerIdentity,
-} from "@/lib/use-explorer-identity";
+import { useExplorerIdentity } from "@/lib/use-explorer-identity";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
@@ -35,8 +32,9 @@ function ProfileEditFields({
   const [displayName, setDisplayName] = useState(initial.displayName);
   const [avatarId, setAvatarId] = useState<AvatarId>(initial.avatarId);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  function onSave(event: FormEvent) {
+  async function onSave(event: FormEvent) {
     event.preventDefault();
     const name = normalizeDisplayName(displayName);
     if (!name) {
@@ -47,9 +45,21 @@ function ProfileEditFields({
       setError("Pick an avatar to continue.");
       return;
     }
-    writeExplorerIdentity({ displayName: name, avatarId });
-    notifyExplorerIdentityChanged();
-    router.push("/profile");
+    setSaving(true);
+    setError(null);
+    try {
+      await patchProfile({ displayName: name, avatarId });
+      router.push("/profile");
+      router.refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not save profile. Sign in and try again.",
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -64,7 +74,7 @@ function ProfileEditFields({
             Edit explorer
           </h1>
           <p className="mt-1 text-sm font-semibold text-slate-500 md:text-base">
-            Local flair only — no account yet
+            Saved to your Jose account
           </p>
         </div>
       </div>
@@ -130,9 +140,10 @@ function ProfileEditFields({
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
         <button
           type="submit"
-          className="rounded-full bg-rose-500 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
+          disabled={saving}
+          className="rounded-full bg-rose-500 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm disabled:opacity-60"
         >
-          Save
+          {saving ? "Saving…" : "Save"}
         </button>
         <button
           type="button"

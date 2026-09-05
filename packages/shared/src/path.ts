@@ -43,6 +43,7 @@ export const pathModuleSchema = z.object({
 export const learnerSchema = z.object({
   id: z.string().min(1),
   displayName: z.string().min(1),
+  avatarId: z.string().min(1).optional(),
   streak: z.number().int().nonnegative(),
   hearts: z.number().int().nonnegative(),
   xp: z.number().int().nonnegative(),

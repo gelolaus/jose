@@ -1,14 +1,43 @@
 import type { Client } from "@libsql/client";
 
 const STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    role TEXT NOT NULL DEFAULT 'student',
+    created_at INTEGER NOT NULL,
+    suspended_at INTEGER
+  )`,
+  `CREATE TABLE IF NOT EXISTS external_identities (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL,
+    issuer TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    email_normalized TEXT,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS external_identities_provider_issuer_subject
+    ON external_identities(provider, issuer, subject)`,
+  `CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    revoked_at INTEGER
+  )`,
   `CREATE TABLE IF NOT EXISTS learners (
     id TEXT PRIMARY KEY,
+    user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
     display_name TEXT NOT NULL,
+    avatar_id TEXT NOT NULL DEFAULT 'compass',
     streak INTEGER NOT NULL,
     hearts INTEGER NOT NULL,
     hearts_updated_at INTEGER NOT NULL DEFAULT 0,
     xp INTEGER NOT NULL
   )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS learners_user_id_unique
+    ON learners(user_id) WHERE user_id IS NOT NULL`,
   `CREATE TABLE IF NOT EXISTS modules (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
@@ -68,6 +97,8 @@ export async function ensureSchema(client: Client) {
     await client.execute(sql);
   }
   await ensureColumn(client, "learners", "hearts_updated_at", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(client, "learners", "avatar_id", "TEXT NOT NULL DEFAULT 'compass'");
+  await ensureColumn(client, "learners", "user_id", "TEXT");
 }
 
 async function ensureColumn(
