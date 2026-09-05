@@ -1,12 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { hintFor } from "./game-copy";
+import { hintFor, labelFor } from "./game-copy";
 
 describe("hintFor", () => {
-  it("tells sort players to Check after placing every chip", () => {
-    expect(hintFor("sort")).toBe("Put every chip in a chest, then Check.");
+  it("tells sort players to Check after placing evidence", () => {
+    expect(hintFor("sort")).toContain("Check");
   });
 
-  it("tells timeline players to Check after filling every stop", () => {
-    expect(hintFor("timeline")).toBe("Put every event on its stop, then Check.");
+  it("tells timeline players to explain the connection", () => {
+    expect(hintFor("timeline")).toContain("connection");
+  });
+
+  it("tells memory players the learning mode is untimed", () => {
+    expect(hintFor("memory")).toContain("no timer");
+  });
+});
+
+describe("labelFor", () => {
+  it("uses the upgraded activity names", () => {
+    expect(labelFor("quiz")).toBe("Evidence duel");
+    expect(labelFor("memory")).toBe("Archive match");
+    expect(labelFor("blank")).toBe("Restore the passage");
   });
 });

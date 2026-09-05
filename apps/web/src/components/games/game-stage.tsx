@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Heart, Star } from "lucide-react";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { SoundFocusControls, useFocusMode, useMotionSound } from "@/lib/motion-sound";
 import type { WhyPayload } from "./play-types";
 
 export function HeartsHud({ hearts, max = 5 }: { hearts: number; max?: number }) {
@@ -30,23 +31,39 @@ export function WhySheet({
   why: WhyPayload;
   onDismiss: () => void;
 }) {
-  const [ready, setReady] = useState(false);
-  const readyRef = useRef(false);
+  const { feedbackHoldMs, cancelStale, playCue } = useMotionSound();
+  const [ready, setReady] = useState(feedbackHoldMs === 0);
+  const readyRef = useRef(feedbackHoldMs === 0);
   const titleId = useId();
   const bodyId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const generationRef = useRef(0);
+
   useEffect(() => {
     dialogRef.current?.focus();
+    const generation = ++generationRef.current;
+    playCue(why.tone === "success" ? "accept" : why.tone === "explain" ? "progress" : "reject");
+    if (feedbackHoldMs === 0) {
+      readyRef.current = true;
+      return () => cancelStale();
+    }
     const t = window.setTimeout(() => {
+      if (generation !== generationRef.current) return;
       readyRef.current = true;
       setReady(true);
-    }, 650);
-    return () => window.clearTimeout(t);
-  }, []);
+    }, feedbackHoldMs);
+    return () => {
+      window.clearTimeout(t);
+      cancelStale();
+    };
+  }, [why, feedbackHoldMs, cancelStale, playCue]);
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape" && readyRef.current) onDismiss();
   }
+
+  const eyebrow =
+    why.tone === "success" ? "Why this works" : why.tone === "explain" ? "Take a look" : "Not quite";
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 p-4 sm:items-center">
@@ -58,10 +75,10 @@ export function WhySheet({
         aria-describedby={bodyId}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className="why-pop w-full max-w-md rounded-[1.75rem] bg-white p-5 shadow-xl outline-none ring-2 ring-amber-200 sm:p-6"
+        className="why-pop motion-screen w-full max-w-md rounded-[1.75rem] bg-white p-5 shadow-xl outline-none ring-2 ring-amber-200 sm:p-6"
       >
         <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-600">
-          Not quite
+          {eyebrow}
         </p>
         <h2 id={titleId} className="mt-2 font-display text-2xl font-semibold text-slate-800">
           {why.title}
@@ -69,6 +86,18 @@ export function WhySheet({
         <p id={bodyId} className="mt-2 whitespace-pre-line text-base font-semibold leading-relaxed text-slate-600">
           {why.body}
         </p>
+        {why.sourceLabel ? (
+          <p className="mt-3 text-sm font-bold text-slate-500">
+            Source:{" "}
+            {why.sourceHref ? (
+              <a href={why.sourceHref} className="text-violet-700 underline" target="_blank" rel="noreferrer">
+                {why.sourceLabel}
+              </a>
+            ) : (
+              why.sourceLabel
+            )}
+          </p>
+        ) : null}
         <button
           type="button"
           disabled={!ready}
@@ -103,17 +132,23 @@ export function StarCelebration({
   retryLabel?: string;
   continueLabel?: string;
 }) {
+  const { playCue, cancelStale, reducedMotion } = useMotionSound();
+  useEffect(() => {
+    playCue("milestone");
+    return () => cancelStale();
+  }, [playCue, cancelStale]);
+
   return (
     <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center gap-4 px-6 py-12 text-center">
       <div className="flex gap-2">
         {[1, 2, 3].map((n) => (
           <Star
             key={n}
-            className={`star-pop size-12 sm:size-14 ${
+            className={`size-12 sm:size-14 ${
               n <= stars ? "fill-amber-400 text-amber-400" : "text-slate-200"
-            }`}
+            } ${reducedMotion ? "" : "star-pop"}`}
             strokeWidth={2.2}
-            style={{ animationDelay: `${n * 80}ms` }}
+            style={reducedMotion ? undefined : { animationDelay: `${n * 80}ms` }}
             aria-hidden
           />
         ))}
@@ -143,6 +178,7 @@ export function StarCelebration({
           {continueLabel}
         </button>
       </div>
+      <SoundFocusControls className="mt-2 justify-center" />
     </div>
   );
 }
@@ -192,8 +228,13 @@ export function GameFrame({
   wide?: boolean;
   children: ReactNode;
 }) {
+  const [focus] = useFocusMode();
   return (
-    <div className={`mx-auto w-full px-4 py-3 sm:px-6 sm:py-8 ${wide ? "max-w-5xl" : "max-w-3xl"}`}>
+    <div
+      className={`mx-auto w-full px-4 py-3 sm:px-6 sm:py-8 ${wide ? "max-w-5xl" : "max-w-3xl"} ${
+        focus ? "jose-focus" : ""
+      }`}
+    >
       <div className="mb-2.5 flex items-start justify-between gap-3 sm:mb-5">
         <div className="min-w-0">
           <h1 className="font-display text-xl font-semibold tracking-tight text-slate-800 sm:text-4xl">
@@ -210,6 +251,7 @@ export function GameFrame({
               {progress}
             </p>
           ) : null}
+          <SoundFocusControls />
         </div>
       </div>
       {children}

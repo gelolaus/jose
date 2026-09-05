@@ -1,8 +1,9 @@
 "use client";
 
-import type { MemoryGame as MemoryContent } from "@jose/shared";
+import { pairExplanation, type MemoryGame as MemoryContent } from "@jose/shared";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useMotionSound } from "@/lib/motion-sound";
 import {
   applyMismatch,
   clockMs,
@@ -13,9 +14,11 @@ import type { PlayBoardProps } from "./play-types";
 
 type Card = {
   id: string;
-  pairId: number;
+  pairIndex: number;
+  pairId: string;
   text?: string;
   imageUrl?: string;
+  alt?: string;
 };
 
 const FLIP_BACK_MS = 700;
@@ -32,18 +35,23 @@ function shuffle<T>(items: T[]): T[] {
 
 function buildDeck(pairs: MemoryContent["pairs"]): Card[] {
   const built: Card[] = [];
-  pairs.forEach((pair, pairId) => {
+  pairs.forEach((pair, pairIndex) => {
+    const pairId = pair.id || `pair-${pairIndex}`;
     built.push({
       id: `${pairId}-a`,
+      pairIndex,
       pairId,
       text: pair.a.text,
       imageUrl: pair.a.imageUrl,
+      alt: pair.a.alt,
     });
     built.push({
       id: `${pairId}-b`,
+      pairIndex,
       pairId,
       text: pair.b.text,
       imageUrl: pair.b.imageUrl,
+      alt: pair.b.alt,
     });
   });
   return built;
@@ -90,22 +98,25 @@ function MemoryPlay({
   onHeartsEmpty,
 }: { game: MemoryContent } & PlayBoardProps) {
   const pairCount = game.pairs.length;
+  const timed = game.playMode === "timed";
+  const timing = game.timing;
   const [cards, setCards] = useState(() => buildDeck(game.pairs));
-
   const [flipped, setFlipped] = useState<string[]>([]);
   const [matched, setMatched] = useState<Set<number>>(new Set());
   const [lock, setLock] = useState(false);
   const [started, setStarted] = useState(false);
-  const [remainingMs, setRemainingMs] = useState(() => clockMs(pairCount));
+  const [remainingMs, setRemainingMs] = useState(() => clockMs(pairCount, timing));
   const [whyPair, setWhyPair] = useState<number | null>(null);
+  const [artifact, setArtifact] = useState<string | null>(null);
   const [lost, setLost] = useState(false);
   const [lostEmpty, setLostEmpty] = useState(false);
   const [hit, setHit] = useState(false);
   const [shake, setShake] = useState(false);
+  const { playCue } = useMotionSound();
 
   const flippedRef = useRef<string[]>([]);
   const matchedRef = useRef<Set<number>>(new Set());
-  const remainingRef = useRef(clockMs(pairCount));
+  const remainingRef = useRef(clockMs(pairCount, timing));
   const startedRef = useRef(false);
   const missesRef = useRef(0);
   const endingRef = useRef(false);
@@ -133,13 +144,14 @@ function MemoryPlay({
     missesRef.current = 0;
     flippedRef.current = [];
     matchedRef.current = new Set();
-    remainingRef.current = clockMs(pairCount);
+    remainingRef.current = clockMs(pairCount, timing);
     setFlipped([]);
     setMatched(new Set());
     setLock(false);
     setStarted(false);
-    setRemainingMs(clockMs(pairCount));
+    setRemainingMs(clockMs(pairCount, timing));
     setWhyPair(null);
+    setArtifact(null);
     setLost(false);
     setLostEmpty(false);
     setHit(false);
@@ -157,7 +169,7 @@ function MemoryPlay({
   }
 
   useEffect(() => {
-    if (!started || disabled || lost) return;
+    if (!timed || !started || disabled || lost) return;
     const id = window.setInterval(() => {
       if (endingRef.current) return;
       remainingRef.current = Math.max(0, remainingRef.current - TICK_MS);
@@ -167,15 +179,16 @@ function MemoryPlay({
         remainingMs: remainingRef.current,
         matchedCount: matchedRef.current.size,
         pairCount,
+        timed: true,
       });
       if (phase === "lost") void lose();
     }, TICK_MS);
     return () => window.clearInterval(id);
-  }, [started, disabled, lost, pairCount]);
+  }, [timed, started, disabled, lost, pairCount]);
 
   function flip(card: Card) {
     if (disabled || lock || lost || endingRef.current) return;
-    if (matched.has(card.pairId) || flippedRef.current.includes(card.id)) return;
+    if (matched.has(card.pairIndex) || flippedRef.current.includes(card.id)) return;
 
     if (!startedRef.current) {
       startedRef.current = true;
@@ -185,30 +198,38 @@ function MemoryPlay({
     const next = [...flippedRef.current, card.id];
     flippedRef.current = next;
     setFlipped(next);
+    playCue("select");
     if (next.length === 1) return;
 
     const first = cards.find((item) => item.id === next[0]);
     const second = cards.find((item) => item.id === next[1]);
     if (!first || !second) return;
 
-    if (first.pairId === second.pairId) {
+    if (first.pairIndex === second.pairIndex) {
       const nextMatched = new Set(matchedRef.current);
-      nextMatched.add(first.pairId);
+      nextMatched.add(first.pairIndex);
       matchedRef.current = nextMatched;
       setMatched(nextMatched);
-      setWhyPair(first.pairId);
+      setWhyPair(first.pairIndex);
+      const pair = game.pairs[first.pairIndex];
+      setArtifact(pair?.artifactLabel?.trim() || pairExplanation(pair ?? {}) || null);
+      playCue("match");
       flippedRef.current = [];
       setFlipped([]);
       if (nextMatched.size === pairCount) {
         endingRef.current = true;
+        playCue("artifact");
         onFinishRef.current(pairCount - missesRef.current, pairCount, missesRef.current);
       }
       return;
     }
 
     missesRef.current += 1;
-    remainingRef.current = applyMismatch(remainingRef.current);
-    setRemainingMs(remainingRef.current);
+    if (timed) {
+      remainingRef.current = applyMismatch(remainingRef.current, timing);
+      setRemainingMs(remainingRef.current);
+    }
+    playCue("reject");
     setHit(true);
     setShake(true);
     window.setTimeout(() => setHit(false), 400);
@@ -223,12 +244,14 @@ function MemoryPlay({
         remainingMs: remainingRef.current,
         matchedCount: matchedRef.current.size,
         pairCount,
+        timed,
       });
       if (phase === "lost") void lose();
     }, FLIP_BACK_MS);
   }
 
-  const fact = whyPair !== null ? game.pairs[whyPair]?.why : null;
+  const fact =
+    whyPair !== null ? pairExplanation(game.pairs[whyPair] ?? {}) : null;
 
   return (
     <div>
@@ -242,26 +265,37 @@ function MemoryPlay({
         }}
       >
         <div className="mb-3 flex items-center justify-center gap-3 sm:mb-4">
-          <p
-            className={`rounded-full border-[1.5px] border-amber-300 px-3 py-1 text-sm font-extrabold text-amber-100 ${
-              hit ? "clock-hit" : "bg-emerald-950"
-            }`}
-            aria-label={`${Math.ceil(remainingMs / 1000)} seconds left`}
-          >
-            {formatClock(remainingMs)}
-          </p>
+          {timed ? (
+            <p
+              className={`rounded-full border-[1.5px] border-amber-300 px-3 py-1 text-sm font-extrabold text-amber-100 ${
+                hit ? "clock-hit" : "bg-emerald-950"
+              }`}
+              aria-label={`${Math.ceil(remainingMs / 1000)} seconds left`}
+            >
+              {formatClock(remainingMs)}
+            </p>
+          ) : (
+            <p className="rounded-full border-[1.5px] border-amber-300/70 bg-emerald-950 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-amber-100">
+              Archive match · untimed
+            </p>
+          )}
           <p className="text-xs font-extrabold uppercase tracking-wide text-emerald-100/80">
             {matched.size} / {pairCount}
           </p>
         </div>
         <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
           {cards.map((card) => {
-            const open = flipped.includes(card.id) || matched.has(card.pairId);
+            const open = flipped.includes(card.id) || matched.has(card.pairIndex);
+            const label =
+              card.text?.trim() ||
+              card.alt?.trim() ||
+              `Archive card ${card.id}`;
             return (
               <li key={card.id} className="[perspective:1000px]">
                 <button
                   type="button"
-                  aria-label={`Card ${card.id}`}
+                  aria-label={open ? label : `Card ${card.id}`}
+                  aria-pressed={open}
                   onClick={() => flip(card)}
                   className="block w-full [transform-style:preserve-3d]"
                 >
@@ -280,7 +314,7 @@ function MemoryPlay({
                       </span>
                     </span>
                     <span className="card-face card-face-front absolute inset-0 overflow-hidden rounded-xl border-2 border-amber-200 bg-[#fff8ef] shadow-[0_4px_0_#c4b48a] sm:rounded-2xl">
-                      <CardFace text={card.text} imageUrl={card.imageUrl} />
+                      <CardFace text={card.text} imageUrl={card.imageUrl} alt={card.alt} />
                     </span>
                   </span>
                 </button>
@@ -290,9 +324,14 @@ function MemoryPlay({
         </ul>
       </div>
       {fact ? (
-        <p className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 ring-1 ring-amber-200">
-          {fact}
-        </p>
+        <div className="motion-artifact mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 ring-1 ring-amber-200">
+          <p>{fact}</p>
+          {artifact ? (
+            <p className="mt-2 text-xs font-extrabold uppercase tracking-wide text-amber-700">
+              Artifact collected: {artifact}
+            </p>
+          ) : null}
+        </div>
       ) : null}
       {lost ? (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 p-4 sm:items-center">
@@ -305,13 +344,13 @@ function MemoryPlay({
             className="w-full max-w-md rounded-[1.75rem] bg-white p-5 shadow-xl outline-none ring-2 ring-amber-200 sm:p-6"
           >
             <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-600">
-              Memory
+              Timed challenge
             </p>
             <h2 id="memory-timeout-title" className="mt-2 font-display text-2xl font-semibold text-slate-800">
               Time’s up
             </h2>
             <p className="mt-2 text-base font-semibold leading-relaxed text-slate-600">
-              The clock ran out before every pair was found.
+              Timed results stay separate from the untimed archive match used for learning.
             </p>
             {lostEmpty ? (
               <button
@@ -337,13 +376,25 @@ function MemoryPlay({
   );
 }
 
-function CardFace({ text, imageUrl }: { text?: string; imageUrl?: string }) {
+function CardFace({
+  text,
+  imageUrl,
+  alt,
+}: {
+  text?: string;
+  imageUrl?: string;
+  alt?: string;
+}) {
   if (imageUrl) {
     return (
       <span className="flex h-full flex-col items-center justify-center gap-1.5 p-2">
         <span className="flex aspect-[3/4] w-[72%] max-h-[78%] items-end justify-center overflow-hidden rounded-full border-2 border-amber-400 bg-amber-100">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+          <img
+            src={imageUrl}
+            alt={alt?.trim() || text?.trim() || "Historical image"}
+            className="h-full w-full object-cover"
+          />
         </span>
         {text ? (
           <span className="line-clamp-2 text-center text-[0.65rem] font-extrabold leading-tight text-slate-700 sm:text-xs">
@@ -372,16 +423,75 @@ function MemoryBuild({
   return (
     <div className="space-y-4">
       <p className="text-sm font-semibold text-slate-500">
-        Best as a photo on one card and a name on the other. Text-only pairs still work. Add a why
-        so a match teaches the fact.
+        Archive Match defaults to untimed learning. Add an explanation so every pair teaches why it
+        belongs together. Timed challenge is optional.
       </p>
+      <div className="flex flex-wrap gap-2">
+        {(["learning", "timed"] as const).map((playMode) => (
+          <button
+            key={playMode}
+            type="button"
+            onClick={() => onChange({ ...game, playMode })}
+            className={`rounded-full px-3 py-1.5 text-xs font-extrabold ${
+              game.playMode === playMode ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {playMode === "learning" ? "Learning (untimed)" : "Timed challenge"}
+          </button>
+        ))}
+      </div>
+      {game.playMode === "timed" ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="text-xs font-extrabold text-slate-500">
+            Seconds per pair
+            <input
+              type="number"
+              min={3}
+              max={60}
+              value={game.timing?.secondsPerPair ?? 8}
+              onChange={(e) =>
+                onChange({
+                  ...game,
+                  timing: {
+                    ...game.timing,
+                    secondsPerPair: Number(e.target.value) || 8,
+                    mismatchPenaltyMs: game.timing?.mismatchPenaltyMs ?? 3000,
+                  },
+                })
+              }
+              className="mt-1 w-full rounded-xl bg-white px-3 py-2 font-bold ring-1 ring-black/10"
+            />
+          </label>
+          <label className="text-xs font-extrabold text-slate-500">
+            Mismatch penalty (ms)
+            <input
+              type="number"
+              min={0}
+              max={30000}
+              step={500}
+              value={game.timing?.mismatchPenaltyMs ?? 3000}
+              onChange={(e) =>
+                onChange({
+                  ...game,
+                  timing: {
+                    secondsPerPair: game.timing?.secondsPerPair ?? 8,
+                    mismatchPenaltyMs: Number(e.target.value) || 0,
+                  },
+                })
+              }
+              className="mt-1 w-full rounded-xl bg-white px-3 py-2 font-bold ring-1 ring-black/10"
+            />
+          </label>
+        </div>
+      ) : null}
       {game.pairs.map((pair, i) => (
-        <div key={i} className="space-y-2 rounded-[1.5rem] bg-violet-50 p-3 ring-1 ring-violet-100">
+        <div key={pair.id} className="space-y-2 rounded-[1.5rem] bg-violet-50 p-3 ring-1 ring-violet-100">
           <div className="grid gap-2 sm:grid-cols-2">
             <SideFields
-              label={`Pair ${i + 1} · Photo`}
+              label={`Pair ${i + 1} · Side A`}
               text={pair.a.text ?? ""}
               imageUrl={pair.a.imageUrl ?? ""}
+              alt={pair.a.alt ?? ""}
               onChange={(side) => {
                 const pairs = [...game.pairs];
                 pairs[i] = { ...pair, a: side };
@@ -389,9 +499,10 @@ function MemoryBuild({
               }}
             />
             <SideFields
-              label="Name"
+              label="Side B"
               text={pair.b.text ?? ""}
               imageUrl={pair.b.imageUrl ?? ""}
+              alt={pair.b.alt ?? ""}
               onChange={(side) => {
                 const pairs = [...game.pairs];
                 pairs[i] = { ...pair, b: side };
@@ -400,11 +511,25 @@ function MemoryBuild({
             />
           </div>
           <input
-            value={pair.why ?? ""}
+            value={pair.explanation ?? pair.why ?? ""}
             placeholder="Why these match"
             onChange={(e) => {
               const pairs = [...game.pairs];
-              pairs[i] = { ...pair, why: e.target.value || undefined };
+              pairs[i] = {
+                ...pair,
+                explanation: e.target.value || undefined,
+                why: e.target.value || undefined,
+              };
+              onChange({ ...game, pairs });
+            }}
+            className="w-full rounded-xl bg-white px-3 py-2 text-sm font-semibold"
+          />
+          <input
+            value={pair.artifactLabel ?? ""}
+            placeholder="Artifact label (optional)"
+            onChange={(e) => {
+              const pairs = [...game.pairs];
+              pairs[i] = { ...pair, artifactLabel: e.target.value || undefined };
               onChange({ ...game, pairs });
             }}
             className="w-full rounded-xl bg-white px-3 py-2 text-sm font-semibold"
@@ -417,7 +542,15 @@ function MemoryBuild({
         onClick={() =>
           onChange({
             ...game,
-            pairs: [...game.pairs, { a: { text: "New A" }, b: { text: "New B" } }],
+            pairs: [
+              ...game.pairs,
+              {
+                id: `pair-${Date.now()}`,
+                a: { text: "New A" },
+                b: { text: "New B" },
+                explanation: "Explain the link.",
+              },
+            ],
           })
         }
       >
@@ -431,12 +564,14 @@ function SideFields({
   label,
   text,
   imageUrl,
+  alt,
   onChange,
 }: {
   label: string;
   text: string;
   imageUrl: string;
-  onChange: (side: { text?: string; imageUrl?: string }) => void;
+  alt: string;
+  onChange: (side: { text?: string; imageUrl?: string; alt?: string }) => void;
 }) {
   return (
     <div className="rounded-2xl bg-white p-3">
@@ -448,6 +583,7 @@ function SideFields({
           onChange({
             text: e.target.value || undefined,
             imageUrl: imageUrl || undefined,
+            alt: alt || undefined,
           })
         }
         className="mt-1 w-full rounded-xl bg-slate-50 px-3 py-2 font-bold"
@@ -459,6 +595,19 @@ function SideFields({
           onChange({
             text: text || undefined,
             imageUrl: e.target.value || undefined,
+            alt: alt || undefined,
+          })
+        }
+        className="mt-1 w-full rounded-xl bg-slate-50 px-3 py-2 font-bold"
+      />
+      <input
+        value={alt}
+        placeholder="Image alt text"
+        onChange={(e) =>
+          onChange({
+            text: text || undefined,
+            imageUrl: imageUrl || undefined,
+            alt: e.target.value || undefined,
           })
         }
         className="mt-1 w-full rounded-xl bg-slate-50 px-3 py-2 font-bold"

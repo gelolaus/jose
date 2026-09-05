@@ -1,6 +1,9 @@
 export type WhyPayload = {
   title: string;
   body: string;
+  tone?: "miss" | "explain" | "success";
+  sourceLabel?: string;
+  sourceHref?: string;
 };
 
 export type MissOpts = {

@@ -20,6 +20,11 @@
   --jose-coral: #fb7185;
   --background: #fff8ef;
   --foreground: #1f2937;
+  /* Motion system (#37): control 120–180ms, screen 180–280ms, short milestones */
+  --jose-motion-control: 150ms;
+  --jose-motion-screen: 220ms;
+  --jose-motion-milestone: 420ms;
+  --jose-motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @layer base {
@@ -122,9 +127,37 @@
     animation: jose-star-pop 0.55s cubic-bezier(0.2, 1.4, 0.3, 1);
   }
 
+  .motion-control {
+    transition:
+      transform var(--jose-motion-control) var(--jose-motion-ease),
+      opacity var(--jose-motion-control) var(--jose-motion-ease),
+      background-color var(--jose-motion-control) var(--jose-motion-ease),
+      box-shadow var(--jose-motion-control) var(--jose-motion-ease);
+  }
+
+  .motion-screen {
+    transition:
+      transform var(--jose-motion-screen) var(--jose-motion-ease),
+      opacity var(--jose-motion-screen) var(--jose-motion-ease);
+  }
+
+  .motion-accept {
+    animation: jose-accept var(--jose-motion-control) var(--jose-motion-ease);
+  }
+
+  .motion-artifact {
+    animation: jose-artifact var(--jose-motion-milestone) var(--jose-motion-ease);
+  }
+
+  .jose-focus .node-pulse,
+  .jose-focus .float-soft,
+  .jose-focus .slot-glow {
+    animation: none !important;
+  }
+
   .card-flip {
     transform-style: preserve-3d;
-    transition: transform 0.45s ease;
+    transition: transform var(--jose-motion-screen) var(--jose-motion-ease);
   }
 
   .card-flip-open {
@@ -253,7 +286,36 @@
   }
 }
 
+@keyframes jose-accept {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes jose-artifact {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    --jose-motion-control: 0.01ms;
+    --jose-motion-screen: 0.01ms;
+    --jose-motion-milestone: 0.01ms;
+  }
+
   *,
   *::before,
   *::after {
@@ -261,5 +323,11 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .node-pulse,
+  .float-soft,
+  .slot-glow {
+    animation: none !important;
   }
 }

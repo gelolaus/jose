@@ -37,7 +37,7 @@ describe("WhySheet", () => {
     fireEvent.keyDown(dialog, { key: "Escape" });
     expect(onDismiss).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(650);
+    await vi.advanceTimersByTimeAsync(280);
     fireEvent.keyDown(dialog, { key: "Escape" });
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });

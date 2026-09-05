@@ -1,4 +1,4 @@
-import { DEMO_LEARNER_ID, emptyGameContent, type GameContent } from "@jose/shared";
+import { DEMO_LEARNER_ID, emptyGameContent, parseGameContent, type GameContent } from "@jose/shared";
 import { and, eq, gte } from "drizzle-orm";
 import type { JoseDb } from "./database.service";
 import {
@@ -96,8 +96,9 @@ On **December 30, 1896**, Rizal was executed in Bagumbayan (today’s Luneta / R
 The path ends here on purpose. Deep-dive modules can go back and linger on school, loves, or Dapitan.`,
 };
 
-const CHILDHOOD_TIMELINE: GameContent = {
+const CHILDHOOD_TIMELINE = parseGameContent({
   type: "timeline",
+  dateHints: "optional",
   items: [
     {
       id: "born",
@@ -109,12 +110,14 @@ const CHILDHOOD_TIMELINE: GameContent = {
       id: "teodora",
       label: "Teodora teaches Pepe to read",
       year: "1860s",
+      groupId: "home-learning",
       why: "His first classroom was home. Teodora Alonso taught him letters and stories.",
     },
     {
       id: "moth",
       label: "The moth and the flame",
       year: "Story",
+      groupId: "home-learning",
       why: "Teodora’s tale warned him about getting too close to danger — it sticks because it is a story, not a date.",
     },
     {
@@ -124,9 +127,27 @@ const CHILDHOOD_TIMELINE: GameContent = {
       why: "Biñan is the first time the path leaves home. Latin and Spanish start here.",
     },
   ],
-};
+  causalLink: {
+    prompt: "How does home learning connect to leaving for Biñan?",
+    choices: [
+      {
+        id: "prep",
+        text: "Reading at home prepared him for a stricter school away from Calamba.",
+      },
+      {
+        id: "skip",
+        text: "The moth story meant he never needed school in Biñan.",
+      },
+    ],
+    correctChoiceId: "prep",
+    explanation:
+      "Home literacy comes first. Biñan is the next outward step on the path.",
+    fromItemId: "teodora",
+    toItemId: "binan",
+  },
+});
 
-const EDUCATION_QUIZ: GameContent = {
+const EDUCATION_QUIZ = parseGameContent({
   type: "quiz",
   questions: [
     {
@@ -134,12 +155,66 @@ const EDUCATION_QUIZ: GameContent = {
       choices: ["Biñan", "Dapitan", "Heidelberg", "Hong Kong"],
       correctIndex: 0,
       why: "Biñan came first — a strict teacher, Latin, and Spanish, still close to Calamba.",
+      whyCorrect: "Biñan is the first school stop after home learning.",
+    },
+    {
+      kind: "evidence",
+      prompt: "Which source best supports the claim?",
+      claim: "Noli Me Tangere argues for exposing colonial ills, not staging a carnival.",
+      sources: [
+        {
+          id: "dedication",
+          label: "Noli dedication",
+          excerpt: "I will strive to answer the calumnies…",
+          citation: "Noli Me Tangere, dedication",
+        },
+        {
+          id: "postcard",
+          label: "Travel postcard",
+          excerpt: "Weather fine in Berlin.",
+          citation: "Unrelated note",
+        },
+      ],
+      choices: [
+        { id: "dedication", text: "Noli dedication" },
+        { id: "postcard", text: "Travel postcard" },
+      ],
+      correctChoiceId: "dedication",
+      rationales: [
+        {
+          id: "direct",
+          text: "It directly frames the novel as answering colonial calumnies.",
+          correct: true,
+        },
+        { id: "weather", text: "Any European note proves the literary claim." },
+      ],
+      correctRationaleId: "direct",
+      why: "A weather note does not argue about colonial critique.",
+      whyCorrect: "The dedication is primary evidence for the novel’s reform purpose.",
+      objectiveTags: ["novels", "evidence"],
     },
     {
       prompt: "Which word marked outstanding Ateneo grades?",
       choices: ["Sobresaliente", "Cum laude", "Magna", "Principal"],
       correctIndex: 0,
       why: "Sobresaliente was the Ateneo’s public honor for top work.",
+      whyCorrect: "Sobresaliente was Ateneo’s public honor word.",
+    },
+    {
+      kind: "evidence",
+      prompt: "Strongest evidence that Berlin matters to Noli’s publication?",
+      claim: "Noli Me Tangere was printed in Berlin in 1887.",
+      sources: [
+        { id: "imprint", label: "1887 Berlin imprint note", citation: "Publication record" },
+        { id: "menu", label: "Café menu", citation: "Unrelated" },
+      ],
+      choices: [
+        { id: "imprint", text: "1887 Berlin imprint note" },
+        { id: "menu", text: "Café menu" },
+      ],
+      correctChoiceId: "imprint",
+      whyCorrect: "The imprint is direct publication evidence.",
+      objectiveTags: ["novels", "evidence"],
     },
     {
       prompt: "Why did he leave UST for Madrid?",
@@ -151,11 +226,12 @@ const EDUCATION_QUIZ: GameContent = {
       ],
       correctIndex: 1,
       why: "UST taught him medicine — and how colonial classrooms treated Filipinos. That push sent him to Spain.",
+      whyCorrect: "Treatment of Filipino students pushed him toward Madrid.",
     },
   ],
-};
+});
 
-const TRAVELS_MEMORY: GameContent = {
+const TRAVELS_MEMORY = parseGameContent({
   type: "memory",
   pairs: [
     {
@@ -191,55 +267,74 @@ const TRAVELS_MEMORY: GameContent = {
       why: "He annotated Morga so readers could see a Philippines that was not empty before the colony.",
     },
   ],
-};
+});
 
-const NOVELS_SORT: GameContent = {
+const NOVELS_SORT = parseGameContent({
   type: "sort",
   buckets: [
-    { id: "noli", label: "Noli Me Tangere" },
-    { id: "fili", label: "El Filibusterismo" },
+    { id: "noli", label: "Noli Me Tangere", role: "category" },
+    { id: "fili", label: "El Filibusterismo", role: "category" },
+    { id: "unsure", label: "Insufficient evidence", role: "insufficient-evidence" },
   ],
   items: [
     {
       id: "ibarra",
       label: "Crisostomo Ibarra",
       bucketId: "noli",
+      scoring: "auto",
       why: "Noli follows Ibarra in San Diego — a diagnosis of the sick colony.",
+      source: { label: "Noli Me Tangere", citation: "Novel text" },
     },
     {
       id: "simoun",
       label: "Simoun",
       bucketId: "fili",
+      scoring: "auto",
       why: "In the sequel Ibarra returns as Simoun. The temperature drops.",
+      source: { label: "El Filibusterismo", citation: "Novel text" },
     },
     {
       id: "year-noli",
       label: "Published 1887 in Berlin",
       bucketId: "noli",
+      scoring: "auto",
       why: "Noli Me Tangere: 1887, Berlin.",
     },
     {
       id: "year-fili",
       label: "Published 1891",
       bucketId: "fili",
+      scoring: "auto",
       why: "El Filibusterismo is the 1891 sequel — colder, plotted, less hopeful.",
     },
     {
       id: "touch",
       label: "“Touch me not”",
       bucketId: "noli",
+      scoring: "auto",
       why: "That is what Noli Me Tangere means.",
     },
     {
-      id: "darker",
-      label: "Reform talk gives way to a darker plot",
-      bucketId: "fili",
-      why: "Fili is the colder book. Teachers pair a chapter from each so you feel the change.",
+      id: "rumor",
+      label: "A classmate said Fili is happier than Noli",
+      bucketId: "unsure",
+      scoring: "auto",
+      why: "Hearsay without a passage is insufficient evidence.",
+    },
+    {
+      id: "tone",
+      label: "Which book feels colder — and why?",
+      scoring: "discussion",
+      why: "Discussion prompt: Fili is usually read as colder. Do not auto-grade a single opinion chip.",
+      justificationChoices: [
+        { id: "fili-cold", text: "Fili reads colder and more conspiratorial." },
+        { id: "noli-cold", text: "Noli is colder because it is earlier." },
+      ],
     },
   ],
-};
+});
 
-const MARTYRDOM_BLANK: GameContent = {
+const MARTYRDOM_BLANK = parseGameContent({
   type: "blank",
   items: [
     {
@@ -247,23 +342,49 @@ const MARTYRDOM_BLANK: GameContent = {
       answer: "Bagumbayan",
       decoys: ["Fort Santiago", "Dapitan", "Calamba"],
       why: "Bagumbayan is today’s Luneta / Rizal Park. The date is December 30, 1896.",
+      whyCorrect: "Bagumbayan anchors the December 30, 1896 execution.",
+      objective: "Identify the execution site from a sourced martyrdom passage.",
+      source: {
+        id: "src-martyr",
+        label: "Martyrdom lesson",
+        citation: "Module lesson: Martyrdom",
+      },
+      distractors: [
+        { text: "Fort Santiago", why: "Fort Santiago is imprisonment, not the execution field." },
+        { text: "Dapitan", why: "Dapitan is exile, years earlier." },
+        { text: "Calamba", why: "Calamba is his birthplace." },
+      ],
     },
     {
       sentence: "Mi Último Adiós was hidden in a ___ and given to his family.",
       answer: "lamp",
       decoys: ["book", "hat", "letterbox"],
       why: "The poem rode in a lamp — a farewell to the country, not a speech for the court.",
+      whyCorrect: "The lamp is the conveyance detail this passage restores.",
+      objective: "Recall how the farewell poem was conveyed.",
+      source: {
+        id: "src-adios",
+        label: "Último Adiós context",
+        citation: "Module lesson: Martyrdom",
+      },
     },
     {
       sentence: "The trial charged him with rebellion, sedition, and ___.",
       answer: "illegal association",
       decoys: ["piracy", "theft", "heresy"],
       why: "Those three charges — not a fair fight — are what the Manila court used.",
+      whyCorrect: "Illegal association completes the three trial charges.",
+      objective: "Name the third charge used in the Manila trial.",
+      source: {
+        id: "src-trial",
+        label: "Arrest & trial lesson",
+        citation: "Module lesson: Arrest & trial",
+      },
     },
   ],
-};
+});
 
-const ATENEO_QUIZ: GameContent = {
+const ATENEO_QUIZ = parseGameContent({
   type: "quiz",
   questions: [
     {
@@ -285,9 +406,9 @@ const ATENEO_QUIZ: GameContent = {
       why: "Jesuits ran Ateneo. Dominicans show up later at UST.",
     },
   ],
-};
+});
 
-const ATENEO_MEMORY: GameContent = {
+const ATENEO_MEMORY = parseGameContent({
   type: "memory",
   pairs: [
     {
@@ -311,9 +432,9 @@ const ATENEO_MEMORY: GameContent = {
       why: "1872 is the door into this module.",
     },
   ],
-};
+});
 
-const ATENEO_TIMELINE: GameContent = {
+const ATENEO_TIMELINE = parseGameContent({
   type: "timeline",
   items: [
     {
@@ -341,9 +462,9 @@ const ATENEO_TIMELINE: GameContent = {
       why: "Awards like Sobresaliente were public. Standing in class mattered.",
     },
   ],
-};
+});
 
-const ATENEO_BLANK: GameContent = {
+const ATENEO_BLANK = parseGameContent({
   type: "blank",
   items: [
     {
@@ -359,9 +480,9 @@ const ATENEO_BLANK: GameContent = {
       why: "Sobresaliente is Ateneo’s word, not the later university Latin.",
     },
   ],
-};
+});
 
-const ATENEO_SORT: GameContent = {
+const ATENEO_SORT = parseGameContent({
   type: "sort",
   buckets: [
     { id: "ateneo", label: "Ateneo days" },
@@ -393,7 +514,7 @@ const ATENEO_SORT: GameContent = {
       why: "The Liga is 1892 in Manila, after Europe — not a school club.",
     },
   ],
-};
+});
 
 function lesson(id: string, title: string): SeedLevel {
   return {
