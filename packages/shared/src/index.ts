@@ -4,5 +4,6 @@ export * from "./youtube";
 export * from "./games";
 export * from "./hearts";
 export * from "./modules";
+export * from "./assessment";
 export * from "./teach";
 export * from "./auth";

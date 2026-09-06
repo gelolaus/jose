@@ -117,10 +117,41 @@ export const attempts = sqliteTable("attempts", {
   levelId: text("level_id")
     .notNull()
     .references(() => levels.id, { onDelete: "cascade" }),
+  contentRevision: text("content_revision").notNull().default(""),
+  mode: text("mode").notNull().default("assessment"),
+  status: text("status").notNull().default("finished"),
+  clientAttemptId: text("client_attempt_id"),
   score: integer("score").notNull(),
   maxScore: integer("max_score").notNull(),
+  stars: integer("stars"),
   payload: text("payload"),
+  secretJson: text("secret_json"),
+  eventsJson: text("events_json"),
   createdAt: integer("created_at").notNull(),
+  finishedAt: integer("finished_at"),
+});
+
+/** Idempotency receipts for heart-spending miss mutations. */
+export const missReceipts = sqliteTable(
+  "miss_receipts",
+  {
+    learnerId: text("learner_id")
+      .notNull()
+      .references(() => learners.id, { onDelete: "cascade" }),
+    idempotencyKey: text("idempotency_key").notNull(),
+    levelId: text("level_id")
+      .notNull()
+      .references(() => levels.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.learnerId, table.idempotencyKey] }),
+  }),
+);
+
+export const seedHistory = sqliteTable("seed_history", {
+  id: text("id").primaryKey(),
+  appliedAt: integer("applied_at").notNull(),
 });
 
 /** Application accounts. Email is admission metadata, never the primary key. */

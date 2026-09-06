@@ -97,6 +97,7 @@ export function TimelineGame({
   disabled = false,
   onMiss,
   onFinish,
+  onEvaluate,
   onChange,
 }: {
   game: TimelineContent;
@@ -108,7 +109,15 @@ export function TimelineGame({
     return <TimelineBuild game={game} onChange={onChange} />;
   }
   if (!onMiss || !onFinish) return null;
-  return <TimelinePlay game={game} disabled={disabled} onMiss={onMiss} onFinish={onFinish} />;
+  return (
+    <TimelinePlay
+      game={game}
+      disabled={disabled}
+      onMiss={onMiss}
+      onFinish={onFinish}
+      onEvaluate={onEvaluate}
+    />
+  );
 }
 
 function TimelinePlay({
@@ -116,6 +125,7 @@ function TimelinePlay({
   disabled,
   onMiss,
   onFinish,
+  onEvaluate,
 }: { game: TimelineContent } & PlayBoardProps) {
   const [placed, setPlaced] = useState<Record<number, string>>({});
   const [locked, setLocked] = useState<Record<string, true>>({});
@@ -172,12 +182,47 @@ function TimelinePlay({
 
   async function check() {
     if (disabled || !allStopsFilled(game.items, placed)) return;
+    const order = game.items.map((_, index) => placed[index]!);
+
+    if (onEvaluate) {
+      const result = await onEvaluate({ type: "timeline_check", order });
+      if (result.perfect || result.correct) {
+        const all: Record<string, true> = {};
+        for (const item of game.items) all[item.id] = true;
+        setLocked(all);
+        onFinish(game.items.length - missesRef.current, game.items.length, missesRef.current, {
+          type: "timeline",
+          order,
+        });
+        return;
+      }
+      missesRef.current += 1;
+      const nextPlaced = { ...placed };
+      const nextLocked: Record<string, true> = { ...locked };
+      for (const id of result.correctIds ?? []) nextLocked[id] = true;
+      for (const item of game.items) {
+        if (nextLocked[item.id]) continue;
+        const slot = slotOf(nextPlaced, item.id);
+        if (slot !== null) delete nextPlaced[slot];
+      }
+      setPlaced(nextPlaced);
+      setLocked(nextLocked);
+      drag.select(null);
+      setShake(true);
+      window.setTimeout(() => setShake(false), 550);
+      await onMiss(result.feedback ?? null);
+      return;
+    }
+
     const result = gradeTimelineCheck(game.items, placed);
     if (result.perfect) {
       const all: Record<string, true> = {};
       for (const item of game.items) all[item.id] = true;
       setLocked(all);
-      onFinish(game.items.length - missesRef.current, game.items.length, missesRef.current);
+      onFinish(game.items.length - missesRef.current, game.items.length, missesRef.current, {
+        type: "timeline",
+        order,
+      });
       return;
     }
     missesRef.current += 1;

@@ -9,6 +9,7 @@ import { DEMO_LEARNER_ID } from "@jose/shared";
 import { AppModule } from "../app.module";
 import { CurriculumService } from "../curriculum/curriculum.service";
 import { DatabaseService } from "../db/database.service";
+import { applyPendingSeeds } from "../db/seed";
 import { attempts, learnerProgress, learners } from "../db/schema";
 import { AuthService } from "./auth.service";
 import { SessionService } from "./session.service";
@@ -43,6 +44,7 @@ describe("Per-account learner isolation (issue #3)", () => {
     sessions = moduleRef.get(SessionService);
     curriculum = moduleRef.get(CurriculumService);
     database = moduleRef.get(DatabaseService);
+    await applyPendingSeeds(database.db, { includeDemo: true });
 
     alice = await createTestAccount(database, {
       admissionEmail: "alice@student.apc.edu.ph",
@@ -82,10 +84,16 @@ describe("Per-account learner isolation (issue #3)", () => {
     expect(alicePath.sections[0]?.nodes[0]?.status).toBe("current");
 
     await curriculum.completeLevel("ateneo-welcome", alice.learnerId);
-    await curriculum.recordMiss("ateneo-quiz", alice.learnerId);
-    await curriculum.submitAttempt(
-      "ateneo-quiz",
-      { score: 2, maxScore: 3 },
+    await curriculum.recordMiss("ateneo-quiz", alice.learnerId, {
+      idempotencyKey: "alice-miss-1",
+    });
+    const play = await curriculum.getPlayLevel("ateneo-quiz", alice.learnerId);
+    expect(play.attempt?.id).toBeTruthy();
+    const choices =
+      play.game?.type === "quiz" ? play.game.questions.map(() => 0) : [];
+    await curriculum.finishAttempt(
+      play.attempt!.id,
+      { answers: { type: "quiz", choices } },
       alice.learnerId,
     );
 
@@ -145,6 +153,11 @@ describe("Per-account learner isolation (issue #3)", () => {
 
     const anonymous = await request(app.getHttpServer()).get("/modules").expect(200);
     expect(anonymous.body.learner.id).toBe(DEMO_LEARNER_ID);
+
+    await request(app.getHttpServer()).get("/levels/ateneo-welcome").expect(401);
+    await request(app.getHttpServer())
+      .post("/levels/ateneo-welcome/complete")
+      .expect(401);
   });
 
   it("restores the same profile after logout and re-login on the same account", async () => {
@@ -223,6 +236,7 @@ describe("Learner access without demo mode", () => {
     app = moduleRef.createNestApplication();
     await app.init();
     database = moduleRef.get(DatabaseService);
+    await applyPendingSeeds(database.db, { includeDemo: true });
     learner = await createTestAccount(database, {
       admissionEmail: "solo@student.apc.edu.ph",
       displayName: "Solo",

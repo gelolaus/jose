@@ -1,11 +1,18 @@
 "use client";
 
-import type { SortGame as SortContent } from "@jose/shared";
+import type { AssessmentSort, SortGame as SortContent } from "@jose/shared";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { PlayBoardProps } from "./play-types";
 import { allChipsPlaced, formatSortWhy, gradeSortCheck } from "./sort-grade";
 import { PlaceGhost, usePlaceDrag } from "./use-place-drag";
+
+type SortPlayContent = SortContent | AssessmentSort;
+
+function isAuthorSort(game: SortPlayContent): game is SortContent {
+  const item = game.items[0];
+  return Boolean(item && "bucketId" in item);
+}
 
 const CHEST_BODY = ["#f59e0b", "#f97316", "#eab308"] as const;
 const CHEST_SHADOW = ["#d97706", "#c2410c", "#a16207"] as const;
@@ -29,18 +36,27 @@ export function SortGame({
   disabled = false,
   onMiss,
   onFinish,
+  onEvaluate,
   onChange,
 }: {
-  game: SortContent;
+  game: SortPlayContent;
   mode?: "play" | "build";
   disabled?: boolean;
   onChange?: (game: SortContent) => void;
 } & Partial<PlayBoardProps>) {
-  if (mode === "build" && onChange) {
+  if (mode === "build" && onChange && isAuthorSort(game)) {
     return <SortBuild game={game} onChange={onChange} />;
   }
   if (!onMiss || !onFinish) return null;
-  return <SortPlay game={game} disabled={disabled} onMiss={onMiss} onFinish={onFinish} />;
+  return (
+    <SortPlay
+      game={game}
+      disabled={disabled}
+      onMiss={onMiss}
+      onFinish={onFinish}
+      onEvaluate={onEvaluate}
+    />
+  );
 }
 
 function SortPlay({
@@ -48,7 +64,8 @@ function SortPlay({
   disabled,
   onMiss,
   onFinish,
-}: { game: SortContent } & PlayBoardProps) {
+  onEvaluate,
+}: { game: SortPlayContent } & PlayBoardProps) {
   const [placed, setPlaced] = useState<Record<string, string>>({});
   const [locked, setLocked] = useState<Record<string, true>>({});
   const [shake, setShake] = useState(false);
@@ -84,12 +101,47 @@ function SortPlay({
 
   async function check() {
     if (disabled || !allChipsPlaced(game.items, placed)) return;
-    const result = gradeSortCheck(game.items, placed);
+
+    if (onEvaluate) {
+      const result = await onEvaluate({ type: "sort_check", placements: placed });
+      if (result.perfect || result.correct) {
+        const all: Record<string, true> = {};
+        for (const item of game.items) all[item.id] = true;
+        setLocked(all);
+        onFinish(game.items.length - missesRef.current, game.items.length, missesRef.current, {
+          type: "sort",
+          placements: placed,
+        });
+        return;
+      }
+      missesRef.current += 1;
+      const nextPlaced = { ...placed };
+      const nextLocked: Record<string, true> = { ...locked };
+      for (const id of result.correctIds ?? []) nextLocked[id] = true;
+      for (const item of game.items) {
+        if (!nextLocked[item.id]) delete nextPlaced[item.id];
+      }
+      setPlaced(nextPlaced);
+      setLocked(nextLocked);
+      drag.select(null);
+      setShake(true);
+      window.setTimeout(() => setShake(false), 550);
+      await onMiss(result.feedback ?? null);
+      return;
+    }
+
+    const result = gradeSortCheck(
+      isAuthorSort(game) ? game.items : [],
+      placed,
+    );
     if (result.perfect) {
       const all: Record<string, true> = {};
       for (const item of game.items) all[item.id] = true;
       setLocked(all);
-      onFinish(game.items.length - missesRef.current, game.items.length, missesRef.current);
+      onFinish(game.items.length - missesRef.current, game.items.length, missesRef.current, {
+        type: "sort",
+        placements: placed,
+      });
       return;
     }
     missesRef.current += 1;

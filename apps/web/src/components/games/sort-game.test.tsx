@@ -72,6 +72,9 @@ describe("SortGame play", () => {
     tapChip("Simoun");
     tapChest("El Filibusterismo");
     fireEvent.click(screen.getByRole("button", { name: "Check" }));
-    expect(onFinish).toHaveBeenCalledWith(2, 3, 1);
+    expect(onFinish).toHaveBeenCalledWith(2, 3, 1, {
+      type: "sort",
+      placements: { a: "noli", b: "fili", c: "noli" },
+    });
   });
 });

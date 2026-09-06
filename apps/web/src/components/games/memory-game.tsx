@@ -1,6 +1,6 @@
 "use client";
 
-import type { MemoryGame as MemoryContent } from "@jose/shared";
+import type { AssessmentMemory, MemoryGame as MemoryContent } from "@jose/shared";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -17,6 +17,12 @@ type Card = {
   text?: string;
   imageUrl?: string;
 };
+
+type MemoryPlayContent = MemoryContent | AssessmentMemory;
+
+function isAuthorMemory(game: MemoryPlayContent): game is MemoryContent {
+  return game.type === "memory" && "pairs" in game;
+}
 
 const FLIP_BACK_MS = 700;
 const TICK_MS = 100;
@@ -53,21 +59,33 @@ function deal(pairs: MemoryContent["pairs"]): Card[] {
   return shuffle(buildDeck(pairs));
 }
 
+function assessmentCards(game: AssessmentMemory): Card[] {
+  return shuffle(
+    game.cards.map((card, index) => ({
+      id: card.id,
+      pairId: -1 - index,
+      text: card.text,
+      imageUrl: card.imageUrl,
+    })),
+  );
+}
+
 export function MemoryGame({
   game,
   mode = "play",
   disabled = false,
   onMiss,
   onFinish,
+  onEvaluate,
   onHeartsEmpty,
   onChange,
 }: {
-  game: MemoryContent;
+  game: MemoryPlayContent;
   mode?: "play" | "build";
   disabled?: boolean;
   onChange?: (game: MemoryContent) => void;
 } & Partial<PlayBoardProps>) {
-  if (mode === "build" && onChange) {
+  if (mode === "build" && onChange && isAuthorMemory(game)) {
     return <MemoryBuild game={game} onChange={onChange} />;
   }
   if (!onMiss || !onFinish) return null;
@@ -77,6 +95,7 @@ export function MemoryGame({
       disabled={disabled}
       onMiss={onMiss}
       onFinish={onFinish}
+      onEvaluate={onEvaluate}
       onHeartsEmpty={onHeartsEmpty}
     />
   );
@@ -87,17 +106,23 @@ function MemoryPlay({
   disabled,
   onMiss,
   onFinish,
+  onEvaluate,
   onHeartsEmpty,
-}: { game: MemoryContent } & PlayBoardProps) {
-  const pairCount = game.pairs.length;
-  const [cards, setCards] = useState(() => buildDeck(game.pairs));
+}: { game: MemoryPlayContent } & PlayBoardProps) {
+  const author = isAuthorMemory(game);
+  const pairCount = author ? game.pairs.length : game.pairCount;
+  const [cards, setCards] = useState(() =>
+    author ? buildDeck(game.pairs) : assessmentCards(game),
+  );
 
   const [flipped, setFlipped] = useState<string[]>([]);
   const [matched, setMatched] = useState<Set<number>>(new Set());
+  const [matchedIds, setMatchedIds] = useState<Set<string>>(new Set());
   const [lock, setLock] = useState(false);
   const [started, setStarted] = useState(false);
   const [remainingMs, setRemainingMs] = useState(() => clockMs(pairCount));
   const [whyPair, setWhyPair] = useState<number | null>(null);
+  const [whyText, setWhyText] = useState<string | null>(null);
   const [lost, setLost] = useState(false);
   const [lostEmpty, setLostEmpty] = useState(false);
   const [hit, setHit] = useState(false);
@@ -105,23 +130,29 @@ function MemoryPlay({
 
   const flippedRef = useRef<string[]>([]);
   const matchedRef = useRef<Set<number>>(new Set());
+  const matchedIdsRef = useRef<Set<string>>(new Set());
+  const matchesRef = useRef<{ cardA: string; cardB: string }[]>([]);
   const remainingRef = useRef(clockMs(pairCount));
   const startedRef = useRef(false);
   const missesRef = useRef(0);
   const endingRef = useRef(false);
   const onMissRef = useRef(onMiss);
   const onFinishRef = useRef(onFinish);
+  const onEvaluateRef = useRef(onEvaluate);
   const lostDialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     onMissRef.current = onMiss;
     onFinishRef.current = onFinish;
-  }, [onFinish, onMiss]);
+    onEvaluateRef.current = onEvaluate;
+  }, [onFinish, onMiss, onEvaluate]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setCards(deal(game.pairs)), 0);
+    const timer = window.setTimeout(() => {
+      setCards(author ? deal(game.pairs) : assessmentCards(game));
+    }, 0);
     return () => window.clearTimeout(timer);
-  }, [game.pairs]);
+  }, [author, game]);
 
   useEffect(() => {
     if (lost) lostDialogRef.current?.focus();
@@ -133,18 +164,22 @@ function MemoryPlay({
     missesRef.current = 0;
     flippedRef.current = [];
     matchedRef.current = new Set();
+    matchedIdsRef.current = new Set();
+    matchesRef.current = [];
     remainingRef.current = clockMs(pairCount);
     setFlipped([]);
     setMatched(new Set());
+    setMatchedIds(new Set());
     setLock(false);
     setStarted(false);
     setRemainingMs(clockMs(pairCount));
     setWhyPair(null);
+    setWhyText(null);
     setLost(false);
     setLostEmpty(false);
     setHit(false);
     setShake(false);
-    setCards(deal(game.pairs));
+    setCards(author ? deal(game.pairs) : assessmentCards(game));
   }
 
   async function lose() {
@@ -162,10 +197,13 @@ function MemoryPlay({
       if (endingRef.current) return;
       remainingRef.current = Math.max(0, remainingRef.current - TICK_MS);
       setRemainingMs(remainingRef.current);
+      const matchedCount = onEvaluateRef.current
+        ? matchedIdsRef.current.size / 2
+        : matchedRef.current.size;
       const phase = roundPhase({
         started: true,
         remainingMs: remainingRef.current,
-        matchedCount: matchedRef.current.size,
+        matchedCount,
         pairCount,
       });
       if (phase === "lost") void lose();
@@ -173,9 +211,46 @@ function MemoryPlay({
     return () => window.clearInterval(id);
   }, [started, disabled, lost, pairCount]);
 
+  function finishMemory() {
+    endingRef.current = true;
+    onFinishRef.current(pairCount - missesRef.current, pairCount, missesRef.current, {
+      type: "memory",
+      matches: matchesRef.current,
+    });
+  }
+
+  function handleMismatch() {
+    missesRef.current += 1;
+    remainingRef.current = applyMismatch(remainingRef.current);
+    setRemainingMs(remainingRef.current);
+    setHit(true);
+    setShake(true);
+    window.setTimeout(() => setHit(false), 400);
+    setLock(true);
+    window.setTimeout(() => {
+      flippedRef.current = [];
+      setFlipped([]);
+      setLock(false);
+      setShake(false);
+      const matchedCount = onEvaluateRef.current
+        ? matchedIdsRef.current.size / 2
+        : matchedRef.current.size;
+      const phase = roundPhase({
+        started: true,
+        remainingMs: remainingRef.current,
+        matchedCount,
+        pairCount,
+      });
+      if (phase === "lost") void lose();
+    }, FLIP_BACK_MS);
+  }
+
   function flip(card: Card) {
     if (disabled || lock || lost || endingRef.current) return;
-    if (matched.has(card.pairId) || flippedRef.current.includes(card.id)) return;
+    const alreadyMatched = onEvaluate
+      ? matchedIds.has(card.id)
+      : matched.has(card.pairId);
+    if (alreadyMatched || flippedRef.current.includes(card.id)) return;
 
     if (!startedRef.current) {
       startedRef.current = true;
@@ -191,44 +266,61 @@ function MemoryPlay({
     const second = cards.find((item) => item.id === next[1]);
     if (!first || !second) return;
 
+    if (onEvaluate) {
+      setLock(true);
+      void (async () => {
+        const result = await onEvaluate({
+          type: "memory_match",
+          cardA: first.id,
+          cardB: second.id,
+        });
+        if (result.correct) {
+          const nextIds = new Set(matchedIdsRef.current);
+          nextIds.add(first.id);
+          nextIds.add(second.id);
+          matchedIdsRef.current = nextIds;
+          setMatchedIds(nextIds);
+          matchesRef.current = [
+            ...matchesRef.current,
+            { cardA: first.id, cardB: second.id },
+          ];
+          setWhyText(result.feedback?.body ?? null);
+          flippedRef.current = [];
+          setFlipped([]);
+          setLock(false);
+          if (nextIds.size / 2 >= pairCount) finishMemory();
+          return;
+        }
+        setLock(false);
+        handleMismatch();
+      })();
+      return;
+    }
+
     if (first.pairId === second.pairId) {
       const nextMatched = new Set(matchedRef.current);
       nextMatched.add(first.pairId);
       matchedRef.current = nextMatched;
       setMatched(nextMatched);
       setWhyPair(first.pairId);
+      matchesRef.current = [
+        ...matchesRef.current,
+        { cardA: first.id, cardB: second.id },
+      ];
       flippedRef.current = [];
       setFlipped([]);
-      if (nextMatched.size === pairCount) {
-        endingRef.current = true;
-        onFinishRef.current(pairCount - missesRef.current, pairCount, missesRef.current);
-      }
+      if (nextMatched.size === pairCount) finishMemory();
       return;
     }
 
-    missesRef.current += 1;
-    remainingRef.current = applyMismatch(remainingRef.current);
-    setRemainingMs(remainingRef.current);
-    setHit(true);
-    setShake(true);
-    window.setTimeout(() => setHit(false), 400);
-    setLock(true);
-    window.setTimeout(() => {
-      flippedRef.current = [];
-      setFlipped([]);
-      setLock(false);
-      setShake(false);
-      const phase = roundPhase({
-        started: true,
-        remainingMs: remainingRef.current,
-        matchedCount: matchedRef.current.size,
-        pairCount,
-      });
-      if (phase === "lost") void lose();
-    }, FLIP_BACK_MS);
+    handleMismatch();
   }
 
-  const fact = whyPair !== null ? game.pairs[whyPair]?.why : null;
+  const fact = whyText
+    ? whyText
+    : whyPair !== null && author
+      ? game.pairs[whyPair]?.why
+      : null;
 
   return (
     <div>
@@ -251,12 +343,14 @@ function MemoryPlay({
             {formatClock(remainingMs)}
           </p>
           <p className="text-xs font-extrabold uppercase tracking-wide text-emerald-100/80">
-            {matched.size} / {pairCount}
+            {(onEvaluate ? matchedIds.size / 2 : matched.size)} / {pairCount}
           </p>
         </div>
         <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
           {cards.map((card) => {
-            const open = flipped.includes(card.id) || matched.has(card.pairId);
+            const open =
+              flipped.includes(card.id) ||
+              (onEvaluate ? matchedIds.has(card.id) : matched.has(card.pairId));
             return (
               <li key={card.id} className="[perspective:1000px]">
                 <button
