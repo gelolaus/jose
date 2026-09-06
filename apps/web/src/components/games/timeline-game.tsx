@@ -1,11 +1,21 @@
 "use client";
 
-import type { TimelineGame as TimelineContent, TimelineItem } from "@jose/shared";
+import type {
+  AssessmentTimeline,
+  TimelineGame as TimelineContent,
+  TimelineItem,
+} from "@jose/shared";
 import { shuffledCopy } from "@jose/shared";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useMotionSound } from "@/lib/motion-sound";
 import type { PlayBoardProps } from "./play-types";
-import { allStopsFilled, formatTimelineWhy, gradeTimelineCheck } from "./timeline-grade";
+import {
+  allStopsFilled,
+  formatTimelineWhy,
+  gradeCausalChoice,
+  gradeTimelineCheck,
+} from "./timeline-grade";
 import { PlaceGhost, usePlaceDrag } from "./use-place-drag";
 
 function useWideScreen() {
@@ -28,9 +38,14 @@ function slotOf(placed: Record<number, string>, itemId: string): number | null {
   return null;
 }
 
-function yearLabel(item: TimelineItem, index: number) {
-  const text = item.year?.trim();
-  return text || `Stop ${index + 1}`;
+function yearLabel(
+  item: TimelineItem,
+  index: number,
+  hints: { mode: "always" | "optional" | "hidden"; revealed: boolean },
+) {
+  if (hints.mode === "hidden") return `Stop ${index + 1}`;
+  if (hints.mode === "optional" && !hints.revealed) return `Stop ${index + 1}`;
+  return item.year?.trim() || `Stop ${index + 1}`;
 }
 
 function dealTimelineItems(items: TimelineItem[]) {
@@ -91,6 +106,12 @@ function StopStem() {
   return <span aria-hidden className="col-start-2 row-start-2 mx-auto mb-1 block h-3 w-0.5 rounded-full bg-amber-700" />;
 }
 
+type TimelinePlayContent = TimelineContent | AssessmentTimeline;
+
+function playItems(game: TimelinePlayContent): TimelineItem[] {
+  return game.items as TimelineItem[];
+}
+
 export function TimelineGame({
   game,
   mode = "play",
@@ -100,13 +121,13 @@ export function TimelineGame({
   onEvaluate,
   onChange,
 }: {
-  game: TimelineContent;
+  game: TimelinePlayContent;
   mode?: "play" | "build";
   disabled?: boolean;
   onChange?: (game: TimelineContent) => void;
 } & Partial<PlayBoardProps>) {
-  if (mode === "build" && onChange) {
-    return <TimelineBuild game={game} onChange={onChange} />;
+  if (mode === "build" && onChange && "causalLink" in game) {
+    return <TimelineBuild game={game as TimelineContent} onChange={onChange} />;
   }
   if (!onMiss || !onFinish) return null;
   return (
@@ -126,12 +147,16 @@ function TimelinePlay({
   onMiss,
   onFinish,
   onEvaluate,
-}: { game: TimelineContent } & PlayBoardProps) {
+}: { game: TimelinePlayContent } & PlayBoardProps) {
   const [placed, setPlaced] = useState<Record<number, string>>({});
   const [locked, setLocked] = useState<Record<string, true>>({});
   const [shake, setShake] = useState(false);
   const [bank, setBank] = useState(game.items);
+  const [phase, setPhase] = useState<"timeline" | "causal" | "causal-explanation">("timeline");
+  const [hintsRevealed, setHintsRevealed] = useState(false);
   const missesRef = useRef(0);
+  const causalChoiceRef = useRef<string | undefined>(undefined);
+  const { feedbackHoldMs, playCue } = useMotionSound();
   const wide = useWideScreen();
   const drag = usePlaceDrag({
     disabled,
@@ -146,13 +171,35 @@ function TimelinePlay({
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setBank(dealTimelineItems(game.items));
+      setBank(dealTimelineItems(playItems(game)));
       setPlaced({});
       setLocked({});
+      setPhase("timeline");
+      setHintsRevealed(false);
       missesRef.current = 0;
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [game.items]);
+  }, [game.items, game.causalLink, game.dateHints]);
+
+  function currentOrder() {
+    return game.items.map((_, index) => placed[index]!).filter(Boolean);
+  }
+
+  function finishTimeline() {
+    onFinish(maxPieces - missesRef.current, maxPieces, missesRef.current, {
+      type: "timeline",
+      order: currentOrder(),
+      causalChoiceId: causalChoiceRef.current,
+    });
+  }
+
+  useEffect(() => {
+    if (phase !== "causal-explanation") return;
+    const timer = window.setTimeout(() => {
+      finishTimeline();
+    }, feedbackHoldMs);
+    return () => window.clearTimeout(timer);
+  }, [feedbackHoldMs, maxPieces, onFinish, phase]);
 
   function putOn(slot: number, itemId = drag.selectedRef.current) {
     if (!itemId || disabled || locked[itemId]) return;
@@ -181,25 +228,27 @@ function TimelinePlay({
   }
 
   async function check() {
-    if (disabled || !allStopsFilled(game.items, placed)) return;
-    const order = game.items.map((_, index) => placed[index]!);
-
+    if (disabled || !allStopsFilled(playItems(game), placed)) return;
+    const order = currentOrder();
     if (onEvaluate) {
       const result = await onEvaluate({ type: "timeline_check", order });
-      if (result.perfect || result.correct) {
+      if (result.perfect) {
         const all: Record<string, true> = {};
         for (const item of game.items) all[item.id] = true;
         setLocked(all);
-        onFinish(game.items.length - missesRef.current, game.items.length, missesRef.current, {
-          type: "timeline",
-          order,
-        });
+        playCue("accept");
+        if (game.causalLink) {
+          setPhase("causal");
+          return;
+        }
+        finishTimeline();
         return;
       }
       missesRef.current += 1;
-      const nextPlaced = { ...placed };
+      playCue("reject");
       const nextLocked: Record<string, true> = { ...locked };
       for (const id of result.correctIds ?? []) nextLocked[id] = true;
+      const nextPlaced = { ...placed };
       for (const item of game.items) {
         if (nextLocked[item.id]) continue;
         const slot = slotOf(nextPlaced, item.id);
@@ -213,19 +262,21 @@ function TimelinePlay({
       await onMiss(result.feedback ?? null);
       return;
     }
-
-    const result = gradeTimelineCheck(game.items, placed);
+    const result = gradeTimelineCheck(playItems(game), placed);
     if (result.perfect) {
       const all: Record<string, true> = {};
       for (const item of game.items) all[item.id] = true;
       setLocked(all);
-      onFinish(game.items.length - missesRef.current, game.items.length, missesRef.current, {
-        type: "timeline",
-        order,
-      });
+      playCue("accept");
+      if (game.causalLink) {
+        setPhase("causal");
+        return;
+      }
+      finishTimeline();
       return;
     }
     missesRef.current += 1;
+    playCue("reject");
     const nextPlaced = { ...placed };
     const nextLocked: Record<string, true> = { ...locked };
     for (const id of result.correctIds) nextLocked[id] = true;
@@ -241,12 +292,57 @@ function TimelinePlay({
     await onMiss(formatTimelineWhy(result.wrongItems));
   }
 
+  async function answerCausal(choiceId: string) {
+    if (disabled || !game.causalLink) return;
+    causalChoiceRef.current = choiceId;
+    if (onEvaluate) {
+      const result = await onEvaluate({ type: "timeline_causal", choiceId });
+      if (!result.correct) {
+        missesRef.current += 1;
+        playCue("reject");
+        await onMiss(
+          result.feedback
+            ? { title: result.feedback.title, body: result.feedback.body, tone: "miss" }
+            : { title: "Not quite", body: "Try the causal connection again.", tone: "miss" },
+        );
+        return;
+      }
+      playCue("accept");
+      setPhase("causal-explanation");
+      return;
+    }
+    const result = gradeCausalChoice(game as TimelineContent, choiceId);
+    if (!result.perfect) {
+      missesRef.current += 1;
+      playCue("reject");
+      await onMiss({
+        title: "Not quite",
+        body: result.explanation ?? "Try the causal connection again.",
+        tone: "miss",
+      });
+      return;
+    }
+    playCue("accept");
+    setPhase("causal-explanation");
+  }
+
   const leftover = bank.filter((item) => !Object.values(placed).includes(item.id));
   const hoverSlot =
     drag.overEl?.dataset.timelineSlot !== undefined
       ? Number(drag.overEl.dataset.timelineSlot)
       : null;
-  const canCheck = allStopsFilled(game.items, placed);
+  const canCheck = allStopsFilled(playItems(game), placed);
+
+  if (phase !== "timeline" && game.causalLink) {
+    return (
+      <CausalChallenge
+        link={game.causalLink as NonNullable<TimelineContent["causalLink"]>}
+        showingExplanation={phase === "causal-explanation"}
+        disabled={disabled}
+        onChoose={answerCausal}
+      />
+    );
+  }
 
   return (
     <div className={`flex flex-col gap-4 pb-28 sm:gap-5 sm:pb-0 ${shake ? "snap-back" : ""}`}>
@@ -258,6 +354,7 @@ function TimelinePlay({
         selectedId={drag.selected}
         hoverSlot={hoverSlot}
         disabled={disabled}
+        hints={{ mode: game.dateHints ?? "always", revealed: hintsRevealed }}
         onEmptyStop={(slot) => putOn(slot)}
         onPlacedCard={(itemId) => {
           if (drag.selected === itemId) {
@@ -267,6 +364,22 @@ function TimelinePlay({
           drag.select(itemId);
         }}
       />
+      {game.dateHints === "optional" ? (
+        <div className="flex items-center gap-3">
+          {!hintsRevealed ? (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => setHintsRevealed(true)}
+              className="rounded-full bg-amber-100 px-3 py-1.5 text-xs font-extrabold text-amber-900"
+            >
+              Show date hints
+            </button>
+          ) : (
+            <p className="text-xs font-bold text-amber-800">Date hints used</p>
+          )}
+        </div>
+      ) : null}
       <div className="z-20 -mx-4 border-t border-amber-200/70 bg-[var(--jose-cream)] px-4 py-2 max-sm:fixed max-sm:inset-x-0 max-sm:bottom-[calc(5.2rem+env(safe-area-inset-bottom,0px))] sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
         {leftover.length > 0 ? (
           <>
@@ -318,6 +431,46 @@ function TimelinePlay({
   );
 }
 
+function CausalChallenge({
+  link,
+  showingExplanation,
+  disabled,
+  onChoose,
+}: {
+  link: NonNullable<TimelineContent["causalLink"]>;
+  showingExplanation: boolean;
+  disabled: boolean;
+  onChoose: (choiceId: string) => void;
+}) {
+  return (
+    <section className="mx-auto w-full max-w-xl rounded-[1.5rem] border-2 border-amber-200 bg-amber-50 p-5 shadow-[0_4px_0_#fde68a]">
+      <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-700">
+        Cause and consequence
+      </p>
+      <h2 className="mt-2 font-display text-2xl font-semibold text-slate-800">{link.prompt}</h2>
+      {showingExplanation ? (
+        <div className="mt-4 rounded-2xl bg-emerald-50 p-4 text-sm font-semibold leading-relaxed text-emerald-900">
+          {link.explanation}
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-2">
+          {link.choices.map((choice) => (
+            <button
+              key={choice.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => void onChoose(choice.id)}
+              className="rounded-2xl bg-white px-4 py-3 text-left text-sm font-extrabold text-slate-800 ring-2 ring-amber-200 transition hover:ring-violet-400 disabled:opacity-50"
+            >
+              {choice.text}
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function TimelineRail({
   items,
   placed,
@@ -325,6 +478,7 @@ function TimelineRail({
   selectedId,
   hoverSlot,
   disabled,
+  hints,
   onEmptyStop,
   onPlacedCard,
 }: {
@@ -334,6 +488,7 @@ function TimelineRail({
   selectedId: string | null;
   hoverSlot: number | null;
   disabled: boolean;
+  hints: { mode: "always" | "optional" | "hidden"; revealed: boolean };
   onEmptyStop: (slot: number) => void;
   onPlacedCard: (itemId: string) => void;
 }) {
@@ -347,7 +502,7 @@ function TimelineRail({
           const hot = !shown && (hoverSlot === index || Boolean(selectedId));
           return (
             <StopShell key={stop.id}>
-              <p className={YEAR_PILL}>{yearLabel(stop, index)}</p>
+              <p className={YEAR_PILL}>{yearLabel(stop, index, hints)}</p>
               <StopBead index={index} tone={isLocked ? "locked" : shown ? "filled" : "empty"} />
               <StopStem />
               <div className="col-start-2 row-start-3 min-w-0 w-full">
@@ -444,6 +599,11 @@ function TimelineBuild({
     });
   }
 
+  function patchCausal(next: Partial<NonNullable<TimelineContent["causalLink"]>>) {
+    if (!game.causalLink) return;
+    onChange({ ...game, causalLink: { ...game.causalLink, ...next } });
+  }
+
   function move(index: number, dir: -1 | 1) {
     const next = index + dir;
     if (next < 0 || next >= game.items.length) return;
@@ -458,6 +618,23 @@ function TimelineBuild({
       <p className="text-sm font-semibold text-slate-500">
         Oldest first. Edit the date pill and the hanging card on the rail. Why sits under the card.
       </p>
+      <label className="flex w-fit items-center gap-2 text-sm font-bold text-slate-700">
+        Date hints
+        <select
+          value={game.dateHints ?? "always"}
+          onChange={(e) =>
+            onChange({
+              ...game,
+              dateHints: e.target.value as TimelineContent["dateHints"],
+            })
+          }
+          className="rounded-full bg-white px-3 py-1.5 text-sm font-semibold ring-1 ring-black/10"
+        >
+          <option value="always">Always show dates</option>
+          <option value="optional">Let learners reveal dates</option>
+          <option value="hidden">Hide dates</option>
+        </select>
+      </label>
       <div className="sm:overflow-x-auto sm:pb-2">
         <div className="relative flex flex-col gap-5 sm:min-w-min sm:flex-row sm:gap-4 sm:px-1 sm:pr-8">
           {game.items.map((item, index) => (
@@ -494,6 +671,16 @@ function TimelineBuild({
                   placeholder="Why (on a miss)"
                   value={item.why ?? ""}
                   onChange={(e) => patch(index, { why: e.target.value.trim() ? e.target.value : undefined })}
+                  onFocus={() => setSelected(index)}
+                  className="mt-1 w-full rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 outline-none ring-1 ring-black/10"
+                />
+                <input
+                  aria-label={`Chronology group for stop ${index + 1}`}
+                  placeholder="Chronology group (optional)"
+                  value={item.groupId ?? ""}
+                  onChange={(e) =>
+                    patch(index, { groupId: e.target.value.trim() ? e.target.value : undefined })
+                  }
                   onFocus={() => setSelected(index)}
                   className="mt-1 w-full rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 outline-none ring-1 ring-black/10"
                 />
@@ -550,6 +737,104 @@ function TimelineBuild({
           Add event
         </button>
       </div>
+      {game.causalLink ? (
+        <section className="space-y-3 rounded-2xl border-2 border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="font-display text-lg font-semibold text-slate-800">Cause and consequence</h3>
+            <button
+              type="button"
+              onClick={() => onChange({ ...game, causalLink: undefined })}
+              className="text-xs font-extrabold text-rose-700"
+            >
+              Remove question
+            </button>
+          </div>
+          <textarea
+            aria-label="Causal prompt"
+            rows={2}
+            value={game.causalLink.prompt}
+            onChange={(e) => patchCausal({ prompt: e.target.value })}
+            className="w-full resize-none rounded-xl bg-white px-3 py-2 text-sm font-semibold ring-1 ring-amber-200"
+          />
+          <div className="grid gap-2">
+            {game.causalLink.choices.map((choice) => (
+              <input
+                key={choice.id}
+                aria-label={`Causal choice ${choice.id}`}
+                value={choice.text}
+                onChange={(e) =>
+                  patchCausal({
+                    choices: game.causalLink!.choices.map((entry) =>
+                      entry.id === choice.id ? { ...entry, text: e.target.value } : entry,
+                    ),
+                  })
+                }
+                className="w-full rounded-full bg-white px-3 py-2 text-sm font-semibold ring-1 ring-amber-200"
+              />
+            ))}
+          </div>
+          {game.causalLink.choices.length < 6 ? (
+            <button
+              type="button"
+              onClick={() =>
+                patchCausal({
+                  choices: [
+                    ...game.causalLink!.choices,
+                    { id: `cause-${Date.now()}`, text: "New choice" },
+                  ],
+                })
+              }
+              className="text-xs font-extrabold text-violet-700"
+            >
+              + Add choice
+            </button>
+          ) : null}
+          <label className="block text-xs font-bold text-slate-700">
+            Correct choice
+            <select
+              value={game.causalLink.correctChoiceId}
+              onChange={(e) => patchCausal({ correctChoiceId: e.target.value })}
+              className="mt-1 block w-full rounded-full bg-white px-3 py-2 text-sm font-semibold ring-1 ring-amber-200"
+            >
+              {game.causalLink.choices.map((choice) => (
+                <option key={choice.id} value={choice.id}>
+                  {choice.text || "Untitled choice"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <textarea
+            aria-label="Causal explanation"
+            rows={3}
+            value={game.causalLink.explanation}
+            onChange={(e) => patchCausal({ explanation: e.target.value })}
+            placeholder="Why this connection is correct"
+            className="w-full resize-none rounded-xl bg-white px-3 py-2 text-sm font-semibold ring-1 ring-amber-200"
+          />
+        </section>
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            const firstChoiceId = `cause-${Date.now()}-1`;
+            onChange({
+              ...game,
+              causalLink: {
+                prompt: "What connects these events?",
+                choices: [
+                  { id: firstChoiceId, text: "The earlier event enabled the later one" },
+                  { id: `${firstChoiceId}-alt`, text: "They are unrelated" },
+                ],
+                correctChoiceId: firstChoiceId,
+                explanation: "Explain how one event shaped the next.",
+              },
+            });
+          }}
+          className="rounded-full bg-amber-100 px-3 py-1.5 text-xs font-extrabold text-amber-900"
+        >
+          Add cause and consequence question
+        </button>
+      )}
     </div>
   );
 }

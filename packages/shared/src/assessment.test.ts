@@ -11,9 +11,9 @@ import {
   sanitizeGameForAssessment,
   stableStringify,
 } from "./assessment";
-import type { GameContent } from "./games";
+import { parseGameContent } from "./games";
 
-const quiz: GameContent = {
+const quiz = parseGameContent({
   type: "quiz",
   questions: [
     {
@@ -23,23 +23,27 @@ const quiz: GameContent = {
       why: "Manila is the capital.",
     },
   ],
-};
+});
+if (quiz.type !== "quiz") throw new Error("expected quiz");
 
 describe("sanitizeGameForAssessment", () => {
   it("strips quiz answer keys", () => {
     const { play } = sanitizeGameForAssessment(quiz);
     expect(play.type).toBe("quiz");
     if (play.type !== "quiz") return;
-    expect(play.questions[0]).toEqual({
+    expect(play.questions[0]).toMatchObject({
       prompt: "Capital?",
-      choices: ["Manila", "Cebu"],
+      choices: [
+        { id: "q1-c1", text: "Manila" },
+        { id: "q1-c2", text: "Cebu" },
+      ],
     });
     expect(assessmentGameSchema.parse(play).type).toBe("quiz");
-    expect(JSON.stringify(play)).not.toMatch(/correctIndex|why/);
+    expect(JSON.stringify(play)).not.toMatch(/correctIndex|correctChoiceId|"why"/);
   });
 
   it("strips blank answers into options", () => {
-    const game: GameContent = {
+    const game = parseGameContent({
       type: "blank",
       items: [
         {
@@ -49,7 +53,7 @@ describe("sanitizeGameForAssessment", () => {
           why: "Laguna",
         },
       ],
-    };
+    });
     const { play } = sanitizeGameForAssessment(game);
     expect(play.type).toBe("blank");
     if (play.type !== "blank") return;
@@ -58,7 +62,7 @@ describe("sanitizeGameForAssessment", () => {
   });
 
   it("strips sort bucket ids", () => {
-    const game: GameContent = {
+    const game = parseGameContent({
       type: "sort",
       buckets: [
         { id: "a", label: "A" },
@@ -68,7 +72,7 @@ describe("sanitizeGameForAssessment", () => {
         { id: "i1", label: "One", bucketId: "a", why: "Because" },
         { id: "i2", label: "Two", bucketId: "b" },
       ],
-    };
+    });
     const { play } = sanitizeGameForAssessment(game);
     expect(play.type).toBe("sort");
     if (play.type !== "sort") return;
@@ -77,13 +81,13 @@ describe("sanitizeGameForAssessment", () => {
   });
 
   it("builds opaque memory cards with a server pair map", () => {
-    const game: GameContent = {
+    const game = parseGameContent({
       type: "memory",
       pairs: [
         { a: { text: "A1" }, b: { text: "B1" }, why: "pair" },
         { a: { text: "A2" }, b: { text: "B2" } },
       ],
-    };
+    });
     let n = 0;
     const { play, secret } = buildMemoryAssessment(game, () => `id-${++n}`);
     expect(play.cards).toHaveLength(4);
@@ -108,24 +112,24 @@ describe("server grading helpers", () => {
   });
 
   it("grades blank, timeline, sort, and memory matches", () => {
-    const blank: GameContent = {
+    const blank = parseGameContent({
       type: "blank",
       items: [{ sentence: "___", answer: "Rizal", decoys: ["Gomez"] }],
-    };
+    });
     expect(evaluateBlankChoice(blank, 0, "rizal").correct).toBe(true);
     expect(evaluateBlankChoice(blank, 0, "Gomez").correct).toBe(false);
 
-    const timeline: GameContent = {
+    const timeline = parseGameContent({
       type: "timeline",
       items: [
         { id: "a", label: "First", why: "start" },
         { id: "b", label: "Second" },
       ],
-    };
+    });
     expect(evaluateTimelineCheck(timeline, ["a", "b"]).perfect).toBe(true);
     expect(evaluateTimelineCheck(timeline, ["b", "a"]).perfect).toBe(false);
 
-    const sort: GameContent = {
+    const sort = parseGameContent({
       type: "sort",
       buckets: [
         { id: "x", label: "X" },
@@ -135,7 +139,7 @@ describe("server grading helpers", () => {
         { id: "1", label: "One", bucketId: "x" },
         { id: "2", label: "Two", bucketId: "y" },
       ],
-    };
+    });
     expect(evaluateSortCheck(sort, { "1": "x", "2": "y" }).perfect).toBe(true);
     expect(evaluateSortCheck(sort, { "1": "y", "2": "y" }).perfect).toBe(false);
 

@@ -40,7 +40,9 @@ import {
   evaluateBlankChoice,
   evaluateMemoryMatch,
   evaluateQuizChoice,
+  evaluateQuizRationale,
   evaluateSortCheck,
+  evaluateTimelineCausal,
   evaluateTimelineCheck,
   finishAttemptBodySchema,
   gameContentSchema,
@@ -61,6 +63,7 @@ import {
   nextReviewAt,
   nodeIconFor,
   parseGameContent,
+  pairExplanation,
   coerceGameContent,
   parseYoutubeVideoId,
   patchLevelBodySchema,
@@ -3161,7 +3164,10 @@ export class CurriculumService {
     switch (event.type) {
       case "quiz_choice":
         if (game.type !== "quiz") throw new BadRequestException("Event type mismatch");
-        return evaluateQuizChoice(game, event.questionIndex, event.choiceIndex);
+        return evaluateQuizChoice(game, event.questionIndex, event.choiceId ?? event.choiceIndex);
+      case "quiz_rationale":
+        if (game.type !== "quiz") throw new BadRequestException("Event type mismatch");
+        return evaluateQuizRationale(game, event.questionIndex, event.rationaleId);
       case "blank_choice":
         if (game.type !== "blank") throw new BadRequestException("Event type mismatch");
         return evaluateBlankChoice(game, event.itemIndex, event.word);
@@ -3174,11 +3180,14 @@ export class CurriculumService {
           secret.memoryPairMap,
           event.cardA,
           event.cardB,
-          (pairIndex) => game.pairs[pairIndex]?.why,
+          (pairIndex) => pairExplanation(game.pairs[pairIndex] ?? {}),
         );
       case "timeline_check":
         if (game.type !== "timeline") throw new BadRequestException("Event type mismatch");
         return evaluateTimelineCheck(game, event.order);
+      case "timeline_causal":
+        if (game.type !== "timeline") throw new BadRequestException("Event type mismatch");
+        return evaluateTimelineCausal(game, event.choiceId);
       case "sort_check":
         if (game.type !== "sort") throw new BadRequestException("Event type mismatch");
         return evaluateSortCheck(game, event.placements);

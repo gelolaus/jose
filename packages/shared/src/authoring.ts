@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { emptyGameContent, type GameContent } from "./games";
+import { emptyGameContent, parseGameContent, quizQuestionSchema, type GameContent } from "./games";
 import type { LessonBlocks } from "./lesson-blocks";
 import { gameTypeSchema, hexColorSchema } from "./path";
 
@@ -80,7 +80,7 @@ export const MODULE_TEMPLATES: ModuleTemplateDefinition[] = [
         title: "Retrieval quiz",
         kind: "game",
         gameType: "quiz",
-        game: {
+        game: parseGameContent({
           type: "quiz",
           questions: [
             quiz("What is the main claim of this lesson?", ["Claim A", "Claim B", "Claim C"], 0, "Return to the lesson objective."),
@@ -89,7 +89,7 @@ export const MODULE_TEMPLATES: ModuleTemplateDefinition[] = [
             quiz("Which detail is a misconception?", ["Accurate date", "Wrong place", "Correct name"], 1, "Trap the common mix-up."),
             quiz("How would you check your answer?", ["Re-read the source", "Ask a stranger", "Invent a date"], 0, "Point back to evidence."),
           ],
-        },
+        }),
       },
     ],
   },
@@ -138,7 +138,7 @@ export const MODULE_TEMPLATES: ModuleTemplateDefinition[] = [
         title: "Sort the evidence",
         kind: "game",
         gameType: "sort",
-        game: {
+        game: parseGameContent({
           type: "sort",
           buckets: [
             { id: "supports", label: "Supports the claim" },
@@ -168,7 +168,7 @@ export const MODULE_TEMPLATES: ModuleTemplateDefinition[] = [
               bucketId: "challenges",
             },
           ],
-        },
+        }),
       },
     ],
   },
@@ -203,7 +203,7 @@ export const MODULE_TEMPLATES: ModuleTemplateDefinition[] = [
         title: "Cause and consequence",
         kind: "game",
         gameType: "timeline",
-        game: {
+        game: parseGameContent({
           type: "timeline",
           items: [
             { id: "t1", label: "First event", year: "1", why: "Why this comes first" },
@@ -211,7 +211,7 @@ export const MODULE_TEMPLATES: ModuleTemplateDefinition[] = [
             { id: "t3", label: "Consequence", year: "3", why: "What followed" },
             { id: "t4", label: "Later echo", year: "4" },
           ],
-        },
+        }),
       },
     ],
   },
@@ -327,16 +327,7 @@ export const importQuestionsResultSchema = z.object({
   validCount: z.number().int().nonnegative(),
   errorCount: z.number().int().nonnegative(),
   errors: z.array(importRowErrorSchema),
-  preview: z
-    .array(
-      z.object({
-        prompt: z.string(),
-        choices: z.array(z.string()),
-        correctIndex: z.number().int(),
-        why: z.string().optional(),
-      }),
-    )
-    .optional(),
+  preview: z.array(quizQuestionSchema).optional(),
   applied: z.boolean(),
   level: z.unknown().optional(),
 });

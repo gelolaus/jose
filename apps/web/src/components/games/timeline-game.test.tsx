@@ -13,6 +13,19 @@ const game: TimelineContent = {
   ],
 };
 
+const gameWithCausalLink: TimelineContent = {
+  ...game,
+  causalLink: {
+    prompt: "What made Rizal's move to Biñan possible?",
+    choices: [
+      { id: "a", text: "His early lessons prepared him" },
+      { id: "b", text: "It happened before he was born" },
+    ],
+    correctChoiceId: "a",
+    explanation: "His early lessons built the foundation for later schooling.",
+  },
+};
+
 function play() {
   const onMiss = vi.fn(async () => "ok" as const);
   const onFinish = vi.fn();
@@ -75,6 +88,32 @@ describe("TimelineGame play", () => {
       type: "timeline",
       order: ["a", "b", "c"],
     });
+  });
+
+  it("asks its causal question before finishing a perfect timeline", () => {
+    const onMiss = vi.fn(async () => "ok" as const);
+    const onFinish = vi.fn();
+    render(
+      <TimelineGame
+        game={gameWithCausalLink}
+        disabled={false}
+        onMiss={onMiss}
+        onFinish={onFinish}
+      />,
+    );
+
+    for (const [event, stop] of [
+      ["Born in Calamba", 1],
+      ["Teodora teaches", 2],
+      ["Leaves for Biñan", 3],
+    ] as const) {
+      tapEvent(event);
+      tapStop(stop);
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Check" }));
+
+    expect(screen.getByText("What made Rizal's move to Biñan possible?")).toBeTruthy();
+    expect(onFinish).not.toHaveBeenCalled();
   });
 
   it("keeps an event selected after pointerdown plus click", () => {

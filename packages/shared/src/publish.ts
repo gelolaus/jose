@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   coerceGameContent,
   gameContentSchema,
+  normalizeBlankKey,
   type GameContent,
   type LessonContent,
 } from "./games";
@@ -204,7 +205,10 @@ function assessGameDetails(
   switch (game.type) {
     case "quiz": {
       for (const [index, question] of game.questions.entries()) {
-        if (isPlaceholderText(question.prompt) || question.choices.some(isPlaceholderText)) {
+        if (
+          isPlaceholderText(question.prompt) ||
+          question.choices.some((choice) => isPlaceholderText(choice.text))
+        ) {
           issues.push(
             issue({
               ...base,
@@ -276,8 +280,8 @@ function assessGameDetails(
             }),
           );
         }
-        const answer = item.answer.trim().toLowerCase();
-        if (item.decoys.some((decoy) => decoy.trim().toLowerCase() === answer)) {
+        const answer = normalizeBlankKey(item.answer);
+        if (item.decoys.some((decoy) => normalizeBlankKey(decoy) === answer)) {
           issues.push(
             issue({
               ...base,
@@ -329,7 +333,8 @@ function assessGameDetails(
       }
       const bucketSet = new Set(bucketIds);
       for (const [index, item] of game.items.entries()) {
-        if (!bucketSet.has(item.bucketId)) {
+        if (!item.bucketId || !bucketSet.has(item.bucketId)) {
+          if (item.scoring === "discussion") continue;
           issues.push(
             issue({
               ...base,

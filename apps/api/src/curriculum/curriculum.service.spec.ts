@@ -93,7 +93,7 @@ describe("CurriculumService", () => {
     expect(play.level.kind).toBe("game");
     expect(play.game?.type).toBe("quiz");
     expect(play.attempt?.mode).toBe("assessment");
-    expect(JSON.stringify(play.game)).not.toMatch(/correctIndex/);
+    expect(JSON.stringify(play.game)).not.toMatch(/correctIndex|correctChoiceId/);
   });
 
   it("refuses to archive the featured module", async () => {

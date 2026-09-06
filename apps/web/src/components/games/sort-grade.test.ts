@@ -25,6 +25,23 @@ describe("gradeSortCheck", () => {
     expect(result.perfect).toBe(true);
     expect(result.wrongItems).toEqual([]);
   });
+
+  it("does not grade discussion chips and bases perfection on auto-scored chips", () => {
+    const withDiscussion = [
+      ...items,
+      { id: "d", label: "A disputed account", scoring: "discussion" as const },
+    ];
+
+    const result = gradeSortCheck(withDiscussion, {
+      a: "noli",
+      b: "fili",
+      c: "noli",
+      d: "fili",
+    });
+    expect(result.perfect).toBe(true);
+    expect(result.wrongItems).toEqual([]);
+    expect(result.discussionIds).toEqual(["d"]);
+  });
 });
 
 describe("formatSortWhy", () => {
@@ -33,9 +50,10 @@ describe("formatSortWhy", () => {
   });
 
   it("uses the chip label as the title when only one why exists", () => {
-    expect(formatSortWhy([items[1]!])).toEqual({
+    expect(formatSortWhy([items[1]!])).toMatchObject({
       title: "Simoun",
       body: "Sequel.",
+      tone: "miss",
     });
   });
 

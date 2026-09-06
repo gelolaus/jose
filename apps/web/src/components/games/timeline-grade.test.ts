@@ -25,6 +25,17 @@ describe("gradeTimelineCheck", () => {
     expect(result.perfect).toBe(true);
     expect(result.wrongItems).toEqual([]);
   });
+
+  it("accepts swaps within a chronology group but keeps solo events strict", () => {
+    const grouped = [
+      { id: "a", label: "First eyewitness account", groupId: "same-day" },
+      { id: "b", label: "Second eyewitness account", groupId: "same-day" },
+      { id: "c", label: "Later event" },
+    ];
+
+    expect(gradeTimelineCheck(grouped, { 0: "b", 1: "a", 2: "c" }).perfect).toBe(true);
+    expect(gradeTimelineCheck(grouped, { 0: "a", 1: "c", 2: "b" }).perfect).toBe(false);
+  });
 });
 
 describe("formatTimelineWhy", () => {
@@ -36,6 +47,7 @@ describe("formatTimelineWhy", () => {
     expect(formatTimelineWhy([items[1]!])).toEqual({
       title: "Teodora teaches",
       body: "Home was the first classroom.",
+      tone: "miss",
     });
   });
 

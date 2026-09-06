@@ -1,18 +1,19 @@
 "use client";
 
-import type { AssessmentSort, SortGame as SortContent } from "@jose/shared";
+import type { AssessmentSort, SortGame as SortContent, SortItem } from "@jose/shared";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useMotionSound } from "@/lib/motion-sound";
 import type { PlayBoardProps } from "./play-types";
-import { allChipsPlaced, formatSortWhy, gradeSortCheck } from "./sort-grade";
+import {
+  allChipsPlaced,
+  discussionSortItems,
+  formatSortExplanations,
+  formatSortWhy,
+  gradeSortCheck,
+  scoredSortItems,
+} from "./sort-grade";
 import { PlaceGhost, usePlaceDrag } from "./use-place-drag";
-
-type SortPlayContent = SortContent | AssessmentSort;
-
-function isAuthorSort(game: SortPlayContent): game is SortContent {
-  const item = game.items[0];
-  return Boolean(item && "bucketId" in item);
-}
 
 const CHEST_BODY = ["#f59e0b", "#f97316", "#eab308"] as const;
 const CHEST_SHADOW = ["#d97706", "#c2410c", "#a16207"] as const;
@@ -28,6 +29,12 @@ function useWideScreen() {
     return () => mq.removeEventListener("change", sync);
   }, []);
   return wide;
+}
+
+type SortPlayContent = SortContent | AssessmentSort;
+
+function isAuthorSort(game: SortPlayContent): game is SortContent {
+  return game.items.some((item) => "bucketId" in item && item.bucketId);
 }
 
 export function SortGame({
@@ -69,7 +76,12 @@ function SortPlay({
   const [placed, setPlaced] = useState<Record<string, string>>({});
   const [locked, setLocked] = useState<Record<string, true>>({});
   const [shake, setShake] = useState(false);
+  const [phase, setPhase] = useState<"sort" | "discussion" | "success">("sort");
+  const [discussionIds, setDiscussionIds] = useState<string[]>([]);
+  const [selectedJustifications, setSelectedJustifications] = useState<Record<string, string>>({});
+  const [curatorNotes, setCuratorNotes] = useState<ReturnType<typeof formatSortExplanations>>(null);
   const missesRef = useRef(0);
+  const { playCue } = useMotionSound();
   const wide = useWideScreen();
   const drag = usePlaceDrag({
     disabled,
@@ -101,23 +113,24 @@ function SortPlay({
 
   async function check() {
     if (disabled || !allChipsPlaced(game.items, placed)) return;
-
     if (onEvaluate) {
       const result = await onEvaluate({ type: "sort_check", placements: placed });
-      if (result.perfect || result.correct) {
+      if (result.perfect) {
         const all: Record<string, true> = {};
         for (const item of game.items) all[item.id] = true;
         setLocked(all);
-        onFinish(game.items.length - missesRef.current, game.items.length, missesRef.current, {
+        playCue("accept");
+        onFinish(autoCount - missesRef.current, autoCount, missesRef.current, {
           type: "sort",
           placements: placed,
         });
         return;
       }
       missesRef.current += 1;
-      const nextPlaced = { ...placed };
+      playCue("reject");
       const nextLocked: Record<string, true> = { ...locked };
       for (const id of result.correctIds ?? []) nextLocked[id] = true;
+      const nextPlaced = { ...placed };
       for (const item of game.items) {
         if (!nextLocked[item.id]) delete nextPlaced[item.id];
       }
@@ -129,22 +142,30 @@ function SortPlay({
       await onMiss(result.feedback ?? null);
       return;
     }
-
-    const result = gradeSortCheck(
-      isAuthorSort(game) ? game.items : [],
-      placed,
-    );
+    const result = gradeSortCheck(isAuthorSort(game) ? game.items : [], placed);
     if (result.perfect) {
       const all: Record<string, true> = {};
       for (const item of game.items) all[item.id] = true;
       setLocked(all);
-      onFinish(game.items.length - missesRef.current, game.items.length, missesRef.current, {
+      setDiscussionIds(result.discussionIds);
+      setCuratorNotes(
+        isAuthorSort(game)
+          ? formatSortExplanations(game, [...result.correctIds, ...result.discussionIds])
+          : null,
+      );
+      playCue("accept");
+      if (result.discussionIds.length > 0) {
+        setPhase("discussion");
+        return;
+      }
+      onFinish(autoCount - missesRef.current, autoCount, missesRef.current, {
         type: "sort",
         placements: placed,
       });
       return;
     }
     missesRef.current += 1;
+    playCue("reject");
     const nextPlaced = { ...placed };
     const nextLocked: Record<string, true> = { ...locked };
     for (const id of result.correctIds) nextLocked[id] = true;
@@ -162,6 +183,29 @@ function SortPlay({
   const three = game.buckets.length === 3;
   const hovering = drag.overEl?.dataset.sortBucket ?? null;
   const canCheck = allChipsPlaced(game.items, placed);
+  const autoCount = scoredSortItems(game.items).length || game.items.length;
+
+  function finish() {
+    onFinish(autoCount - missesRef.current, autoCount, missesRef.current, {
+      type: "sort",
+      placements: placed,
+    });
+  }
+
+  if (phase === "discussion") {
+    return (
+      <DiscussionReview
+        items={discussionSortItems(game.items).filter((item) => discussionIds.includes(item.id))}
+        selectedJustifications={selectedJustifications}
+        curatorNotes={curatorNotes}
+        disabled={disabled}
+        onChoose={(itemId, choiceId) =>
+          setSelectedJustifications((current) => ({ ...current, [itemId]: choiceId }))
+        }
+        onFinish={finish}
+      />
+    );
+  }
 
   return (
     <div className={`flex flex-col gap-3 pb-28 sm:gap-5 sm:pb-0 ${shake ? "snap-back" : ""}`}>
@@ -179,6 +223,7 @@ function SortPlay({
               key={bucket.id}
               bucketId={bucket.id}
               label={bucket.label}
+              role={bucket.role}
               palette={index}
               active={hovering === bucket.id}
               inviting={active}
@@ -195,6 +240,11 @@ function SortPlay({
                           <span className="block rounded-full bg-emerald-50 px-3 py-1.5 text-left text-xs font-extrabold text-emerald-900 ring-2 ring-emerald-300 sm:text-sm">
                             {item.label}
                           </span>
+                          {"source" in item && (item.source?.citation || item.source?.label) ? (
+                            <p className="mt-1 px-2 text-[10px] font-bold text-emerald-800/80">
+                              Source: {item.source.citation || item.source.label}
+                            </p>
+                          ) : null}
                         </li>
                       );
                     }
@@ -283,6 +333,92 @@ function SortPlay({
   );
 }
 
+function CuratorNotes({ notes }: { notes: ReturnType<typeof formatSortExplanations> }) {
+  if (!notes) return null;
+  return (
+    <div className="rounded-2xl bg-white/80 p-4">
+      <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-emerald-700">
+        {notes.title}
+      </p>
+      <p className="mt-2 whitespace-pre-line text-sm font-semibold leading-relaxed text-slate-700">
+        {notes.body}
+      </p>
+    </div>
+  );
+}
+
+function DiscussionReview({
+  items,
+  selectedJustifications,
+  curatorNotes,
+  disabled,
+  onChoose,
+  onFinish,
+}: {
+  items: SortItem[];
+  selectedJustifications: Record<string, string>;
+  curatorNotes: ReturnType<typeof formatSortExplanations>;
+  disabled: boolean;
+  onChoose: (itemId: string, choiceId: string) => void;
+  onFinish: () => void;
+}) {
+  return (
+    <section className="space-y-4 rounded-[1.5rem] border-2 border-amber-200 bg-amber-50 p-5">
+      <div>
+        <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-700">
+          Discussion — not auto-scored
+        </p>
+        <h2 className="mt-1 font-display text-2xl font-semibold text-slate-800">
+          Consider the evidence
+        </h2>
+      </div>
+      {items.map((item) => (
+        <article key={item.id} className="rounded-2xl bg-white p-4 ring-1 ring-amber-200">
+          <p className="text-sm font-extrabold text-slate-800">{item.label}</p>
+          {item.source?.citation || item.source?.label ? (
+            <p className="mt-1 text-xs font-bold text-slate-500">
+              Source: {item.source.citation || item.source.label}
+            </p>
+          ) : null}
+          {item.justificationChoices?.length ? (
+            <div className="mt-3 grid gap-2">
+              {item.justificationChoices.map((choice) => (
+                <button
+                  key={choice.id}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onChoose(item.id, choice.id)}
+                  className={`rounded-xl px-3 py-2 text-left text-sm font-semibold ring-1 ${
+                    selectedJustifications[item.id] === choice.id
+                      ? "bg-violet-100 text-violet-900 ring-violet-400"
+                      : "bg-white text-slate-700 ring-slate-200"
+                  }`}
+                >
+                  {choice.text}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {(selectedJustifications[item.id] || !item.justificationChoices?.length) && item.why ? (
+            <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm font-semibold leading-relaxed text-emerald-900">
+              {item.why}
+            </p>
+          ) : null}
+        </article>
+      ))}
+      <CuratorNotes notes={curatorNotes} />
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onFinish}
+        className="rounded-full bg-violet-600 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-50"
+      >
+        Continue
+      </button>
+    </section>
+  );
+}
+
 function SortBuild({
   game,
   onChange,
@@ -291,6 +427,26 @@ function SortBuild({
   onChange: (game: SortContent) => void;
 }) {
   const three = game.buckets.length === 3;
+
+  function patchItem(itemId: string, next: Partial<SortItem>) {
+    onChange({
+      ...game,
+      items: game.items.map((item) => (item.id === itemId ? { ...item, ...next } : item)),
+    });
+  }
+
+  function patchSource(item: SortItem, key: "label" | "citation", value: string) {
+    const label = (key === "label" ? value : item.source?.label ?? "").trim();
+    if (!label) {
+      patchItem(item.id, { source: undefined });
+      return;
+    }
+    const citation = key === "citation" ? value : item.source?.citation;
+    patchItem(item.id, {
+      source: { ...item.source, label, ...(citation?.trim() ? { citation } : {}) },
+    });
+  }
+
   return (
     <div className="space-y-4">
       <p className="text-sm font-semibold text-slate-500">
@@ -306,6 +462,7 @@ function SortBuild({
             <SortChest
               bucketId={bucket.id}
               label={bucket.label}
+              role={bucket.role}
               palette={i}
               inviting
               labelSlot={
@@ -321,6 +478,25 @@ function SortBuild({
                 />
               }
             >
+              <label className="mt-2 flex items-center justify-center gap-1 text-[10px] font-bold text-amber-950">
+                Bucket role
+                <select
+                  aria-label={`${bucket.label} bucket role`}
+                  value={bucket.role ?? "category"}
+                  onChange={(e) => {
+                    const buckets = [...game.buckets];
+                    buckets[i] = {
+                      ...bucket,
+                      role: e.target.value as NonNullable<typeof bucket.role>,
+                    };
+                    onChange({ ...game, buckets });
+                  }}
+                  className="rounded-full bg-white/80 px-2 py-1"
+                >
+                  <option value="category">Category</option>
+                  <option value="insufficient-evidence">Insufficient evidence</option>
+                </select>
+              </label>
               <ul className="space-y-2">
                 {game.items
                   .filter((item) => item.bucketId === bucket.id)
@@ -328,25 +504,40 @@ function SortBuild({
                     <li key={item.id}>
                       <input
                         value={item.label}
-                        onChange={(e) => {
-                          const items = game.items.map((entry) =>
-                            entry.id === item.id ? { ...entry, label: e.target.value } : entry,
-                          );
-                          onChange({ ...game, items });
-                        }}
+                        onChange={(e) => patchItem(item.id, { label: e.target.value })}
                         className="w-full rounded-full bg-white px-3 py-1 text-sm font-extrabold ring-1 ring-black/10"
                       />
+                      <label className="mt-1 flex items-center gap-2 px-1 text-xs font-bold text-slate-600">
+                        Scoring
+                        <select
+                          value={item.scoring ?? "auto"}
+                          onChange={(e) =>
+                            patchItem(item.id, {
+                              scoring: e.target.value as NonNullable<typeof item.scoring>,
+                            })
+                          }
+                          className="rounded-full bg-white px-2 py-1 ring-1 ring-black/10"
+                        >
+                          <option value="auto">Auto-score</option>
+                          <option value="discussion">Discussion</option>
+                        </select>
+                      </label>
                       <input
                         value={item.why ?? ""}
                         placeholder="Why"
-                        onChange={(e) => {
-                          const items = game.items.map((entry) =>
-                            entry.id === item.id
-                              ? { ...entry, why: e.target.value || undefined }
-                              : entry,
-                          );
-                          onChange({ ...game, items });
-                        }}
+                        onChange={(e) => patchItem(item.id, { why: e.target.value || undefined })}
+                        className="mt-1 w-full rounded-full bg-white/70 px-3 py-1 text-xs font-semibold ring-1 ring-black/5"
+                      />
+                      <input
+                        value={item.source?.label ?? ""}
+                        placeholder="Source label"
+                        onChange={(e) => patchSource(item, "label", e.target.value)}
+                        className="mt-1 w-full rounded-full bg-white/70 px-3 py-1 text-xs font-semibold ring-1 ring-black/5"
+                      />
+                      <input
+                        value={item.source?.citation ?? ""}
+                        placeholder="Source citation"
+                        onChange={(e) => patchSource(item, "citation", e.target.value)}
                         className="mt-1 w-full rounded-full bg-white/70 px-3 py-1 text-xs font-semibold ring-1 ring-black/5"
                       />
                     </li>
@@ -375,7 +566,7 @@ function SortBuild({
           </div>
         ))}
       </div>
-      {game.buckets.length < 3 ? (
+      {game.buckets.length < 4 ? (
         <button
           type="button"
           className="inline-flex min-h-12 items-center gap-1 text-sm font-extrabold text-violet-700"
@@ -396,6 +587,7 @@ function SortBuild({
 function SortChest({
   bucketId,
   label,
+  role,
   labelSlot,
   palette = 0,
   active = false,
@@ -405,6 +597,7 @@ function SortChest({
 }: {
   bucketId: string;
   label: string;
+  role?: "category" | "insufficient-evidence";
   labelSlot?: ReactNode;
   palette?: number;
   active?: boolean;
@@ -426,7 +619,16 @@ function SortChest({
   return (
     <div className="flex w-full min-w-0 flex-col">
       <div className="mb-1.5 rounded-2xl bg-white px-2 py-1.5 text-center font-display text-xs font-semibold text-amber-950 shadow-[0_2px_0_rgb(180_83_9/18%)] sm:text-sm">
-        {labelSlot ?? label}
+        {labelSlot ?? (
+          <>
+            {label}
+            {role === "insufficient-evidence" ? (
+              <span className="ml-1 font-sans text-[10px] font-bold text-amber-700">
+                (insufficient evidence)
+              </span>
+            ) : null}
+          </>
+        )}
       </div>
       <div
         data-sort-bucket={bucketId}

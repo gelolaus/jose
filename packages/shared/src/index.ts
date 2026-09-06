@@ -3,6 +3,7 @@ export * from "./progress";
 export * from "./youtube";
 export * from "./lesson-blocks";
 export * from "./games";
+export * from "./motion";
 export * from "./hearts";
 export * from "./modules";
 export * from "./assessment";
