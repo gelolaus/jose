@@ -1,10 +1,10 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SortGame as SortContent } from "@jose/shared";
+import { parseGameContent, type SortGame as SortContent } from "@jose/shared";
 import { SortGame } from "./sort-game";
 
-const game: SortContent = {
+const game = parseGameContent({
   type: "sort",
   buckets: [
     { id: "noli", label: "Noli Me Tangere" },
@@ -15,13 +15,15 @@ const game: SortContent = {
     { id: "b", label: "Simoun", bucketId: "fili", why: "Sequel." },
     { id: "c", label: "1887", bucketId: "noli" },
   ],
-};
+});
+if (game.type !== "sort") throw new Error("expected sort");
+const sortGame = game;
 
 function play() {
   const onMiss = vi.fn(async () => "ok" as const);
   const onFinish = vi.fn();
   render(
-    <SortGame game={game} disabled={false} onMiss={onMiss} onFinish={onFinish} />,
+    <SortGame game={sortGame} disabled={false} onMiss={onMiss} onFinish={onFinish} />,
   );
   return { onMiss, onFinish };
 }

@@ -129,4 +129,9 @@ export class StudentController {
   ) {
     return this.curriculum.finishAttempt(attemptId, body, learnerId);
   }
+
+  @Get("artifacts")
+  artifacts(@CurrentLearnerId() learnerId: string) {
+    return this.curriculum.listArtifacts(learnerId);
+  }
 }

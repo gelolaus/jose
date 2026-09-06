@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { chestContentSchema } from "./artifacts";
 import {
   applyTemplateBodySchema,
   createAssetBodySchema,
@@ -176,11 +177,14 @@ export const putGameMutationSchema = z.object({
   game: gameContentSchema.optional(),
 }).passthrough();
 
+export const putChestBodySchema = chestContentSchema;
+
 export const teachLevelDetailSchema = teachLevelSchema.extend({
   moduleId: z.string().min(1),
   sectionId: z.string().min(1),
   lesson: lessonContentSchema.nullable(),
   game: gameContentSchema.nullable(),
+  chest: chestContentSchema.nullable(),
 });
 
 export const CONFLICT_CODE = "CONTENT_CONFLICT" as const;

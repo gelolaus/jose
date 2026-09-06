@@ -34,25 +34,31 @@ describe("formatClock", () => {
 describe("roundPhase", () => {
   it("stays idle until the first flip", () => {
     expect(
-      roundPhase({ started: false, remainingMs: 32_000, matchedCount: 0, pairCount: 4 }),
+      roundPhase({ started: false, remainingMs: 32_000, matchedCount: 0, pairCount: 4, timed: true }),
     ).toBe("idle");
   });
 
   it("is running after the first flip while time remains", () => {
     expect(
-      roundPhase({ started: true, remainingMs: 12_000, matchedCount: 1, pairCount: 4 }),
+      roundPhase({ started: true, remainingMs: 12_000, matchedCount: 1, pairCount: 4, timed: true }),
     ).toBe("running");
   });
 
   it("wins when every pair is matched, even at 0:00", () => {
     expect(
-      roundPhase({ started: true, remainingMs: 0, matchedCount: 4, pairCount: 4 }),
+      roundPhase({ started: true, remainingMs: 0, matchedCount: 4, pairCount: 4, timed: true }),
     ).toBe("won");
   });
 
   it("loses when time hits zero before the board is clear", () => {
     expect(
-      roundPhase({ started: true, remainingMs: 0, matchedCount: 3, pairCount: 4 }),
+      roundPhase({ started: true, remainingMs: 0, matchedCount: 3, pairCount: 4, timed: true }),
     ).toBe("lost");
+  });
+
+  it("keeps learning rounds running at 0:00", () => {
+    expect(
+      roundPhase({ started: true, remainingMs: 0, matchedCount: 3, pairCount: 4, timed: false }),
+    ).toBe("running");
   });
 });

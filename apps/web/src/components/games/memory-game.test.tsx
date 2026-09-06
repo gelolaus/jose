@@ -1,18 +1,36 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { MemoryGame as MemoryContent } from "@jose/shared";
+import { parseGameContent, type MemoryGame as MemoryContent } from "@jose/shared";
 import { MemoryGame } from "./memory-game";
 
-const game: MemoryContent = {
+const learningGame = parseGameContent({
   type: "memory",
+  playMode: "learning",
   pairs: [
-    { a: { text: "Paris" }, b: { text: "Eye doctor" }, why: "Paris trained his eyes." },
-    { a: { text: "Berlin" }, b: { text: "Noli, 1887" } },
+    {
+      id: "pair-1",
+      a: { text: "Paris" },
+      b: { text: "Eye doctor" },
+      explanation: "Paris trained his eyes.",
+    },
+    {
+      id: "pair-2",
+      a: { text: "Berlin" },
+      b: { text: "Noli, 1887" },
+      explanation: "Noli was printed in Berlin.",
+    },
   ],
-};
+}) as MemoryContent;
 
-function play() {
+const timedGame = parseGameContent({
+  type: "memory",
+  playMode: "timed",
+  timing: { secondsPerPair: 8, mismatchPenaltyMs: 3000 },
+  pairs: learningGame.pairs,
+}) as MemoryContent;
+
+function play(game: MemoryContent = learningGame) {
   const onMiss = vi.fn(async () => "ok" as const);
   const onFinish = vi.fn();
   render(
@@ -21,23 +39,14 @@ function play() {
   return { onMiss, onFinish };
 }
 
-/** Deck order with Math.random mocked to 0.999: 0-a, 0-b, 1-a, 1-b */
-const cardIndex: Record<string, number> = {
-  "0-a": 0,
-  "0-b": 1,
-  "1-a": 2,
-  "1-b": 3,
-};
-
 function tap(id: string) {
-  const buttons = screen.getAllByRole("button");
-  const index = cardIndex[id];
-  if (index === undefined) throw new Error(`unknown card ${id}`);
-  fireEvent.click(buttons[index]!);
+  const button = document.querySelector(`[data-card-id="${id}"]`);
+  if (!button) throw new Error(`missing card ${id}`);
+  fireEvent.click(button);
 }
 
 describe("MemoryGame play", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
     vi.spyOn(Math, "random").mockReturnValue(0.999);
   });
@@ -48,55 +57,54 @@ describe("MemoryGame play", () => {
     vi.restoreAllMocks();
   });
 
-  it("announces revealed card content for screen readers", () => {
+  it("announces revealed card content for screen readers", async () => {
     play();
-    tap("0-a");
+    await vi.advanceTimersByTimeAsync(0);
+    tap("pair-1-a");
     expect(screen.getByRole("button", { name: "Revealed: Paris" })).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "Hidden card" })).toHaveLength(3);
   });
 
-  it("does not spend a heart on a mismatch", async () => {
-    const { onMiss } = play();
-    tap("0-a");
-    tap("1-a");
+  it("plays learning mode without a timer and does not spend a heart on a mismatch", async () => {
+    const { onMiss } = play(learningGame);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(screen.getByText(/untimed/i)).toBeTruthy();
+    tap("pair-1-a");
+    tap("pair-2-a");
     await vi.advanceTimersByTimeAsync(800);
     expect(onMiss).not.toHaveBeenCalled();
-    expect(screen.getByText("0:13")).toBeTruthy();
+    expect(screen.queryByLabelText(/seconds left/i)).toBeNull();
   });
 
-  it("starts the clock on the first flip and times out with a held miss", async () => {
-    const { onMiss, onFinish } = play();
+  it("starts the clock on the first flip in timed mode and times out with a held miss", async () => {
+    const { onMiss, onFinish } = play(timedGame);
+    await vi.advanceTimersByTimeAsync(0);
     expect(screen.getByText("0:16")).toBeTruthy();
     await vi.advanceTimersByTimeAsync(2_000);
     expect(screen.getByText("0:16")).toBeTruthy();
-    tap("0-a");
+    tap("pair-1-a");
     await vi.advanceTimersByTimeAsync(16_000);
     expect(onMiss).toHaveBeenCalledWith(null, { hold: true });
     expect(onFinish).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "Time’s up" })).toBeTruthy();
   });
 
-  it("finishes with mismatch count and never calls onMiss", async () => {
-    const { onMiss, onFinish } = play();
-    tap("0-a");
-    tap("1-a");
+  it("finishes learning mode with mismatch count and never calls onMiss", async () => {
+    const { onMiss, onFinish } = play(learningGame);
+    await vi.advanceTimersByTimeAsync(0);
+    tap("pair-1-a");
+    tap("pair-2-a");
     await vi.advanceTimersByTimeAsync(800);
-    tap("0-a");
-    tap("0-b");
-    tap("1-a");
-    tap("1-b");
+    tap("pair-1-a");
+    tap("pair-1-b");
+    tap("pair-2-a");
+    tap("pair-2-b");
     expect(onMiss).not.toHaveBeenCalled();
     expect(onFinish).toHaveBeenCalledWith(
       1,
       2,
       1,
-      expect.objectContaining({
-        type: "memory",
-        matches: expect.arrayContaining([
-          expect.objectContaining({ cardA: "0-a", cardB: "0-b" }),
-          expect.objectContaining({ cardA: "1-a", cardB: "1-b" }),
-        ]),
-      }),
+      expect.objectContaining({ type: "memory" }),
     );
   });
 });

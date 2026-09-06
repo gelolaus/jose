@@ -2,9 +2,11 @@ import { z } from "zod";
 import {
   coerceGameContent,
   gameContentSchema,
+  normalizeBlankKey,
   type GameContent,
   type LessonContent,
 } from "./games";
+import { parseChestContent, type ChestContent } from "./artifacts";
 import type { GameType, NodeKind } from "./path";
 
 export const publishIssueSeveritySchema = z.enum(["blocker", "warning"]);
@@ -59,6 +61,7 @@ export type PublishLevelInput = {
   sectionId: string;
   lesson?: LessonContent | null;
   game?: unknown;
+  chest?: ChestContent | null;
 };
 
 export type PublishModuleInput = {
@@ -204,7 +207,10 @@ function assessGameDetails(
   switch (game.type) {
     case "quiz": {
       for (const [index, question] of game.questions.entries()) {
-        if (isPlaceholderText(question.prompt) || question.choices.some(isPlaceholderText)) {
+        if (
+          isPlaceholderText(question.prompt) ||
+          question.choices.some((choice) => isPlaceholderText(choice.text))
+        ) {
           issues.push(
             issue({
               ...base,
@@ -276,8 +282,8 @@ function assessGameDetails(
             }),
           );
         }
-        const answer = item.answer.trim().toLowerCase();
-        if (item.decoys.some((decoy) => decoy.trim().toLowerCase() === answer)) {
+        const answer = normalizeBlankKey(item.answer);
+        if (item.decoys.some((decoy) => normalizeBlankKey(decoy) === answer)) {
           issues.push(
             issue({
               ...base,
@@ -329,7 +335,8 @@ function assessGameDetails(
       }
       const bucketSet = new Set(bucketIds);
       for (const [index, item] of game.items.entries()) {
-        if (!bucketSet.has(item.bucketId)) {
+        if (!item.bucketId || !bucketSet.has(item.bucketId)) {
+          if (item.scoring === "discussion") continue;
           issues.push(
             issue({
               ...base,
@@ -367,8 +374,69 @@ function assessGameDetails(
       }
       break;
     }
+    case "case-files":
+    case "dispatches":
+    case "editorial":
+    case "dapitan": {
+      if (game.approvalStatus !== "approved") {
+        issues.push(
+          issue({
+            ...base,
+            code: "game.draft",
+            message:
+              "Replace draft excerpts and citations with instructor-approved sources before publishing.",
+            path: `levels.${base.levelId}.game.approvalStatus`,
+            field: "approvalStatus",
+          }),
+        );
+      }
+      break;
+    }
   }
   return issues;
+}
+
+function assessChest(
+  moduleId: string,
+  sectionId: string,
+  level: PublishLevelInput,
+  rawChest: unknown,
+): PublishIssue[] {
+  const base = {
+    moduleId,
+    sectionId,
+    levelId: level.id,
+  };
+  const parsed = (() => {
+    try {
+      return parseChestContent(rawChest);
+    } catch {
+      return null;
+    }
+  })();
+  if (!parsed) {
+    return [
+      issue({
+        ...base,
+        code: "chest.invalid",
+        message: "Chest artifact content is missing or invalid.",
+        path: `levels.${level.id}.chest`,
+        field: "chest",
+      }),
+    ];
+  }
+  if (parsed.artifact.approvalStatus !== "approved") {
+    return [
+      issue({
+        ...base,
+        code: "chest.draft",
+        message: "Approve artifact provenance before publishing this chest.",
+        path: `levels.${level.id}.chest.artifact.approvalStatus`,
+        field: "approvalStatus",
+      }),
+    ];
+  }
+  return [];
 }
 
 export function assessPublishReadiness(input: PublishModuleInput): PublishReadiness {
@@ -427,7 +495,12 @@ export function assessPublishReadiness(input: PublishModuleInput): PublishReadin
       continue;
     }
     for (const level of section.levels) {
-      if (level.kind === "chest") continue;
+      if (level.kind === "chest") {
+        for (const item of assessChest(input.id, section.id, level, level.chest)) {
+          (item.severity === "blocker" ? blockers : warnings).push(item);
+        }
+        continue;
+      }
       if (level.kind === "lesson") {
         for (const item of assessLesson(input.id, section.id, level, level.lesson)) {
           (item.severity === "blocker" ? blockers : warnings).push(item);

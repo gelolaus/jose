@@ -1,6 +1,17 @@
 import { randomUUID } from "node:crypto";
-import { DEMO_LEARNER_ID, emptyGameContent, type GameContent } from "@jose/shared";
-import { and, eq, isNull } from "drizzle-orm";
+import {
+  DEMO_LEARNER_ID,
+  emptyCaseFilesGame,
+  emptyChestContent,
+  emptyDapitanGame,
+  emptyDispatchesGame,
+  emptyEditorialGame,
+  emptyGameContent,
+  parseGameContent,
+  type ChestContent,
+  type GameContent,
+} from "@jose/shared";
+import { and, eq, gte, isNull } from "drizzle-orm";
 import type { JoseDb } from "./database.service";
 import {
   gameContent,
@@ -17,6 +28,7 @@ import {
 export const SEED_IDS = {
   curriculum: "curriculum@1",
   demoLearner: "demo-learner@1",
+  gameRelease: "games-37-47@1",
 } as const;
 
 export type ApplySeedsOptions = {
@@ -34,9 +46,10 @@ type SeedLevel = {
   id: string;
   title: string;
   kind: "lesson" | "game" | "chest";
-  gameType?: "quiz" | "memory" | "timeline" | "blank" | "sort";
+  gameType?: GameContent["type"];
   markdown?: string;
   game?: GameContent;
+  chest?: ChestContent;
 };
 
 const RIZAL_LESSONS: Record<string, string> = {
@@ -113,8 +126,9 @@ On **December 30, 1896**, Rizal was executed in Bagumbayan (today’s Luneta / R
 The path ends here on purpose. Deep-dive modules can go back and linger on school, loves, or Dapitan.`,
 };
 
-const CHILDHOOD_TIMELINE: GameContent = {
+const CHILDHOOD_TIMELINE = parseGameContent({
   type: "timeline",
+  dateHints: "optional",
   items: [
     {
       id: "born",
@@ -126,12 +140,14 @@ const CHILDHOOD_TIMELINE: GameContent = {
       id: "teodora",
       label: "Teodora teaches Pepe to read",
       year: "1860s",
+      groupId: "home-learning",
       why: "His first classroom was home. Teodora Alonso taught him letters and stories.",
     },
     {
       id: "moth",
       label: "The moth and the flame",
       year: "Story",
+      groupId: "home-learning",
       why: "Teodora’s tale warned him about getting too close to danger — it sticks because it is a story, not a date.",
     },
     {
@@ -141,9 +157,27 @@ const CHILDHOOD_TIMELINE: GameContent = {
       why: "Biñan is the first time the path leaves home. Latin and Spanish start here.",
     },
   ],
-};
+  causalLink: {
+    prompt: "How does home learning connect to leaving for Biñan?",
+    choices: [
+      {
+        id: "prep",
+        text: "Reading at home prepared him for a stricter school away from Calamba.",
+      },
+      {
+        id: "skip",
+        text: "The moth story meant he never needed school in Biñan.",
+      },
+    ],
+    correctChoiceId: "prep",
+    explanation:
+      "Home literacy comes first. Biñan is the next outward step on the path.",
+    fromItemId: "teodora",
+    toItemId: "binan",
+  },
+});
 
-const EDUCATION_QUIZ: GameContent = {
+const EDUCATION_QUIZ = parseGameContent({
   type: "quiz",
   questions: [
     {
@@ -151,12 +185,66 @@ const EDUCATION_QUIZ: GameContent = {
       choices: ["Biñan", "Dapitan", "Heidelberg", "Hong Kong"],
       correctIndex: 0,
       why: "Biñan came first — a strict teacher, Latin, and Spanish, still close to Calamba.",
+      whyCorrect: "Biñan is the first school stop after home learning.",
+    },
+    {
+      kind: "evidence",
+      prompt: "Which source best supports the claim?",
+      claim: "Noli Me Tangere argues for exposing colonial ills, not staging a carnival.",
+      sources: [
+        {
+          id: "dedication",
+          label: "Noli dedication",
+          excerpt: "I will strive to answer the calumnies…",
+          citation: "Noli Me Tangere, dedication",
+        },
+        {
+          id: "postcard",
+          label: "Travel postcard",
+          excerpt: "Weather fine in Berlin.",
+          citation: "Unrelated note",
+        },
+      ],
+      choices: [
+        { id: "dedication", text: "Noli dedication" },
+        { id: "postcard", text: "Travel postcard" },
+      ],
+      correctChoiceId: "dedication",
+      rationales: [
+        {
+          id: "direct",
+          text: "It directly frames the novel as answering colonial calumnies.",
+          correct: true,
+        },
+        { id: "weather", text: "Any European note proves the literary claim." },
+      ],
+      correctRationaleId: "direct",
+      why: "A weather note does not argue about colonial critique.",
+      whyCorrect: "The dedication is primary evidence for the novel’s reform purpose.",
+      objectiveTags: ["novels", "evidence"],
     },
     {
       prompt: "Which word marked outstanding Ateneo grades?",
       choices: ["Sobresaliente", "Cum laude", "Magna", "Principal"],
       correctIndex: 0,
       why: "Sobresaliente was the Ateneo’s public honor for top work.",
+      whyCorrect: "Sobresaliente was Ateneo’s public honor word.",
+    },
+    {
+      kind: "evidence",
+      prompt: "Strongest evidence that Berlin matters to Noli’s publication?",
+      claim: "Noli Me Tangere was printed in Berlin in 1887.",
+      sources: [
+        { id: "imprint", label: "1887 Berlin imprint note", citation: "Publication record" },
+        { id: "menu", label: "Café menu", citation: "Unrelated" },
+      ],
+      choices: [
+        { id: "imprint", text: "1887 Berlin imprint note" },
+        { id: "menu", text: "Café menu" },
+      ],
+      correctChoiceId: "imprint",
+      whyCorrect: "The imprint is direct publication evidence.",
+      objectiveTags: ["novels", "evidence"],
     },
     {
       prompt: "Why did he leave UST for Madrid?",
@@ -168,11 +256,12 @@ const EDUCATION_QUIZ: GameContent = {
       ],
       correctIndex: 1,
       why: "UST taught him medicine — and how colonial classrooms treated Filipinos. That push sent him to Spain.",
+      whyCorrect: "Treatment of Filipino students pushed him toward Madrid.",
     },
   ],
-};
+});
 
-const TRAVELS_MEMORY: GameContent = {
+const TRAVELS_MEMORY = parseGameContent({
   type: "memory",
   pairs: [
     {
@@ -208,55 +297,74 @@ const TRAVELS_MEMORY: GameContent = {
       why: "He annotated Morga so readers could see a Philippines that was not empty before the colony.",
     },
   ],
-};
+});
 
-const NOVELS_SORT: GameContent = {
+const NOVELS_SORT = parseGameContent({
   type: "sort",
   buckets: [
-    { id: "noli", label: "Noli Me Tangere" },
-    { id: "fili", label: "El Filibusterismo" },
+    { id: "noli", label: "Noli Me Tangere", role: "category" },
+    { id: "fili", label: "El Filibusterismo", role: "category" },
+    { id: "unsure", label: "Insufficient evidence", role: "insufficient-evidence" },
   ],
   items: [
     {
       id: "ibarra",
       label: "Crisostomo Ibarra",
       bucketId: "noli",
+      scoring: "auto",
       why: "Noli follows Ibarra in San Diego — a diagnosis of the sick colony.",
+      source: { label: "Noli Me Tangere", citation: "Novel text" },
     },
     {
       id: "simoun",
       label: "Simoun",
       bucketId: "fili",
+      scoring: "auto",
       why: "In the sequel Ibarra returns as Simoun. The temperature drops.",
+      source: { label: "El Filibusterismo", citation: "Novel text" },
     },
     {
       id: "year-noli",
       label: "Published 1887 in Berlin",
       bucketId: "noli",
+      scoring: "auto",
       why: "Noli Me Tangere: 1887, Berlin.",
     },
     {
       id: "year-fili",
       label: "Published 1891",
       bucketId: "fili",
+      scoring: "auto",
       why: "El Filibusterismo is the 1891 sequel — colder, plotted, less hopeful.",
     },
     {
       id: "touch",
       label: "“Touch me not”",
       bucketId: "noli",
+      scoring: "auto",
       why: "That is what Noli Me Tangere means.",
     },
     {
-      id: "darker",
-      label: "Reform talk gives way to a darker plot",
-      bucketId: "fili",
-      why: "Fili is the colder book. Teachers pair a chapter from each so you feel the change.",
+      id: "rumor",
+      label: "A classmate said Fili is happier than Noli",
+      bucketId: "unsure",
+      scoring: "auto",
+      why: "Hearsay without a passage is insufficient evidence.",
+    },
+    {
+      id: "tone",
+      label: "Which book feels colder — and why?",
+      scoring: "discussion",
+      why: "Discussion prompt: Fili is usually read as colder. Do not auto-grade a single opinion chip.",
+      justificationChoices: [
+        { id: "fili-cold", text: "Fili reads colder and more conspiratorial." },
+        { id: "noli-cold", text: "Noli is colder because it is earlier." },
+      ],
     },
   ],
-};
+});
 
-const MARTYRDOM_BLANK: GameContent = {
+const MARTYRDOM_BLANK = parseGameContent({
   type: "blank",
   items: [
     {
@@ -264,23 +372,49 @@ const MARTYRDOM_BLANK: GameContent = {
       answer: "Bagumbayan",
       decoys: ["Fort Santiago", "Dapitan", "Calamba"],
       why: "Bagumbayan is today’s Luneta / Rizal Park. The date is December 30, 1896.",
+      whyCorrect: "Bagumbayan anchors the December 30, 1896 execution.",
+      objective: "Identify the execution site from a sourced martyrdom passage.",
+      source: {
+        id: "src-martyr",
+        label: "Martyrdom lesson",
+        citation: "Module lesson: Martyrdom",
+      },
+      distractors: [
+        { text: "Fort Santiago", why: "Fort Santiago is imprisonment, not the execution field." },
+        { text: "Dapitan", why: "Dapitan is exile, years earlier." },
+        { text: "Calamba", why: "Calamba is his birthplace." },
+      ],
     },
     {
       sentence: "Mi Último Adiós was hidden in a ___ and given to his family.",
       answer: "lamp",
       decoys: ["book", "hat", "letterbox"],
       why: "The poem rode in a lamp — a farewell to the country, not a speech for the court.",
+      whyCorrect: "The lamp is the conveyance detail this passage restores.",
+      objective: "Recall how the farewell poem was conveyed.",
+      source: {
+        id: "src-adios",
+        label: "Último Adiós context",
+        citation: "Module lesson: Martyrdom",
+      },
     },
     {
       sentence: "The trial charged him with rebellion, sedition, and ___.",
       answer: "illegal association",
       decoys: ["piracy", "theft", "heresy"],
       why: "Those three charges — not a fair fight — are what the Manila court used.",
+      whyCorrect: "Illegal association completes the three trial charges.",
+      objective: "Name the third charge used in the Manila trial.",
+      source: {
+        id: "src-trial",
+        label: "Arrest & trial lesson",
+        citation: "Module lesson: Arrest & trial",
+      },
     },
   ],
-};
+});
 
-const ATENEO_QUIZ: GameContent = {
+const ATENEO_QUIZ = parseGameContent({
   type: "quiz",
   questions: [
     {
@@ -302,9 +436,9 @@ const ATENEO_QUIZ: GameContent = {
       why: "Jesuits ran Ateneo. Dominicans show up later at UST.",
     },
   ],
-};
+});
 
-const ATENEO_MEMORY: GameContent = {
+const ATENEO_MEMORY = parseGameContent({
   type: "memory",
   pairs: [
     {
@@ -328,9 +462,9 @@ const ATENEO_MEMORY: GameContent = {
       why: "1872 is the door into this module.",
     },
   ],
-};
+});
 
-const ATENEO_TIMELINE: GameContent = {
+const ATENEO_TIMELINE = parseGameContent({
   type: "timeline",
   items: [
     {
@@ -358,9 +492,9 @@ const ATENEO_TIMELINE: GameContent = {
       why: "Awards like Sobresaliente were public. Standing in class mattered.",
     },
   ],
-};
+});
 
-const ATENEO_BLANK: GameContent = {
+const ATENEO_BLANK = parseGameContent({
   type: "blank",
   items: [
     {
@@ -376,9 +510,9 @@ const ATENEO_BLANK: GameContent = {
       why: "Sobresaliente is Ateneo’s word, not the later university Latin.",
     },
   ],
-};
+});
 
-const ATENEO_SORT: GameContent = {
+const ATENEO_SORT = parseGameContent({
   type: "sort",
   buckets: [
     { id: "ateneo", label: "Ateneo days" },
@@ -410,7 +544,7 @@ const ATENEO_SORT: GameContent = {
       why: "The Liga is 1892 in Manila, after Europe — not a school club.",
     },
   ],
-};
+});
 
 function lesson(id: string, title: string): SeedLevel {
   return {
@@ -435,6 +569,44 @@ function game(
   };
 }
 
+function chest(id: string, title: string, content: ChestContent): SeedLevel {
+  return {
+    id,
+    title,
+    kind: "chest",
+    chest: content,
+  };
+}
+
+function draftChest(
+  id: string,
+  title: string,
+  kind: ChestContent["artifact"]["kind"],
+  coverId: string | null,
+): ChestContent {
+  const base = emptyChestContent();
+  return {
+    ...base,
+    message: `You opened ${title}. Collect a revisitable journal artifact.`,
+    achievementCriteria: "Complete this chest stop once to earn the artifact.",
+    journalCoverId: coverId,
+    artifact: {
+      ...base.artifact,
+      id: `${id}-artifact`,
+      title: `${title} (draft artifact)`,
+      kind,
+      summary:
+        "Draft reward for the journal. Replace with an approved map, excerpt, cover, or illustration before classroom publish.",
+      provenance:
+        "Teacher must supply provenance (archive, edition, or public-domain citation).",
+      body: "[Paste an instructor-approved excerpt or description. Do not invent quotations.]",
+      approvalStatus: "draft",
+      teacherInstructions:
+        "Approve provenance and body text, set approvalStatus to approved, then publish.",
+    },
+  };
+}
+
 /**
  * Applies pending versioned seeds. Already-recorded seeds are skipped, so
  * editorial deletions survive restarts and re-runs of the seed command.
@@ -446,6 +618,9 @@ export async function applyPendingSeeds(
   const results: SeedApplyResult[] = [];
   results.push(
     await applySeedOnce(db, SEED_IDS.curriculum, () => seedCurriculumV1(db)),
+  );
+  results.push(
+    await applySeedOnce(db, SEED_IDS.gameRelease, () => seedGameReleaseV1(db)),
   );
   if (options.includeDemo) {
     results.push(
@@ -497,7 +672,11 @@ async function seedCurriculumV1(db: JoseDb) {
           lesson("childhood-family", "The Mercado family"),
           lesson("childhood-stories", "Stories from Teodora"),
           game("childhood-timeline", "Put the years in order", CHILDHOOD_TIMELINE),
-          { id: "childhood-chest", title: "Childhood treasure", kind: "chest" },
+          chest(
+            "childhood-chest",
+            "Childhood treasure",
+            draftChest("childhood-chest", "Childhood treasure", "illustration", "cover-calamba"),
+          ),
         ],
       },
       {
@@ -522,7 +701,12 @@ async function seedCurriculumV1(db: JoseDb) {
           lesson("travel-paris", "Paris days"),
           lesson("travel-germany", "Germany & science"),
           game("travel-memory", "Match the cities", TRAVELS_MEMORY),
-          { id: "travel-chest", title: "Traveler's chest", kind: "chest" },
+          chest(
+            "travel-chest",
+            "Traveler's chest",
+            draftChest("travel-chest", "Traveler's chest", "map", "cover-europe"),
+          ),
+          game("travel-dispatches", "Dispatches from Europe (draft)", emptyDispatchesGame()),
         ],
       },
       {
@@ -535,6 +719,8 @@ async function seedCurriculumV1(db: JoseDb) {
           lesson("fili", "El Filibusterismo"),
           lesson("reform", "La Liga Filipina"),
           game("novels-sort", "Which novel?", NOVELS_SORT),
+          game("novels-case-files", "Rizal Case Files (draft)", emptyCaseFilesGame()),
+          game("novels-editorial", "Editorial Room (draft)", emptyEditorialGame()),
         ],
       },
       {
@@ -547,7 +733,12 @@ async function seedCurriculumV1(db: JoseDb) {
           lesson("mi-ultimo", "Mi Último Adiós"),
           lesson("bagumbayan", "Bagumbayan"),
           game("martyrdom-blank", "Finish the farewell", MARTYRDOM_BLANK),
-          { id: "legacy-chest", title: "Legacy chest", kind: "chest" },
+          chest(
+            "legacy-chest",
+            "Legacy chest",
+            draftChest("legacy-chest", "Legacy chest", "excerpt", "cover-adios"),
+          ),
+          game("legacy-dapitan", "Dapitan Workshop (draft)", emptyDapitanGame()),
         ],
       },
     ],
@@ -593,6 +784,198 @@ He boarded in Manila, wrote poems for school programs, and finished as one of th
       },
     ],
   });
+}
+
+const GAME_RELEASE_EXTRAS: {
+  id: string;
+  sectionId: string;
+  afterId: string;
+  title: string;
+  game: GameContent;
+}[] = [
+  {
+    id: "novels-case-files",
+    sectionId: "novels",
+    afterId: "novels-sort",
+    title: "Rizal Case Files (draft)",
+    game: emptyCaseFilesGame(),
+  },
+  {
+    id: "travel-dispatches",
+    sectionId: "travels",
+    afterId: "travel-chest",
+    title: "Dispatches from Europe (draft)",
+    game: emptyDispatchesGame(),
+  },
+  {
+    id: "novels-editorial",
+    sectionId: "novels",
+    afterId: "novels-case-files",
+    title: "Editorial Room (draft)",
+    game: emptyEditorialGame(),
+  },
+  {
+    id: "legacy-dapitan",
+    sectionId: "martyrdom",
+    afterId: "legacy-chest",
+    title: "Dapitan Workshop (draft)",
+    game: emptyDapitanGame(),
+  },
+];
+
+const GAME_RELEASE_CHESTS = [
+  {
+    id: "childhood-chest",
+    title: "Childhood treasure",
+    kind: "illustration" as const,
+    coverId: "cover-calamba",
+  },
+  {
+    id: "travel-chest",
+    title: "Traveler's chest",
+    kind: "map" as const,
+    coverId: "cover-europe",
+  },
+  {
+    id: "legacy-chest",
+    title: "Legacy chest",
+    kind: "excerpt" as const,
+    coverId: "cover-adios",
+  },
+];
+
+async function seedGameReleaseV1(db: JoseDb) {
+  for (const chestLevel of GAME_RELEASE_CHESTS) {
+    const [level] = await db
+      .select({ id: levels.id })
+      .from(levels)
+      .where(eq(levels.id, chestLevel.id))
+      .limit(1);
+    if (!level) continue;
+    const [content] = await db
+      .select()
+      .from(gameContent)
+      .where(eq(gameContent.levelId, chestLevel.id))
+      .limit(1);
+    if (content) continue;
+    await db.insert(gameContent).values({
+      levelId: chestLevel.id,
+      json: JSON.stringify(
+        draftChest(chestLevel.id, chestLevel.title, chestLevel.kind, chestLevel.coverId),
+      ),
+    });
+  }
+
+  for (const extra of GAME_RELEASE_EXTRAS) {
+    const [exists] = await db
+      .select({ id: levels.id })
+      .from(levels)
+      .where(eq(levels.id, extra.id))
+      .limit(1);
+    if (exists) continue;
+    const [anchor] = await db
+      .select()
+      .from(levels)
+      .where(eq(levels.id, extra.afterId))
+      .limit(1);
+    if (!anchor) continue;
+    const insertAt = anchor.sortOrder + 1;
+    const later = await db
+      .select()
+      .from(levels)
+      .where(
+        and(eq(levels.sectionId, extra.sectionId), gte(levels.sortOrder, insertAt)),
+      );
+    for (const row of later) {
+      await db
+        .update(levels)
+        .set({ sortOrder: row.sortOrder + 1 })
+        .where(eq(levels.id, row.id));
+    }
+    await db.insert(levels).values({
+      id: extra.id,
+      sectionId: extra.sectionId,
+      title: extra.title,
+      kind: "game",
+      gameType: extra.game.type,
+      sortOrder: insertAt,
+    });
+    await db.insert(gameContent).values({
+      levelId: extra.id,
+      json: JSON.stringify(extra.game),
+    });
+  }
+
+  await spliceExtrasIntoPublishedSnapshots(db);
+}
+
+async function spliceExtrasIntoPublishedSnapshots(db: JoseDb) {
+  const published = await db.select().from(modules);
+  for (const mod of published) {
+    if (!mod.publishedRevisionId) continue;
+    const [revision] = await db
+      .select()
+      .from(moduleRevisions)
+      .where(eq(moduleRevisions.id, mod.publishedRevisionId))
+      .limit(1);
+    if (!revision) continue;
+    const snapshot = JSON.parse(revision.snapshotJson) as {
+      sections: Array<{
+        id: string;
+        levels: Array<{
+          id: string;
+          title: string;
+          kind: string;
+          gameType: string | null;
+          sortOrder: number;
+          lesson: unknown;
+          game: unknown;
+          chest?: unknown;
+        }>;
+      }>;
+    };
+    let changed = false;
+    for (const extra of GAME_RELEASE_EXTRAS) {
+      const section = snapshot.sections.find((row) => row.id === extra.sectionId);
+      if (!section) continue;
+      if (section.levels.some((level) => level.id === extra.id)) continue;
+      const afterIndex = section.levels.findIndex((level) => level.id === extra.afterId);
+      const insertAt = afterIndex >= 0 ? afterIndex + 1 : section.levels.length;
+      section.levels.splice(insertAt, 0, {
+        id: extra.id,
+        title: extra.title,
+        kind: "game",
+        gameType: extra.game.type,
+        sortOrder: insertAt,
+        lesson: null,
+        game: extra.game,
+      });
+      section.levels.forEach((level, index) => {
+        level.sortOrder = index;
+      });
+      changed = true;
+    }
+    for (const chestLevel of GAME_RELEASE_CHESTS) {
+      for (const section of snapshot.sections) {
+        const level = section.levels.find((row) => row.id === chestLevel.id);
+        if (!level) continue;
+        if (level.chest && typeof level.chest === "object") continue;
+        const [content] = await db
+          .select()
+          .from(gameContent)
+          .where(eq(gameContent.levelId, chestLevel.id))
+          .limit(1);
+        if (!content) continue;
+        level.chest = JSON.parse(content.json);
+        changed = true;
+      }
+    }
+    if (!changed) continue;
+    await db
+      .update(moduleRevisions)
+      .set({ snapshotJson: JSON.stringify(snapshot) })
+      .where(eq(moduleRevisions.id, revision.id));
+  }
 }
 
 async function seedDemoLearnerV1(db: JoseDb) {
@@ -747,6 +1130,15 @@ async function insertModuleIfMissing(
             .values({ levelId: level.id, json })
             .onConflictDoNothing();
         }
+        if (level.kind === "chest") {
+          const json = JSON.stringify(
+            level.chest ?? draftChest(level.id, level.title, "excerpt", null),
+          );
+          await tx
+            .insert(gameContent)
+            .values({ levelId: level.id, json })
+            .onConflictDoNothing();
+        }
       }
     }
   });
@@ -772,6 +1164,7 @@ async function ensurePublishedRevisions(db: JoseDb) {
       for (const level of levelRows) {
         let lesson = null;
         let game = null;
+        let chest = null;
         if (level.kind === "lesson") {
           const [content] = await db
             .select()
@@ -796,6 +1189,13 @@ async function ensurePublishedRevisions(db: JoseDb) {
             .where(eq(gameContent.levelId, level.id));
           game = JSON.parse(content?.json ?? "{}");
         }
+        if (level.kind === "chest") {
+          const [content] = await db
+            .select()
+            .from(gameContent)
+            .where(eq(gameContent.levelId, level.id));
+          chest = JSON.parse(content?.json ?? "{}");
+        }
         levelsSnap.push({
           id: level.id,
           title: level.title,
@@ -804,6 +1204,7 @@ async function ensurePublishedRevisions(db: JoseDb) {
           sortOrder: level.sortOrder,
           lesson,
           game,
+          chest,
         });
       }
       sectionsSnap.push({

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { chestContentSchema } from "./artifacts";
 import { gameContentSchema, lessonContentSchema } from "./games";
 import { gameTypeSchema, hexColorSchema, nodeKindSchema } from "./path";
 
@@ -10,6 +11,7 @@ export const revisionLevelSnapshotSchema = z.object({
   sortOrder: z.number().int(),
   lesson: lessonContentSchema.nullable().optional(),
   game: gameContentSchema.nullable().optional(),
+  chest: chestContentSchema.nullable().optional(),
 });
 
 export const revisionSectionSnapshotSchema = z.object({

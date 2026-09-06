@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { gameContentSchema } from "./games";
-import { gameTypeSchema, nodeKindSchema } from "./path";
+import { gameTypeSchema, nodeKindSchema, type GameType } from "./path";
 
 export const practiceReasonKindSchema = z.enum([
   "recent_miss",
@@ -114,7 +114,7 @@ export function buildPracticeQueue(input: {
       sectionTitle: string;
       title: string;
       kind: "lesson" | "game" | "chest";
-      gameType: "quiz" | "memory" | "timeline" | "blank" | "sort" | null;
+      gameType: GameType | null;
       instructorTags?: string[];
     }
   >;

@@ -5,12 +5,21 @@ import {
   type GameContent,
   type MemoryGame,
   type QuizGame,
+  type QuizQuestion,
   type SortGame,
   type TimelineGame,
+  pairExplanation,
   pieceCount,
   shuffledCopy,
+  normalizeBlankKey,
 } from "./games";
 import { firstTryScore } from "./hearts";
+import {
+  caseFilesGameSchema,
+  dapitanGameSchema,
+  dispatchesGameSchema,
+  editorialGameSchema,
+} from "./advanced-games";
 import { learnerSchema } from "./path";
 
 export const attemptModeSchema = z.enum(["assessment", "practice"]);
@@ -19,14 +28,44 @@ export type AttemptMode = z.infer<typeof attemptModeSchema>;
 export const attemptStatusSchema = z.enum(["open", "finished"]);
 export type AttemptStatus = z.infer<typeof attemptStatusSchema>;
 
-/** Quiz delivered to assessment play — no correctIndex / why. */
+/** Quiz delivered to assessment play — no correctChoiceId / why. */
 export const assessmentQuizSchema = z.object({
   type: z.literal("quiz"),
+  title: z.string().trim().optional(),
   questions: z
     .array(
       z.object({
+        id: z.string().trim().min(1),
+        kind: z.enum(["recall", "evidence"]).optional(),
         prompt: z.string().trim().min(1),
-        choices: z.array(z.string().trim().min(1)).min(2).max(6),
+        claim: z.string().trim().optional(),
+        sources: z
+          .array(
+            z.object({
+              id: z.string().trim().min(1),
+              label: z.string().trim().min(1),
+              excerpt: z.string().trim().optional(),
+              citation: z.string().trim().optional(),
+            }),
+          )
+          .optional(),
+        choices: z
+          .array(
+            z.object({
+              id: z.string().trim().min(1),
+              text: z.string().trim().min(1),
+            }),
+          )
+          .min(2)
+          .max(6),
+        rationales: z
+          .array(
+            z.object({
+              id: z.string().trim().min(1),
+              text: z.string().trim().min(1),
+            }),
+          )
+          .optional(),
       }),
     )
     .min(1),
@@ -49,16 +88,31 @@ export const assessmentBlankSchema = z.object({
 /** Timeline items without why; order is shuffled for delivery. */
 export const assessmentTimelineSchema = z.object({
   type: z.literal("timeline"),
+  dateHints: z.enum(["always", "optional", "hidden"]).optional(),
   items: z
     .array(
       z.object({
         id: z.string().trim().min(1),
         label: z.string().trim().min(1),
         year: z.string().trim().min(1).max(40).optional(),
+        groupId: z.string().trim().min(1).optional(),
       }),
     )
     .min(2)
     .max(12),
+  causalLink: z
+    .object({
+      prompt: z.string().trim().min(1),
+      choices: z
+        .array(
+          z.object({
+            id: z.string().trim().min(1),
+            text: z.string().trim().min(1),
+          }),
+        )
+        .min(2),
+    })
+    .optional(),
 });
 
 /** Sort chips without bucketId / why. */
@@ -69,15 +123,17 @@ export const assessmentSortSchema = z.object({
       z.object({
         id: z.string().trim().min(1),
         label: z.string().trim().min(1),
+        role: z.enum(["category", "insufficient-evidence"]).optional(),
       }),
     )
     .min(2)
-    .max(3),
+    .max(4),
   items: z
     .array(
       z.object({
         id: z.string().trim().min(1),
         label: z.string().trim().min(1),
+        scoring: z.enum(["auto", "discussion"]).optional(),
       }),
     )
     .min(2)
@@ -94,6 +150,7 @@ export const assessmentMemorySchema = z.object({
         id: z.string().trim().min(1),
         text: z.string().trim().optional(),
         imageUrl: z.string().trim().url().optional(),
+        alt: z.string().trim().optional(),
       }),
     )
     .min(4)
@@ -106,6 +163,10 @@ export const assessmentGameSchema = z.union([
   assessmentTimelineSchema,
   assessmentSortSchema,
   assessmentMemorySchema,
+  caseFilesGameSchema,
+  dispatchesGameSchema,
+  editorialGameSchema,
+  dapitanGameSchema,
 ]);
 
 export type AssessmentGame = z.infer<typeof assessmentGameSchema>;
@@ -128,7 +189,13 @@ export const attemptEventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("quiz_choice"),
     questionIndex: z.number().int().nonnegative(),
-    choiceIndex: z.number().int().nonnegative(),
+    choiceIndex: z.number().int().nonnegative().optional(),
+    choiceId: z.string().trim().min(1).optional(),
+  }),
+  z.object({
+    type: z.literal("quiz_rationale"),
+    questionIndex: z.number().int().nonnegative(),
+    rationaleId: z.string().trim().min(1),
   }),
   z.object({
     type: z.literal("blank_choice"),
@@ -145,6 +212,10 @@ export const attemptEventSchema = z.discriminatedUnion("type", [
     order: z.array(z.string().trim().min(1)).min(2).max(12),
   }),
   z.object({
+    type: z.literal("timeline_causal"),
+    choiceId: z.string().trim().min(1),
+  }),
+  z.object({
     type: z.literal("sort_check"),
     placements: z.record(z.string().trim().min(1)),
   }),
@@ -155,7 +226,8 @@ export type AttemptEvent = z.infer<typeof attemptEventSchema>;
 export const finishAnswersSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("quiz"),
-    choices: z.array(z.number().int().nonnegative()).min(1),
+    choices: z.array(z.union([z.number().int().nonnegative(), z.string().trim().min(1)])).min(1),
+    rationales: z.array(z.string().trim().min(1).nullable()).optional(),
   }),
   z.object({
     type: z.literal("blank"),
@@ -164,6 +236,7 @@ export const finishAnswersSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("timeline"),
     order: z.array(z.string().trim().min(1)).min(2).max(12),
+    causalChoiceId: z.string().trim().min(1).optional(),
   }),
   z.object({
     type: z.literal("sort"),
@@ -171,7 +244,6 @@ export const finishAnswersSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("memory"),
-    /** Successful match pairs as [cardA, cardB] lists recorded by the client; verified server-side. */
     matches: z
       .array(
         z.object({
@@ -180,6 +252,22 @@ export const finishAnswersSchema = z.discriminatedUnion("type", [
         }),
       )
       .min(1),
+  }),
+  z.object({
+    type: z.literal("case-files"),
+    completed: z.literal(true),
+  }),
+  z.object({
+    type: z.literal("dispatches"),
+    completed: z.literal(true),
+  }),
+  z.object({
+    type: z.literal("editorial"),
+    completed: z.literal(true),
+  }),
+  z.object({
+    type: z.literal("dapitan"),
+    completed: z.literal(true),
   }),
 ]);
 
@@ -274,9 +362,22 @@ export function sanitizeGameForAssessment(
       return {
         play: {
           type: "quiz",
+          ...(game.title ? { title: game.title } : {}),
           questions: game.questions.map((q) => ({
+            id: q.id,
+            ...(q.kind ? { kind: q.kind } : {}),
             prompt: q.prompt,
-            choices: [...q.choices],
+            ...(q.claim ? { claim: q.claim } : {}),
+            ...(q.sources?.length ? { sources: q.sources } : {}),
+            choices: q.choices.map((choice) => ({ id: choice.id, text: choice.text })),
+            ...(q.rationales?.length
+              ? {
+                  rationales: q.rationales.map((item) => ({
+                    id: item.id,
+                    text: item.text,
+                  })),
+                }
+              : {}),
           })),
         },
         secret: secret ?? {},
@@ -293,35 +394,59 @@ export function sanitizeGameForAssessment(
         secret: secret ?? {},
       };
     case "timeline": {
-      const items = game.items.map(({ id, label, year }) => ({
+      const items = game.items.map(({ id, label, year, groupId }) => ({
         id,
         label,
-        ...(year !== undefined ? { year } : {}),
+        ...(year !== undefined && game.dateHints !== "hidden" ? { year } : {}),
+        ...(groupId ? { groupId } : {}),
       }));
-      const shuffled = shuffledCopy(items);
-      if (
-        shuffled.length > 1 &&
-        shuffled.every((item, i) => item.id === items[i]?.id)
-      ) {
-        [shuffled[0], shuffled[1]] = [shuffled[1]!, shuffled[0]!];
-      }
-      return { play: { type: "timeline", items: shuffled }, secret: secret ?? {} };
+      return {
+        play: {
+          type: "timeline",
+          ...(game.dateHints ? { dateHints: game.dateHints } : {}),
+          items,
+          ...(game.causalLink
+            ? {
+                causalLink: {
+                  prompt: game.causalLink.prompt,
+                  choices: game.causalLink.choices.map((choice) => ({
+                    id: choice.id,
+                    text: choice.text,
+                  })),
+                },
+              }
+            : {}),
+        },
+        secret: secret ?? {},
+      };
     }
     case "sort":
       return {
         play: {
           type: "sort",
-          buckets: game.buckets.map((b) => ({ id: b.id, label: b.label })),
-          items: game.items.map((item) => ({ id: item.id, label: item.label })),
+          buckets: game.buckets.map((b) => ({
+            id: b.id,
+            label: b.label,
+            ...(b.role ? { role: b.role } : {}),
+          })),
+          items: game.items.map((item) => ({
+            id: item.id,
+            label: item.label,
+            ...(item.scoring === "discussion" ? { scoring: "discussion" as const } : {}),
+          })),
         },
         secret: secret ?? {},
       };
     case "memory":
-      // Prefer buildMemoryAssessment in the API so card ids are unguessable.
       return buildMemoryAssessment(game, () => {
         const n = Math.floor(Math.random() * 1e9).toString(36);
         return `card-${n}`;
       });
+    case "case-files":
+    case "dispatches":
+    case "editorial":
+    case "dapitan":
+      return { play: game, secret: secret ?? {} };
   }
 }
 
@@ -341,11 +466,13 @@ export function buildMemoryAssessment(
       id: idA,
       ...(pair.a.text ? { text: pair.a.text } : {}),
       ...(pair.a.imageUrl ? { imageUrl: pair.a.imageUrl } : {}),
+      ...(pair.a.alt ? { alt: pair.a.alt } : {}),
     });
     cards.push({
       id: idB,
       ...(pair.b.text ? { text: pair.b.text } : {}),
       ...(pair.b.imageUrl ? { imageUrl: pair.b.imageUrl } : {}),
+      ...(pair.b.alt ? { alt: pair.b.alt } : {}),
     });
   });
   return {
@@ -375,23 +502,69 @@ export function gradeFromMisses(game: GameContent, misses: number): GradedAttemp
   };
 }
 
+export function resolveQuizChoiceId(
+  question: QuizQuestion,
+  choiceId?: string,
+  choiceIndex?: number,
+): string | undefined {
+  if (choiceId) return choiceId;
+  if (choiceIndex === undefined) return undefined;
+  return question.choices[choiceIndex]?.id;
+}
+
 export function evaluateQuizChoice(
   game: QuizGame,
   questionIndex: number,
-  choiceIndex: number,
+  choiceIdOrIndex?: string | number,
+  choiceIndex?: number,
 ): EvaluateEventResult {
   const question = game.questions[questionIndex];
   if (!question) {
     return { correct: false, feedback: null, misses: 1 };
   }
-  const correct = choiceIndex === question.correctIndex;
-  if (correct) return { correct: true, feedback: null, misses: 0 };
-  const title = question.choices[question.correctIndex] ?? "Correct answer";
+  const pickedId =
+    typeof choiceIdOrIndex === "number"
+      ? resolveQuizChoiceId(question, undefined, choiceIdOrIndex)
+      : resolveQuizChoiceId(question, choiceIdOrIndex, choiceIndex);
+  const correct = pickedId === question.correctChoiceId;
+  const correctChoice = question.choices.find((choice) => choice.id === question.correctChoiceId);
+  if (correct) {
+    return {
+      correct: true,
+      feedback: question.whyCorrect?.trim()
+        ? { title: "Why this is right", body: question.whyCorrect.trim() }
+        : null,
+      misses: 0,
+    };
+  }
+  const title = correctChoice?.text ?? "Correct answer";
   return {
     correct: false,
     feedback: {
       title,
       body: question.why?.trim() || `The right answer is ${title}.`,
+    },
+    misses: 1,
+  };
+}
+
+export function evaluateQuizRationale(
+  game: QuizGame,
+  questionIndex: number,
+  rationaleId: string,
+): EvaluateEventResult {
+  const question = game.questions[questionIndex];
+  if (!question?.correctRationaleId) {
+    return { correct: true, feedback: null, misses: 0 };
+  }
+  const correct = rationaleId === question.correctRationaleId;
+  if (correct) return { correct: true, feedback: null, misses: 0 };
+  const right = question.rationales?.find((item) => item.id === question.correctRationaleId);
+  return {
+    correct: false,
+    feedback: {
+      title: right?.text ?? "Stronger reason",
+      body: question.why?.trim() || "Pick the reason that ties the evidence to the claim.",
     },
     misses: 1,
   };
@@ -405,7 +578,7 @@ export function evaluateBlankChoice(
   const item = game.items[itemIndex];
   if (!item) return { correct: false, feedback: null, misses: 1 };
   const correct =
-    word.trim().toLowerCase() === item.answer.trim().toLowerCase();
+    normalizeBlankKey(word) === normalizeBlankKey(item.answer);
   if (correct) return { correct: true, feedback: null, misses: 0 };
   return {
     correct: false,
@@ -439,30 +612,59 @@ export function evaluateMemoryMatch(
   };
 }
 
+function timelineOrderKey(item: TimelineGame["items"][number]): string {
+  return item.groupId?.trim() || `__solo_${item.id}`;
+}
+
 export function evaluateTimelineCheck(
   game: TimelineGame,
   order: string[],
 ): EvaluateEventResult {
-  const expected = game.items.map((item) => item.id);
-  if (order.length !== expected.length) {
+  if (order.length !== game.items.length) {
     return { correct: false, perfect: false, correctIds: [], misses: 1 };
   }
   const correctIds: string[] = [];
   const wrong: TimelineGame["items"] = [];
-  expected.forEach((id, index) => {
-    if (order[index] === id) correctIds.push(id);
-    else {
-      const item = game.items.find((entry) => entry.id === order[index]);
-      if (item) wrong.push(item);
+  game.items.forEach((slotItem, index) => {
+    const placedId = order[index];
+    const occupant = game.items.find((entry) => entry.id === placedId);
+    if (!occupant) return;
+    if (timelineOrderKey(slotItem) === timelineOrderKey(occupant)) {
+      correctIds.push(occupant.id);
+      return;
     }
+    wrong.push(occupant);
   });
-  const perfect = wrong.length === 0;
+  const uniqueCorrect = [...new Set(correctIds)];
+  const perfect = wrong.length === 0 && uniqueCorrect.length === game.items.length;
   return {
     correct: perfect,
     perfect,
-    correctIds,
+    correctIds: uniqueCorrect,
     feedback: perfect ? null : formatMultiWhy(wrong),
     misses: perfect ? 0 : 1,
+  };
+}
+
+export function evaluateTimelineCausal(
+  game: TimelineGame,
+  choiceId: string,
+): EvaluateEventResult {
+  const link = game.causalLink;
+  if (!link) return { correct: true, perfect: true, misses: 0 };
+  const correct = choiceId === link.correctChoiceId;
+  return {
+    correct,
+    perfect: correct,
+    feedback: correct
+      ? link.explanation
+        ? { title: "Connection", body: link.explanation }
+        : null
+      : {
+          title: "Check the connection",
+          body: link.explanation || "That is not the authored causal link.",
+        },
+    misses: correct ? 0 : 1,
   };
 }
 
@@ -472,15 +674,21 @@ export function evaluateSortCheck(
 ): EvaluateEventResult {
   const correctIds: string[] = [];
   const wrong: SortGame["items"] = [];
+  const discussionIds: string[] = [];
   for (const item of game.items) {
+    if (item.scoring === "discussion") {
+      if (placements[item.id]) discussionIds.push(item.id);
+      continue;
+    }
     if (placements[item.id] === item.bucketId) correctIds.push(item.id);
     else wrong.push(item);
   }
-  const perfect = wrong.length === 0;
+  const autoItems = game.items.filter((item) => item.scoring !== "discussion");
+  const perfect = wrong.length === 0 && correctIds.length === autoItems.length;
   return {
     correct: perfect,
     perfect,
-    correctIds,
+    correctIds: [...correctIds, ...discussionIds],
     feedback: perfect ? null : formatMultiWhy(wrong),
     misses: perfect ? 0 : 1,
   };
@@ -526,8 +734,18 @@ export function gradeAssessmentFinish(
       }
       let misses = 0;
       answers.choices.forEach((choice, index) => {
-        if (choice !== game.questions[index]!.correctIndex) misses += 1;
+        const question = game.questions[index]!;
+        const choiceId =
+          typeof choice === "number" ? question.choices[choice]?.id : choice;
+        if (choiceId !== question.correctChoiceId) misses += 1;
       });
+      if (answers.rationales?.length) {
+        answers.rationales.forEach((rationaleId, index) => {
+          const question = game.questions[index]!;
+          if (!question.correctRationaleId) return;
+          if (rationaleId !== question.correctRationaleId) misses += 1;
+        });
+      }
       return gradeFromMisses(game, misses);
     }
     case "blank": {
@@ -537,8 +755,8 @@ export function gradeAssessmentFinish(
       }
       let misses = 0;
       answers.words.forEach((word, index) => {
-        const expected = game.items[index]!.answer.trim().toLowerCase();
-        if (word.trim().toLowerCase() !== expected) misses += 1;
+        const expected = game.items[index]!.answer;
+        if (normalizeBlankKey(word) !== normalizeBlankKey(expected)) misses += 1;
       });
       return gradeFromMisses(game, misses);
     }
@@ -546,6 +764,12 @@ export function gradeAssessmentFinish(
       if (game.type !== "timeline") throw new Error("Answer type mismatch");
       const check = evaluateTimelineCheck(game, answers.order);
       if (!check.perfect) throw new Error("Timeline is not complete");
+      if (game.causalLink) {
+        if (!answers.causalChoiceId) throw new Error("Causal choice missing");
+        const causal = evaluateTimelineCausal(game, answers.causalChoiceId);
+        if (!causal.correct) throw new Error("Causal choice is not complete");
+        return gradeFromMisses(game, priorMisses + causal.misses);
+      }
       return gradeFromMisses(game, priorMisses);
     }
     case "sort": {
@@ -564,7 +788,7 @@ export function gradeAssessmentFinish(
           pairMap,
           match.cardA,
           match.cardB,
-          () => undefined,
+          (pairIndex) => pairExplanation(game.pairs[pairIndex] ?? {}),
         );
         if (!result.correct) throw new Error("Invalid memory match");
         const pairIndex = pairMap[match.cardA]!;
@@ -575,5 +799,11 @@ export function gradeAssessmentFinish(
       }
       return gradeFromMisses(game, priorMisses);
     }
+    case "case-files":
+    case "dispatches":
+    case "editorial":
+    case "dapitan":
+      if (game.type !== answers.type) throw new Error("Answer type mismatch");
+      return gradeFromMisses(game, priorMisses);
   }
 }

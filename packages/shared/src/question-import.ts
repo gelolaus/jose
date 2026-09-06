@@ -5,7 +5,7 @@ import {
   questionImportRowSchema,
   type ImportQuestionsResult,
 } from "./authoring";
-import { quizQuestionSchema, type QuizGame } from "./games";
+import { coerceGameContent, quizQuestionSchema, type QuizGame } from "./games";
 
 function parseCsv(raw: string): string[][] {
   const rows: string[][] = [];
@@ -183,7 +183,11 @@ export function validateQuestionImport(input: {
       correctIndex,
       ...(row.why ? { why: row.why } : {}),
     };
-    const checked = quizQuestionSchema.safeParse(question);
+    const wrapped = coerceGameContent({
+      type: "quiz",
+      questions: [question],
+    }) as { questions?: unknown[] };
+    const checked = quizQuestionSchema.safeParse(wrapped.questions?.[0]);
     if (!checked.success) {
       errors.push({
         row: index + 1,

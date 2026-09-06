@@ -20,7 +20,16 @@ vi.mock("@/lib/path-api", async () => {
 
 const game: AssessmentGame = {
   type: "quiz",
-  questions: [{ prompt: "Year?", choices: ["1861", "1896"] }],
+  questions: [
+    {
+      id: "q1",
+      prompt: "Year?",
+      choices: [
+        { id: "a", text: "1861" },
+        { id: "b", text: "1896" },
+      ],
+    },
+  ],
 };
 
 const attempt: AttemptInfo = {

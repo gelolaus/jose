@@ -93,7 +93,7 @@ describe("CurriculumService", () => {
     expect(play.level.kind).toBe("game");
     expect(play.game?.type).toBe("quiz");
     expect(play.attempt?.mode).toBe("assessment");
-    expect(JSON.stringify(play.game)).not.toMatch(/correctIndex/);
+    expect(JSON.stringify(play.game)).not.toMatch(/correctIndex|correctChoiceId/);
   });
 
   it("refuses to archive the featured module", async () => {
@@ -736,5 +736,39 @@ describe("authoritative assessment", () => {
     expect(asset.src.startsWith("data:image/png;base64,")).toBe(true);
     const listed = await service.listAssets(mod.id);
     expect(listed.some((item) => item.id === asset.id)).toBe(true);
+  });
+
+  it("awards a journal artifact once and does not duplicate on repeat", async () => {
+    const prior = [
+      "childhood-born",
+      "childhood-family",
+      "childhood-stories",
+      "childhood-timeline",
+    ];
+    await database.db.insert(learnerProgress).values(
+      prior.map((levelId) => ({
+        learnerId: alice.learnerId,
+        levelId,
+        completedAt: Date.now(),
+      })),
+    ).onConflictDoNothing();
+    const play = await service.getPlayLevel("childhood-chest", alice.learnerId);
+    expect(play.chest?.artifact.id).toBeTruthy();
+    expect(play.chest?.artifact.provenance.length).toBeGreaterThan(10);
+
+    const first = await service.completeLevel("childhood-chest", alice.learnerId);
+    expect(first.artifactAwarded).toBe(true);
+    const listed = await service.listArtifacts(alice.learnerId);
+    expect(listed.artifacts.some((a) => a.sourceLevelId === "childhood-chest")).toBe(
+      true,
+    );
+
+    const second = await service.completeLevel("childhood-chest", alice.learnerId);
+    expect(second.artifactAwarded).toBe(false);
+    expect(
+      (await service.listArtifacts(alice.learnerId)).artifacts.filter(
+        (a) => a.artifactId === play.chest!.artifact.id,
+      ),
+    ).toHaveLength(1);
   });
 });
