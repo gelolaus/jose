@@ -52,7 +52,7 @@ describe("MemoryGame play", () => {
     play();
     tap("0-a");
     expect(screen.getByRole("button", { name: "Revealed: Paris" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Hidden card" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Hidden card" })).toHaveLength(3);
   });
 
   it("does not spend a heart on a mismatch", async () => {
