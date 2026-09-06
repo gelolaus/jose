@@ -15,6 +15,7 @@ export function TeachChallengesPanel({
   onCreateTeam,
   onAssignMember,
   onModerate,
+  onRefresh,
 }: {
   classId: string;
   className: string;
@@ -32,6 +33,7 @@ export function TeachChallengesPanel({
   onCreateTeam: (challengeId: string, name: string) => void;
   onAssignMember: (challengeId: string, teamId: string, learnerId: string) => void;
   onModerate: (challengeId: string, contributionId: string, status: "accepted" | "returned") => void;
+  onRefresh?: () => void;
 }) {
   const [title, setTitle] = useState("");
   const [prompt, setPrompt] = useState("Add a unique source excerpt when you can.");
@@ -63,6 +65,15 @@ export function TeachChallengesPanel({
       </p>
       {challengesEnabled ? (
         <>
+          {onRefresh ? (
+            <button
+              type="button"
+              className="mt-3 rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-slate-700 ring-1 ring-black/10"
+              onClick={() => onRefresh()}
+            >
+              Load existing challenges
+            </button>
+          ) : null}
           <form
             className="mt-3 space-y-2"
             onSubmit={(event) => {

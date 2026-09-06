@@ -11,7 +11,7 @@ import {
   patchClassChallengeSettings,
 } from "@/lib/path-api";
 import type { TeacherChallengeSummary, TeacherChallengeView } from "@jose/shared";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export function TeachClassChallenges({
   classId,
@@ -30,20 +30,12 @@ export function TeachClassChallenges({
   const [detail, setDetail] = useState<TeacherChallengeView | null>(null);
 
   async function reload() {
-    if (!challengesEnabled) {
-      setSummaries([]);
-      setDetail(null);
-      return;
-    }
     setSummaries(await fetchTeachChallenges(classId));
   }
 
-  useEffect(() => {
-    void reload().catch((err: unknown) => {
-      onError(err instanceof Error ? err.message : "Could not load challenges");
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when class toggle changes
-  }, [classId, challengesEnabled]);
+  function report(err: unknown, fallback: string) {
+    onError(err instanceof Error ? err.message : fallback);
+  }
 
   return (
     <TeachChallengesPanel
@@ -57,8 +49,14 @@ export function TeachClassChallenges({
           try {
             await patchClassChallengeSettings(classId, { challengesEnabled: enabled });
             onEnabledChange(enabled);
+            if (enabled) {
+              await reload();
+            } else {
+              setSummaries([]);
+              setDetail(null);
+            }
           } catch (err) {
-            onError(err instanceof Error ? err.message : "Could not update setting");
+            report(err, "Could not update setting");
           }
         })();
       }}
@@ -69,7 +67,7 @@ export function TeachClassChallenges({
             setDetail(created);
             await reload();
           } catch (err) {
-            onError(err instanceof Error ? err.message : "Could not create challenge");
+            report(err, "Could not create challenge");
           }
         })();
       }}
@@ -78,7 +76,7 @@ export function TeachClassChallenges({
           try {
             setDetail(await fetchTeachChallenge(classId, challengeId));
           } catch (err) {
-            onError(err instanceof Error ? err.message : "Could not load challenge");
+            report(err, "Could not load challenge");
           }
         })();
       }}
@@ -88,7 +86,7 @@ export function TeachClassChallenges({
             await createTeachChallengeTeam(classId, challengeId, name);
             setDetail(await fetchTeachChallenge(classId, challengeId));
           } catch (err) {
-            onError(err instanceof Error ? err.message : "Could not add team");
+            report(err, "Could not add team");
           }
         })();
       }}
@@ -98,7 +96,7 @@ export function TeachClassChallenges({
             await assignTeachChallengeTeamMember(classId, challengeId, teamId, learnerId);
             setDetail(await fetchTeachChallenge(classId, challengeId));
           } catch (err) {
-            onError(err instanceof Error ? err.message : "Could not assign student");
+            report(err, "Could not assign student");
           }
         })();
       }}
@@ -110,9 +108,12 @@ export function TeachClassChallenges({
             );
             await reload();
           } catch (err) {
-            onError(err instanceof Error ? err.message : "Could not moderate");
+            report(err, "Could not moderate");
           }
         })();
+      }}
+      onRefresh={() => {
+        void reload().catch((err) => report(err, "Could not load challenges"));
       }}
     />
   );
