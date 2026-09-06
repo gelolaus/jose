@@ -84,20 +84,21 @@ function QuizPlay({
       return;
     }
 
-    if (!author) return;
-    const right = choiceIndex === question.correctIndex;
+    if (!isAuthorQuiz(game)) return;
+    const authored = game.questions[index]!;
+    const right = choiceIndex === authored.correctIndex;
     choicesRef.current[index] = choiceIndex;
     if (right) {
-      setRevealedCorrect(question.correctIndex);
+      setRevealedCorrect(authored.correctIndex);
       return;
     }
-    const correct = question.choices[question.correctIndex]!;
+    const correct = authored.choices[authored.correctIndex]!;
     const miss = await onMiss({
       title: correct,
-      body: question.why?.trim() || `The right answer is ${correct}.`,
+      body: authored.why?.trim() || `The right answer is ${correct}.`,
     });
     missesRef.current += 1;
-    setRevealedCorrect(question.correctIndex);
+    setRevealedCorrect(authored.correctIndex);
     if (miss === "empty") return;
   }
 

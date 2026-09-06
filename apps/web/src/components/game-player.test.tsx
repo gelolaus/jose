@@ -41,6 +41,7 @@ const draft = (accountId: string): AttemptDraft => ({
   maxScore: 1,
   stars: 3,
   misses: 0,
+  answers: { type: "quiz", choices: [0] },
   status: "save-failed",
   updatedAt: Date.now(),
 });
@@ -58,14 +59,8 @@ describe("GamePlayer save recovery", () => {
 
   it("restores an unsaved result for the signed-in student and hides another student's draft", () => {
     writeAttemptDraft(draft("student-a"));
-    sessionStorage.setItem(
-      "jose.attemptAnswers",
-      JSON.stringify({
-        "student-a::level-1::rev-1": { type: "quiz", choices: [0] },
-      }),
-    );
 
-    const { rerender } = render(
+    const { unmount } = render(
       <GamePlayer
         levelId="level-1"
         moduleId="mod-1"
@@ -80,7 +75,8 @@ describe("GamePlayer save recovery", () => {
     expect(screen.getByRole("button", { name: /retry saving/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /play again/i })).toBeTruthy();
 
-    rerender(
+    unmount();
+    render(
       <GamePlayer
         levelId="level-1"
         moduleId="mod-1"

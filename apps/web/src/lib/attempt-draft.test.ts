@@ -15,11 +15,12 @@ const baseDraft = (): AttemptDraft => ({
   moduleId: "mod-1",
   title: "Quiz",
   revision: "rev-1",
-  clientAttemptId: "11111111-1111-4111-8111-111111111111",
+    clientAttemptId: "11111111-1111-4111-8111-111111111111",
   score: 3,
   maxScore: 4,
   stars: 2,
   misses: 1,
+  answers: { type: "quiz", choices: [0] },
   status: "save-failed",
   updatedAt: 1_700_000_000_000,
 });

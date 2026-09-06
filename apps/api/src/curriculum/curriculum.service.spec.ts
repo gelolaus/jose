@@ -118,7 +118,7 @@ describe("CurriculumService", () => {
       .update(learners)
       .set({ hearts: 1, heartsUpdatedAt: Date.now() })
       .where(eq(learners.id, student.learnerId));
-    await service.completeLevel("edu-binan", student.learnerId);
+    await service.completeLevel("childhood-born", student.learnerId);
     expect((await service.getLearner(student.learnerId)).hearts).toBe(5);
   });
 

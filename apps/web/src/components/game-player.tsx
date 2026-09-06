@@ -101,7 +101,17 @@ export function GamePlayer({
   const [empty, setEmpty] = useState(startHearts <= 0);
   const pendingEmpty = useRef(false);
   const [resume] = useState(() => readResumeDraft(accountId, levelId, revision));
-  const [result, setResult] = useState<ScoredResult | null>(null);
+  const [result, setResult] = useState<ScoredResult | null>(() => {
+    if (!resume?.answers) return null;
+    return {
+      score: resume.score,
+      maxScore: resume.maxScore,
+      stars: resume.stars,
+      misses: resume.misses,
+      clientAttemptId: resume.clientAttemptId,
+      answers: resume.answers,
+    };
+  });
   const [savePhase, setSavePhase] = useState<SavePhase>(() => {
     if (!resume) return "playing";
     return resume.status === "saving" ? "save-failed" : resume.status;
@@ -114,11 +124,6 @@ export function GamePlayer({
       : null,
   );
   const [attemptId, setAttemptId] = useState(attempt.id);
-  const pendingAnswers = useRef<FinishAnswers | null>(
-    resume && typeof sessionStorage !== "undefined"
-      ? readPendingAnswers(accountId, levelId, revision)
-      : null,
-  );
 
   function persistDraft(scored: ScoredResult, status: AttemptDraft["status"]): void {
     writeAttemptDraft({
@@ -132,10 +137,10 @@ export function GamePlayer({
       maxScore: scored.maxScore,
       stars: scored.stars,
       misses: scored.misses,
+      answers: scored.answers,
       status,
       updatedAt: Date.now(),
     });
-    writePendingAnswers(accountId, levelId, revision, scored.answers);
   }
 
   async function reconcileSave(scored: ScoredResult): Promise<void> {
@@ -158,7 +163,6 @@ export function GamePlayer({
       setSavePhase("saved");
       persistDraft(next, "saved");
       clearAttemptDraft({ accountId, levelId, revision });
-      clearPendingAnswers(accountId, levelId, revision);
     } catch (err) {
       setSavePhase("save-failed");
       persistDraft(scored, "save-failed");
@@ -243,53 +247,38 @@ export function GamePlayer({
     return <HeartsBreak moduleId={moduleId} />;
   }
 
-  if ((result || (resume && pendingAnswers.current)) && savePhase !== "playing") {
-    const scored =
-      result ??
-      (resume && pendingAnswers.current
-        ? {
-            score: resume.score,
-            maxScore: resume.maxScore,
-            stars: resume.stars,
-            misses: resume.misses,
-            clientAttemptId: resume.clientAttemptId,
-            answers: pendingAnswers.current,
-          }
-        : null);
-    if (scored) {
-      const unsaved = isUnsavedSavePhase(savePhase);
-      return (
-        <StarCelebration
-          title={title}
-          score={scored.score}
-          maxScore={scored.maxScore}
-          stars={scored.stars}
-          error={error}
-          statusLabel={statusLabelFor(savePhase)}
-          onRetrySave={
-            unsaved && !busy
-              ? () => {
-                  void reconcileSave(scored);
-                }
-              : undefined
-          }
-          onPlayAgain={() => {
-            clearAttemptDraft({ accountId, levelId, revision });
-            clearPendingAnswers(accountId, levelId, revision);
-            setResult(null);
-            setSavePhase("playing");
-            setError(null);
-            setNonce((n) => n + 1);
-            router.refresh();
-            setAttemptId(attempt.id);
-          }}
-          onContinue={() => {
-            router.push(`/learn/${moduleId}`);
-            router.refresh();
-          }}
-        />
-      );
-    }
+  if (result && savePhase !== "playing") {
+    const unsaved = isUnsavedSavePhase(savePhase);
+    return (
+      <StarCelebration
+        title={title}
+        score={result.score}
+        maxScore={result.maxScore}
+        stars={result.stars}
+        error={error}
+        statusLabel={statusLabelFor(savePhase)}
+        onRetrySave={
+          unsaved && !busy
+            ? () => {
+                void reconcileSave(result);
+              }
+            : undefined
+        }
+        onPlayAgain={() => {
+          clearAttemptDraft({ accountId, levelId, revision });
+          setResult(null);
+          setSavePhase("playing");
+          setError(null);
+          setNonce((n) => n + 1);
+          router.refresh();
+          setAttemptId(attempt.id);
+        }}
+        onContinue={() => {
+          router.push(`/learn/${moduleId}`);
+          router.refresh();
+        }}
+      />
+    );
   }
 
   return (
@@ -433,51 +422,3 @@ export function localPracticeFinish(
   return firstTryScore(pieceCount(game), misses);
 }
 
-const ANSWERS_KEY = "jose.attemptAnswers";
-
-function answersStoreKey(accountId: string, levelId: string, revision: string) {
-  return `${accountId}::${levelId}::${revision}`;
-}
-
-function readPendingAnswers(
-  accountId: string,
-  levelId: string,
-  revision: string,
-): FinishAnswers | null {
-  try {
-    const raw = sessionStorage.getItem(ANSWERS_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Record<string, FinishAnswers>;
-    return parsed[answersStoreKey(accountId, levelId, revision)] ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function writePendingAnswers(
-  accountId: string,
-  levelId: string,
-  revision: string,
-  answers: FinishAnswers,
-) {
-  try {
-    const raw = sessionStorage.getItem(ANSWERS_KEY);
-    const parsed = raw ? (JSON.parse(raw) as Record<string, FinishAnswers>) : {};
-    parsed[answersStoreKey(accountId, levelId, revision)] = answers;
-    sessionStorage.setItem(ANSWERS_KEY, JSON.stringify(parsed));
-  } catch {
-    // ignore
-  }
-}
-
-function clearPendingAnswers(accountId: string, levelId: string, revision: string) {
-  try {
-    const raw = sessionStorage.getItem(ANSWERS_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw) as Record<string, FinishAnswers>;
-    delete parsed[answersStoreKey(accountId, levelId, revision)];
-    sessionStorage.setItem(ANSWERS_KEY, JSON.stringify(parsed));
-  } catch {
-    // ignore
-  }
-}

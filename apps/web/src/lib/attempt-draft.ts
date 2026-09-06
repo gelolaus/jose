@@ -1,4 +1,4 @@
-import type { GameContent } from "@jose/shared";
+import type { FinishAnswers, GameContent } from "@jose/shared";
 import { clearSensitiveClientState } from "./explorer-identity";
 
 export const ATTEMPT_DRAFT_STORAGE_KEY = "jose.attemptDrafts";
@@ -21,6 +21,7 @@ export type AttemptDraft = {
   maxScore: number;
   stars: number;
   misses: number;
+  answers?: FinishAnswers;
   status: Exclude<SavePhase, "playing">;
   updatedAt: number;
 };
