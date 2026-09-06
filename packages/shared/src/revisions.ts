@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { chestContentSchema } from "./artifacts";
+import { gameContentSchema, lessonContentSchema } from "./games";
 import { gameTypeSchema, hexColorSchema, nodeKindSchema } from "./path";
 
 export const revisionLevelSnapshotSchema = z.object({

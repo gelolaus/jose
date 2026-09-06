@@ -88,6 +88,7 @@ describe("sanitizeGameForAssessment", () => {
         { a: { text: "A2" }, b: { text: "B2" } },
       ],
     });
+    if (game.type !== "memory") throw new Error("expected memory");
     let n = 0;
     const { play, secret } = buildMemoryAssessment(game, () => `id-${++n}`);
     expect(play.cards).toHaveLength(4);
@@ -116,6 +117,7 @@ describe("server grading helpers", () => {
       type: "blank",
       items: [{ sentence: "___", answer: "Rizal", decoys: ["Gomez"] }],
     });
+    if (blank.type !== "blank") throw new Error("expected blank");
     expect(evaluateBlankChoice(blank, 0, "rizal").correct).toBe(true);
     expect(evaluateBlankChoice(blank, 0, "Gomez").correct).toBe(false);
 
@@ -126,6 +128,7 @@ describe("server grading helpers", () => {
         { id: "b", label: "Second" },
       ],
     });
+    if (timeline.type !== "timeline") throw new Error("expected timeline");
     expect(evaluateTimelineCheck(timeline, ["a", "b"]).perfect).toBe(true);
     expect(evaluateTimelineCheck(timeline, ["b", "a"]).perfect).toBe(false);
 
@@ -140,6 +143,7 @@ describe("server grading helpers", () => {
         { id: "2", label: "Two", bucketId: "y" },
       ],
     });
+    if (sort.type !== "sort") throw new Error("expected sort");
     expect(evaluateSortCheck(sort, { "1": "x", "2": "y" }).perfect).toBe(true);
     expect(evaluateSortCheck(sort, { "1": "y", "2": "y" }).perfect).toBe(false);
 

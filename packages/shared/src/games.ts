@@ -455,9 +455,7 @@ export function parseGameContent(raw: unknown): GameContent {
   return gameContentSchema.parse(coerceGameContent(raw));
 }
 
-export function emptyGameContent(
-  type: GameContent["type"],
-): z.input<typeof gameContentSchema> {
+export function emptyGameContent(type: GameContent["type"]): GameContent {
   switch (type) {
     case "quiz":
       return {

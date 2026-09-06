@@ -13,6 +13,7 @@ import {
   shuffledCopy,
   normalizeBlankKey,
 } from "./games";
+import { firstTryScore } from "./hearts";
 import {
   caseFilesGameSchema,
   dapitanGameSchema,
@@ -240,6 +241,17 @@ export const finishAnswersSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("sort"),
     placements: z.record(z.string().trim().min(1)),
+  }),
+  z.object({
+    type: z.literal("memory"),
+    matches: z
+      .array(
+        z.object({
+          cardA: z.string().trim().min(1),
+          cardB: z.string().trim().min(1),
+        }),
+      )
+      .min(1),
   }),
   z.object({
     type: z.literal("case-files"),
