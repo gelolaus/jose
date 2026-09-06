@@ -96,6 +96,7 @@ export class ClassroomService {
       inviteCodeHint: inviteCode.slice(-4),
       inviteFailures: 0,
       inviteLockedUntil: null,
+      challengesEnabled: false,
       archivedAt: null,
       createdAt: t,
     });
@@ -505,6 +506,7 @@ export class ClassroomService {
       name: row.name,
       inviteCode: includeCode ? null : null,
       memberCount: members.length,
+      challengesEnabled: Boolean(row.challengesEnabled),
       archivedAt: row.archivedAt,
       createdAt: row.createdAt,
     };

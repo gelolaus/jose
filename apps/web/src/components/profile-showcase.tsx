@@ -80,6 +80,12 @@ export function ProfileShowcase({
           >
             Field journal
           </Link>
+          <Link
+            href="/learn/challenges"
+            className="min-h-11 rounded-xl bg-teal-100 px-6 py-3 text-base font-semibold text-teal-900 shadow-sm"
+          >
+            Class challenges
+          </Link>
           {!loading && canTeach ? (
             <Link
               href="/teach"

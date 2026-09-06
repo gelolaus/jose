@@ -17,6 +17,7 @@ export * from "./pagination";
 export * from "./limits";
 export * from "./publish";
 export * from "./classroom";
+export * from "./classroom-challenges";
 export * from "./revisions";
 export * from "./streak";
 export * from "./continue";

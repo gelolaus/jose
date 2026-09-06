@@ -300,6 +300,9 @@ export const classes = sqliteTable("classes", {
   inviteCodeHint: text("invite_code_hint").notNull(),
   inviteFailures: integer("invite_failures").notNull().default(0),
   inviteLockedUntil: integer("invite_locked_until"),
+  challengesEnabled: integer("challenges_enabled", { mode: "boolean" })
+    .notNull()
+    .default(false),
   archivedAt: integer("archived_at"),
   createdAt: integer("created_at").notNull(),
 });
@@ -335,6 +338,83 @@ export const assignments = sqliteTable("assignments", {
   dueAt: integer("due_at"),
   assignedAt: integer("assigned_at").notNull(),
   archivedAt: integer("archived_at"),
+});
+
+export const classChallenges = sqliteTable("class_challenges", {
+  id: text("id").primaryKey(),
+  classId: text("class_id")
+    .notNull()
+    .references(() => classes.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  title: text("title").notNull(),
+  prompt: text("prompt").notNull(),
+  goalCount: integer("goal_count").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  archivedAt: integer("archived_at"),
+  createdAt: integer("created_at").notNull(),
+  closedAt: integer("closed_at"),
+});
+
+export const classChallengeTeams = sqliteTable("class_challenge_teams", {
+  id: text("id").primaryKey(),
+  challengeId: text("challenge_id")
+    .notNull()
+    .references(() => classChallenges.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const classChallengeTeamMembers = sqliteTable(
+  "class_challenge_team_members",
+  {
+    teamId: text("team_id")
+      .notNull()
+      .references(() => classChallengeTeams.id, { onDelete: "cascade" }),
+    learnerId: text("learner_id")
+      .notNull()
+      .references(() => learners.id, { onDelete: "cascade" }),
+    assignedAt: integer("assigned_at").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.teamId, table.learnerId] }),
+  }),
+);
+
+export const classChallengeParticipants = sqliteTable(
+  "class_challenge_participants",
+  {
+    challengeId: text("challenge_id")
+      .notNull()
+      .references(() => classChallenges.id, { onDelete: "cascade" }),
+    learnerId: text("learner_id")
+      .notNull()
+      .references(() => learners.id, { onDelete: "cascade" }),
+    alias: text("alias").notNull(),
+    displayMode: text("display_mode").notNull().default("alias"),
+    optedInAt: integer("opted_in_at").notNull(),
+    withdrawnAt: integer("withdrawn_at"),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.challengeId, table.learnerId] }),
+  }),
+);
+
+export const classChallengeContributions = sqliteTable("class_challenge_contributions", {
+  id: text("id").primaryKey(),
+  challengeId: text("challenge_id")
+    .notNull()
+    .references(() => classChallenges.id, { onDelete: "cascade" }),
+  learnerId: text("learner_id")
+    .notNull()
+    .references(() => learners.id, { onDelete: "cascade" }),
+  teamId: text("team_id").references(() => classChallengeTeams.id, {
+    onDelete: "set null",
+  }),
+  evidenceKey: text("evidence_key").notNull(),
+  title: text("title").notNull(),
+  note: text("note"),
+  status: text("status").notNull().default("accepted"),
+  createdAt: integer("created_at").notNull(),
 });
 
 export const inviteAttempts = sqliteTable("invite_attempts", {

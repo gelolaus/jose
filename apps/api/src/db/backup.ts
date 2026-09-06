@@ -29,6 +29,13 @@ const TABLE_ORDER = [
   "oauth_states",
   "pending_admissions",
   "mailbox_verifications",
+  "classes",
+  "class_members",
+  "class_challenges",
+  "class_challenge_teams",
+  "class_challenge_team_members",
+  "class_challenge_participants",
+  "class_challenge_contributions",
 ] as const;
 
 function urlKind(url: string): BackupManifest["sourceUrlKind"] {

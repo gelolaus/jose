@@ -5,6 +5,7 @@ export const classSummarySchema = z.object({
   name: z.string().min(1),
   inviteCode: z.string().min(1).nullable(),
   memberCount: z.number().int().nonnegative(),
+  challengesEnabled: z.boolean(),
   archivedAt: z.number().int().nullable(),
   createdAt: z.number().int(),
 });
