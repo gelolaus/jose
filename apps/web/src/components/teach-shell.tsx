@@ -4,10 +4,51 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { ArrowLeft, Layers } from "lucide-react";
+import { useJoseSession } from "@/lib/use-jose-session";
 
 export function TeachShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const modulesActive = pathname === "/teach" || pathname.startsWith("/teach/modules");
+  const { canTeach, loading } = useJoseSession();
+
+  if (loading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-[var(--jose-cream)] px-6">
+        <p className="font-semibold text-slate-600">Checking teacher access…</p>
+      </div>
+    );
+  }
+
+  // Cosmetic gate only; the API re-checks the role and module ownership per request.
+  if (!canTeach) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-[var(--jose-cream)] px-6 text-center">
+        <div className="max-w-md space-y-3">
+          <p className="font-display text-3xl font-semibold text-slate-800">
+            Teachers only
+          </p>
+          <p className="font-semibold text-slate-600">
+            Teacher studio needs a teacher or admin session. Students cannot open these
+            tools, and an APC email alone does not grant access.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Link
+              href="/login"
+              className="inline-flex rounded-full bg-violet-600 px-5 py-2.5 text-sm font-extrabold text-white"
+            >
+              School sign-in
+            </Link>
+            <Link
+              href="/learn"
+              className="inline-flex rounded-full bg-slate-800 px-5 py-2.5 text-sm font-extrabold text-white"
+            >
+              Back to learning
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-dvh overflow-hidden bg-[var(--jose-cream)] lg:grid lg:grid-cols-[16.5rem_minmax(0,1fr)]">

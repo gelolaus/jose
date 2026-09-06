@@ -1,9 +1,12 @@
 "use client";
 
 import { ExplorerAvatar } from "@/components/explorer-avatar";
+import { logoutJose } from "@/lib/auth-api";
+import { clearSensitiveClientState, isAvatarId } from "@/lib/explorer-identity";
 import {
   useExplorerIdentity,
 } from "@/lib/use-explorer-identity";
+import { useJoseSession } from "@/lib/use-jose-session";
 import {
   deriveTrophies,
   highlightSectionId,
@@ -12,6 +15,8 @@ import {
 import type { PathResponse } from "@jose/shared";
 import { Flame, Heart, Lock, Trophy, Zap } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 type ProfileShowcaseProps = {
   path: PathResponse;
@@ -19,36 +24,77 @@ type ProfileShowcaseProps = {
 
 export function ProfileShowcase({ path }: ProfileShowcaseProps) {
   const identity = useExplorerIdentity(path.learner.displayName);
+  const { authenticated, canTeach, loading } = useJoseSession();
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+
+  // Server truth wins over the locally cached explorer look.
+  const avatarId =
+    path.learner.avatarId && isAvatarId(path.learner.avatarId)
+      ? path.learner.avatarId
+      : identity.avatarId;
+  const displayName = path.learner.displayName || identity.displayName;
 
   const trophies = deriveTrophies(path);
   const activeSectionId = highlightSectionId(path);
   const { streak, hearts, xp } = path.learner;
 
+  async function onSignOut() {
+    setSigningOut(true);
+    try {
+      await logoutJose();
+      clearSensitiveClientState();
+      router.refresh();
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-5 py-8 sm:px-8 sm:py-10">
       <section className="flex flex-col items-center gap-4 text-center">
-        <ExplorerAvatar avatarId={identity.avatarId} floating />
+        <ExplorerAvatar avatarId={avatarId} floating />
         <div className="space-y-1.5">
           <h1 className="font-display text-4xl font-semibold tracking-tight text-slate-800 md:text-5xl">
-            {identity.displayName}
+            {displayName}
           </h1>
           <p className="text-base font-semibold text-slate-500 md:text-lg">
             Rizal path explorer
           </p>
         </div>
         <div className="flex flex-col items-center gap-2 sm:flex-row">
+          {!loading && !authenticated ? (
+            <Link
+              href="/login"
+              className="rounded-full bg-violet-600 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
+            >
+              School sign-in
+            </Link>
+          ) : null}
           <Link
             href="/profile/edit"
             className="rounded-full bg-rose-500 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
           >
             Edit explorer
           </Link>
-          <Link
-            href="/teach"
-            className="rounded-full bg-slate-800 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
-          >
-            Teacher studio
-          </Link>
+          {!loading && canTeach ? (
+            <Link
+              href="/teach"
+              className="rounded-full bg-slate-800 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
+            >
+              Teacher studio
+            </Link>
+          ) : null}
+          {!loading && authenticated ? (
+            <button
+              type="button"
+              onClick={onSignOut}
+              disabled={signingOut}
+              className="rounded-full bg-white px-6 py-3 text-base font-extrabold text-slate-600 shadow-sm ring-1 ring-black/10 transition active:translate-y-0.5 disabled:opacity-60"
+            >
+              {signingOut ? "Signing out…" : "Sign out"}
+            </button>
+          ) : null}
         </div>
       </section>
 

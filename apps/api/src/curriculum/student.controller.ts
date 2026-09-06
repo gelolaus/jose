@@ -4,45 +4,56 @@ import {
   Get,
   Param,
   Post,
+  UseGuards,
 } from "@nestjs/common";
+import { CurrentLearnerId, SessionLearnerGuard } from "../auth/session.guard";
 import { CurriculumService } from "./curriculum.service";
 
+/**
+ * Progress is always read and written against the learner id the guard derived
+ * from the session cookie, so one student can never touch another's path.
+ */
 @Controller()
+@UseGuards(SessionLearnerGuard)
 export class StudentController {
   constructor(private readonly curriculum: CurriculumService) {}
 
   @Get("modules")
-  listModules() {
-    return this.curriculum.listPublishedModules();
+  listModules(@CurrentLearnerId() learnerId: string) {
+    return this.curriculum.listPublishedModules(learnerId);
   }
 
   @Get("modules/:id")
-  getModule(@Param("id") id: string) {
-    return this.curriculum.getModulePath(id);
+  getModule(@Param("id") id: string, @CurrentLearnerId() learnerId: string) {
+    return this.curriculum.getModulePath(id, learnerId);
   }
 
   @Get("path/demo")
-  getDemo() {
-    return this.curriculum.getFeaturedPath();
+  getDemo(@CurrentLearnerId() learnerId: string) {
+    return this.curriculum.getFeaturedPath(learnerId);
   }
 
   @Get("levels/:id")
-  getLevel(@Param("id") id: string) {
-    return this.curriculum.getPlayLevel(id);
+  getLevel(@Param("id") id: string, @CurrentLearnerId() learnerId: string) {
+    return this.curriculum.getPlayLevel(id, learnerId);
   }
 
   @Post("levels/:id/complete")
-  complete(@Param("id") id: string) {
-    return this.curriculum.completeLevel(id);
+  complete(@Param("id") id: string, @CurrentLearnerId() learnerId: string) {
+    return this.curriculum.completeLevel(id, learnerId);
   }
 
   @Post("levels/:id/miss")
-  miss(@Param("id") id: string) {
-    return this.curriculum.recordMiss(id);
+  miss(@Param("id") id: string, @CurrentLearnerId() learnerId: string) {
+    return this.curriculum.recordMiss(id, learnerId);
   }
 
   @Post("levels/:id/attempts")
-  attempt(@Param("id") id: string, @Body() body: unknown) {
-    return this.curriculum.submitAttempt(id, body);
+  attempt(
+    @Param("id") id: string,
+    @Body() body: unknown,
+    @CurrentLearnerId() learnerId: string,
+  ) {
+    return this.curriculum.submitAttempt(id, body, learnerId);
   }
 }

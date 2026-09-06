@@ -1,5 +1,6 @@
 import { TeachModuleEditor } from "@/components/teach-module-editor";
-import { fetchTeachModule, isNotFoundError } from "@/lib/path-api";
+import { isNotFoundError } from "@/lib/path-api";
+import { fetchTeachModule } from "@/lib/server-api";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";

@@ -1,6 +1,6 @@
 import { TeachModuleList } from "@/components/teach-module-list";
 import { TeachTitle } from "@/components/teach-shell";
-import { fetchTeachModules } from "@/lib/path-api";
+import { fetchTeachModules } from "@/lib/server-api";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";

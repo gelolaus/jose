@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { avatarIdSchema } from "./auth";
 
 export const nodeStatusSchema = z.enum(["completed", "current", "locked"]);
 export const nodeKindSchema = z.enum(["lesson", "game", "chest"]);
@@ -43,6 +44,7 @@ export const pathModuleSchema = z.object({
 export const learnerSchema = z.object({
   id: z.string().min(1),
   displayName: z.string().min(1),
+  avatarId: avatarIdSchema.optional(),
   streak: z.number().int().nonnegative(),
   hearts: z.number().int().nonnegative(),
   xp: z.number().int().nonnegative(),

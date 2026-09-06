@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/learning-shell";
 import { ProfileShowcase } from "@/components/profile-showcase";
-import { fetchDemoPath } from "@/lib/path-api";
+import { SignInRequired } from "@/components/sign-in-required";
+import { fetchDemoPath } from "@/lib/server-api";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -14,6 +15,13 @@ export default async function ProfilePage() {
   const result = await fetchDemoPath();
 
   if (!result.ok) {
+    if (result.status === 401) {
+      return (
+        <AppShell>
+          <SignInRequired title="Sign in to see your profile" />
+        </AppShell>
+      );
+    }
     return (
       <AppShell>
         <div className="mx-auto flex min-h-full max-w-2xl flex-col items-center justify-center gap-4 px-6 py-16 text-center">

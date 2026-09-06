@@ -12,6 +12,8 @@ export const teachModuleSchema = z.object({
   sortOrder: z.number().int(),
   sectionCount: z.number().int().nonnegative(),
   levelCount: z.number().int().nonnegative(),
+  /** Null for seeded modules, which only admins may edit. */
+  ownerUserId: z.string().nullable(),
 });
 
 export const teachLevelSchema = z.object({
