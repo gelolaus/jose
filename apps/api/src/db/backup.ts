@@ -1,6 +1,6 @@
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import type { Client } from "@libsql/client";
+import { createClient, type Client } from "@libsql/client";
 
 export type BackupManifest = {
   version: 1;
@@ -49,6 +49,12 @@ export async function backupFileDatabase(
     throw new Error("Cannot file-copy an in-memory database");
   }
   await mkdir(dirname(destinationPath), { recursive: true });
+  const checkpoint = createClient({ url: databaseUrl });
+  try {
+    await checkpoint.execute("PRAGMA wal_checkpoint(TRUNCATE)");
+  } finally {
+    checkpoint.close();
+  }
   await copyFile(sourcePath, destinationPath);
   for (const suffix of ["-wal", "-shm"]) {
     try {

@@ -10,6 +10,7 @@ import {
 import {
   DEFAULT_AVATAR_ID,
   HEARTS_EMPTY_CODE,
+  MAX_ATTEMPT_PAYLOAD_BYTES,
   MAX_HEARTS,
   applyHeartDrip,
   attemptBodySchema,
@@ -43,6 +44,7 @@ import {
   putGameBodySchema,
   putLessonBodySchema,
   sanitizeGameForAssessment,
+  serializedJsonBytes,
   shuffledCopy,
   stableStringify,
   type AssessmentSecret,
@@ -319,13 +321,23 @@ export class CurriculumService {
    * the server-issued attempt id and answer events.
    */
   async submitAttempt(levelId: string, body: unknown, learnerId: string) {
+    const payload =
+      body && typeof body === "object" && "payload" in body
+        ? (body as { payload?: unknown }).payload
+        : undefined;
+    if (payload !== undefined) {
+      const size = serializedJsonBytes(payload);
+      if (size == null) {
+        throw new BadRequestException("Attempt payload must be JSON-serializable");
+      }
+      if (size > MAX_ATTEMPT_PAYLOAD_BYTES) {
+        throw new BadRequestException(
+          `Attempt payload exceeds ${MAX_ATTEMPT_PAYLOAD_BYTES} bytes`,
+        );
+      }
+    }
     await this.requireStudentVisibleLevel(levelId);
     void learnerId;
-    if (body && typeof body === "object" && ("score" in body || "maxScore" in body)) {
-      throw new BadRequestException(
-        "Client scores are not accepted; finish the server-issued attempt instead",
-      );
-    }
     parseBody(attemptBodySchema, body ?? {});
     throw new BadRequestException(
       "Start play via GET /levels/:id, then POST /attempts/:attemptId/finish",
