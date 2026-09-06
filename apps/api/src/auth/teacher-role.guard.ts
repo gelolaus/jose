@@ -17,7 +17,10 @@ export class TeacherRoleGuard implements CanActivate {
       throw new UnauthorizedException("Authentication required");
     }
     if (user.role !== "teacher" && user.role !== "admin") {
-      throw new ForbiddenException("Insufficient role");
+      throw new ForbiddenException({
+        message: "Teacher access denied",
+        code: "TEACHER_DENIED",
+      });
     }
     return true;
   }

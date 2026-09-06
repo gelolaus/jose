@@ -70,9 +70,19 @@ export function isProductionEnv(env: NodeJS.ProcessEnv = process.env): boolean {
 function assertProductionSafe(env: NodeJS.ProcessEnv, mode: AuthMode) {
   if (!isProductionEnv(env)) return;
 
+  if (mode === "disabled") {
+    throw new AuthConfigError(
+      "JOSE_AUTH_MODE=disabled cannot run in production. Set JOSE_AUTH_MODE=microsoft.",
+    );
+  }
   if (mode === "mock") {
     throw new AuthConfigError(
       "JOSE_AUTH_MODE=mock is a test-only login bypass and cannot run in production. Set JOSE_AUTH_MODE=microsoft.",
+    );
+  }
+  if (isTruthy(env.JOSE_AUTH_STUB)) {
+    throw new AuthConfigError(
+      "JOSE_AUTH_STUB is a test-only identity header and cannot run in production. Remove JOSE_AUTH_STUB.",
     );
   }
   if (isTruthy(env.JOSE_DEMO_MODE)) {

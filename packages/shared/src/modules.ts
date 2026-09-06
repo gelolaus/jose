@@ -3,6 +3,7 @@ import {
   assessmentGameSchema,
   attemptInfoSchema,
 } from "./assessment";
+import { MAX_ATTEMPT_PAYLOAD_BYTES, serializedJsonBytes } from "./limits";
 import { lessonContentSchema } from "./games";
 import {
   gameTypeSchema,
@@ -57,8 +58,30 @@ export const attemptBodySchema = z
     payload: z.unknown().optional(),
     clientAttemptId: z.string().trim().min(1).max(128).optional(),
   })
-  .refine((body) => body.score === undefined && body.maxScore === undefined, {
-    message: "Client scores are not accepted; finish the server-issued attempt instead",
+  .superRefine((body, ctx) => {
+    if (body.score !== undefined || body.maxScore !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Client scores are not accepted; finish the server-issued attempt instead",
+      });
+    }
+    if (body.payload === undefined) return;
+    const size = serializedJsonBytes(body.payload);
+    if (size == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Attempt payload must be JSON-serializable",
+        path: ["payload"],
+      });
+      return;
+    }
+    if (size > MAX_ATTEMPT_PAYLOAD_BYTES) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Attempt payload exceeds ${MAX_ATTEMPT_PAYLOAD_BYTES} bytes`,
+        path: ["payload"],
+      });
+    }
   });
 
 export const missBodySchema = z.object({

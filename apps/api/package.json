@@ -6,6 +6,9 @@
     "dev": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main.js",
+    "db:migrate": "ts-node --transpile-only src/db/migrate-cli.ts",
+    "db:backup": "ts-node --transpile-only src/db/backup-cli.ts",
+    "db:restore": "ts-node --transpile-only src/db/restore-cli.ts",
     "db:seed": "ts-node --transpile-only src/db/seed-cli.ts",
     "test": "jest --config ./jest.config.ts",
     "lint": "tsc -p tsconfig.json --noEmit"

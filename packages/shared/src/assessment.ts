@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_ATTEMPT_PAYLOAD_BYTES, serializedJsonBytes } from "./limits";
 import {
   type BlankGame,
   type GameContent,
@@ -184,11 +185,28 @@ export const finishAnswersSchema = z.discriminatedUnion("type", [
 
 export type FinishAnswers = z.infer<typeof finishAnswersSchema>;
 
-export const finishAttemptBodySchema = z.object({
-  answers: finishAnswersSchema,
-  /** Client-generated id so a retry after a failed save does not award XP twice. */
-  clientAttemptId: z.string().trim().min(1).max(128).optional(),
-});
+export const finishAttemptBodySchema = z
+  .object({
+    answers: finishAnswersSchema,
+    /** Client-generated id so a retry after a failed save does not award XP twice. */
+    clientAttemptId: z.string().trim().min(1).max(128).optional(),
+  })
+  .superRefine((body, ctx) => {
+    const size = serializedJsonBytes(body);
+    if (size == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Attempt payload must be JSON-serializable",
+      });
+      return;
+    }
+    if (size > MAX_ATTEMPT_PAYLOAD_BYTES) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Attempt payload exceeds ${MAX_ATTEMPT_PAYLOAD_BYTES} bytes`,
+      });
+    }
+  });
 
 export const evaluateEventResultSchema = z.object({
   correct: z.boolean(),

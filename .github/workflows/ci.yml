@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "**-platform-reliability", "cursor/**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-gate:
+    name: Release gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Clean install (no prior dist)
+        run: |
+          rm -rf node_modules apps/*/node_modules packages/*/node_modules
+          rm -rf packages/shared/dist apps/api/dist apps/web/.next
+          npm ci
+
+      - name: Shared package build
+        run: npm run build --workspace=@jose/shared
+
+      - name: Lint / typecheck (depends on ^build via turbo)
+        run: npm run lint
+
+      - name: Unit + critical-path tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+        env:
+          JOSE_INTERNAL_API_URL: http://127.0.0.1:3001
+
+      - name: Dependency advisories (informational)
+        run: npm run audit:deps || true
+
+      - name: Migration dry-run on fresh DB
+        run: |
+          JOSE_DATABASE_URL="file:./apps/api/data/ci-migrate.sqlite" npm run db:migrate
+        env:
+          NODE_ENV: test

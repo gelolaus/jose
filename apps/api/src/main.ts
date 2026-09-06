@@ -1,43 +1,50 @@
 import { NestFactory } from "@nestjs/core";
-import { AppModule } from "./app.module";
+import { json, urlencoded } from "express";
 import cookieParser from "cookie-parser";
-import { loadAuthConfig, AuthConfigError } from "./auth/auth-config";
+import { AppModule } from "./app.module";
+import { AuthConfigError, loadAuthConfig } from "./auth/auth-config";
+import { EnvValidationError, loadJoseEnv } from "./config/env";
+import { writeStructuredLog } from "./observability/telemetry";
 
 async function bootstrap() {
-  // Fail fast on invalid microsoft/mock configuration; disabled mode is allowed.
+  let env;
   try {
+    env = loadJoseEnv(process.env);
     loadAuthConfig();
   } catch (error) {
-    if (error instanceof AuthConfigError) {
-      console.error(`[auth] configuration error: ${error.message}`);
-      process.exit(1);
-    }
-    throw error;
+    const message =
+      error instanceof EnvValidationError || error instanceof AuthConfigError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : String(error);
+    console.error(`[config] ${message}`);
+    process.exit(1);
   }
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  const http = app.getHttpAdapter().getInstance() as {
+    set: (key: string, value: unknown) => void;
+  };
+  http.set("trust proxy", env.trustProxy);
+  app.use(json({ limit: env.maxBodyBytes }));
+  app.use(urlencoded({ extended: true, limit: env.maxBodyBytes }));
   app.use(cookieParser());
 
-  // Credentialed CORS: in production only the configured web origin may send the
-  // session cookie, so a local app cannot call a deployed API as a signed-in user.
-  let webOrigins = ["http://localhost:3000", "http://127.0.0.1:3000"];
-  try {
-    const config = loadAuthConfig();
-    if (config.isProduction) {
-      webOrigins = config.webOrigin ? [config.webOrigin] : [];
-    } else if (config.webOrigin && !webOrigins.includes(config.webOrigin)) {
-      webOrigins = [...webOrigins, config.webOrigin];
-    }
-  } catch {
-    // disabled / already validated above
-  }
-
   app.enableCors({
-    origin: webOrigins,
+    origin: env.allowedOrigins,
     credentials: true,
   });
-  const port = Number(process.env.PORT ?? 3001);
-  await app.listen(port);
+  await app.listen(env.port);
+  writeStructuredLog({
+    level: "info",
+    msg: "api.started",
+    port: env.port,
+    nodeEnv: env.nodeEnv,
+  });
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+});

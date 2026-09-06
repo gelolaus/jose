@@ -126,6 +126,24 @@ describe("production hard rejects (issues #4 and #5)", () => {
     ).toThrow(AuthConfigError);
   });
 
+  it("refuses disabled and stub authentication in production", () => {
+    expect(() =>
+      loadAuthConfig({
+        NODE_ENV: "production",
+        JOSE_AUTH_MODE: "disabled",
+      }),
+    ).toThrow(/JOSE_AUTH_MODE=disabled/);
+    expect(() =>
+      loadAuthConfig({
+        ...MICROSOFT_ENV,
+        NODE_ENV: "production",
+        JOSE_WEB_ORIGIN: "https://jose.example",
+        JOSE_API_PUBLIC_URL: "https://api.jose.example",
+        JOSE_AUTH_STUB: "1",
+      }),
+    ).toThrow(/JOSE_AUTH_STUB/);
+  });
+
   it("accepts a fully configured production deployment and secures cookies", () => {
     const config = loadAuthConfig({
       ...MICROSOFT_ENV,

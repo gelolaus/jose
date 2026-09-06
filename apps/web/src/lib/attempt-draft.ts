@@ -113,12 +113,13 @@ export function clearAccountScopedClientState(): void {
 }
 
 export function newClientAttemptId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
+  const webCrypto = globalThis.crypto;
+  if (webCrypto && typeof webCrypto.randomUUID === "function") {
+    return webCrypto.randomUUID();
   }
   const bytes = new Uint8Array(16);
-  if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
-    crypto.getRandomValues(bytes);
+  if (webCrypto && typeof webCrypto.getRandomValues === "function") {
+    webCrypto.getRandomValues(bytes);
   } else {
     for (let i = 0; i < bytes.length; i += 1) {
       bytes[i] = Math.floor(Math.random() * 256);

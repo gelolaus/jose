@@ -1,15 +1,11 @@
-import { drizzle } from "drizzle-orm/libsql";
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { loadJoseEnv } from "../config/env";
 import { openDatabaseClient, resolveDatabaseUrl } from "./database.service";
 import { runMigrations } from "./migrate";
-import { applyPendingSeeds } from "./seed";
-import * as schema from "./schema";
 
 async function main() {
   loadJoseEnv(process.env);
-  const includeDemo = process.argv.includes("--demo");
   const url = resolveDatabaseUrl();
   if (url.startsWith("file:")) {
     const filePath = url.slice("file:".length);
@@ -20,16 +16,9 @@ async function main() {
 
   const client = openDatabaseClient(url);
   try {
-    const db = drizzle(client, { schema });
-    await runMigrations(client);
-    const results = await applyPendingSeeds(db, { includeDemo });
+    const results = await runMigrations(client);
     for (const result of results) {
       console.log(`${result.status}: ${result.id}`);
-    }
-    if (!includeDemo) {
-      console.log(
-        "Demo learner skipped (pass --demo to opt in). Production learners start with honest statistics.",
-      );
     }
   } finally {
     client.close();
@@ -37,6 +26,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
 });

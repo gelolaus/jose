@@ -10,6 +10,7 @@ import {
 import {
   DEFAULT_AVATAR_ID,
   HEARTS_EMPTY_CODE,
+  MAX_ATTEMPT_PAYLOAD_BYTES,
   MAX_HEARTS,
   applyHeartDrip,
   attemptBodySchema,
@@ -43,6 +44,7 @@ import {
   putGameBodySchema,
   putLessonBodySchema,
   sanitizeGameForAssessment,
+  serializedJsonBytes,
   shuffledCopy,
   stableStringify,
   type AssessmentSecret,
@@ -160,12 +162,12 @@ export class CurriculumService {
       .where(eq(modules.published, true))
       .orderBy(desc(modules.featured), asc(modules.sortOrder));
 
-    const cards = [];
-    for (const row of rows) {
-      const ordered = await this.orderedLevelIds(row.id);
-      const completed = await this.completedSet(learnerId);
+    const orderedByModule = await this.orderedLevelIdsByModules(rows.map((row) => row.id));
+    const completed = await this.completedSet(learnerId);
+    const cards = rows.map((row) => {
+      const ordered = orderedByModule.get(row.id) ?? [];
       const completedCount = ordered.filter((id) => completed.has(id)).length;
-      cards.push({
+      return {
         id: row.id,
         title: row.title,
         subtitle: row.subtitle,
@@ -174,8 +176,8 @@ export class CurriculumService {
         published: row.published,
         completedCount,
         totalCount: ordered.length,
-      });
-    }
+      };
+    });
     return { learner, modules: cards };
   }
 
@@ -319,13 +321,23 @@ export class CurriculumService {
    * the server-issued attempt id and answer events.
    */
   async submitAttempt(levelId: string, body: unknown, learnerId: string) {
+    const payload =
+      body && typeof body === "object" && "payload" in body
+        ? (body as { payload?: unknown }).payload
+        : undefined;
+    if (payload !== undefined) {
+      const size = serializedJsonBytes(payload);
+      if (size == null) {
+        throw new BadRequestException("Attempt payload must be JSON-serializable");
+      }
+      if (size > MAX_ATTEMPT_PAYLOAD_BYTES) {
+        throw new BadRequestException(
+          `Attempt payload exceeds ${MAX_ATTEMPT_PAYLOAD_BYTES} bytes`,
+        );
+      }
+    }
     await this.requireStudentVisibleLevel(levelId);
     void learnerId;
-    if (body && typeof body === "object" && ("score" in body || "maxScore" in body)) {
-      throw new BadRequestException(
-        "Client scores are not accepted; finish the server-issued attempt instead",
-      );
-    }
     parseBody(attemptBodySchema, body ?? {});
     throw new BadRequestException(
       "Start play via GET /levels/:id, then POST /attempts/:attemptId/finish",
@@ -500,15 +512,26 @@ export class CurriculumService {
                 .where(eq(moduleCollaborators.userId, user.id))
             ).map((row) => row.moduleId),
           );
-    const result: TeachModule[] = [];
-    for (const row of rows) {
-      if (user.role !== "admin") {
-        const isOwner = row.ownerUserId != null && row.ownerUserId === user.id;
-        if (!isOwner && !collaboratorModuleIds?.has(row.id)) continue;
-      }
-      result.push(await this.toTeachModule(row));
-    }
-    return result;
+    const visible = rows.filter((row) => {
+      if (user.role === "admin") return true;
+      const isOwner = row.ownerUserId != null && row.ownerUserId === user.id;
+      return isOwner || Boolean(collaboratorModuleIds?.has(row.id));
+    });
+    const ids = visible.map((row) => row.id);
+    const orderedByModule = await this.orderedLevelIdsByModules(ids);
+    const sectionCounts = await this.sectionCountsByModules(ids);
+    return visible.map((row) => ({
+      id: row.id,
+      title: row.title,
+      subtitle: row.subtitle,
+      coverColor: row.coverColor,
+      featured: row.featured,
+      published: row.published,
+      sortOrder: row.sortOrder,
+      sectionCount: sectionCounts.get(row.id) ?? 0,
+      levelCount: (orderedByModule.get(row.id) ?? []).length,
+      ownerUserId: row.ownerUserId ?? null,
+    }));
   }
 
   async getTeachModule(moduleId: string): Promise<TeachModuleDetail> {
@@ -518,14 +541,10 @@ export class CurriculumService {
       .from(sections)
       .where(eq(sections.moduleId, moduleId))
       .orderBy(asc(sections.sortOrder));
-    const detailSections = [];
-    for (const section of sectionRows) {
-      const levelRows = await this.db
-        .select()
-        .from(levels)
-        .where(eq(levels.sectionId, section.id))
-        .orderBy(asc(levels.sortOrder));
-      detailSections.push({
+    const levelsBySection = await this.levelsBySectionIds(sectionRows.map((s) => s.id));
+    const detailSections = sectionRows.map((section) => {
+      const levelRows = levelsBySection.get(section.id) ?? [];
+      return {
         id: section.id,
         title: section.title,
         subtitle: section.subtitle,
@@ -538,8 +557,8 @@ export class CurriculumService {
           gameType: (level.gameType as GameType | null) ?? null,
           sortOrder: level.sortOrder,
         })),
-      });
-    }
+      };
+    });
     const summary = await this.toTeachModule(mod);
     return { ...summary, sections: detailSections };
   }
@@ -892,15 +911,11 @@ export class CurriculumService {
       .where(eq(sections.moduleId, mod.id))
       .orderBy(asc(sections.sortOrder));
 
+    const levelsBySection = await this.levelsBySectionIds(sectionRows.map((s) => s.id));
     let globalIndex = 0;
-    const pathSections = [];
-    for (const section of sectionRows) {
-      const levelRows = await this.db
-        .select()
-        .from(levels)
-        .where(eq(levels.sectionId, section.id))
-        .orderBy(asc(levels.sortOrder));
-      pathSections.push({
+    const pathSections = sectionRows.map((section) => {
+      const levelRows = levelsBySection.get(section.id) ?? [];
+      return {
         id: section.id,
         title: section.title,
         subtitle: section.subtitle,
@@ -920,8 +935,8 @@ export class CurriculumService {
           globalIndex += 1;
           return node;
         }),
-      });
-    }
+      };
+    });
 
     if (pathSections.length === 0 || pathSections.every((s) => s.nodes.length === 0)) {
       throw new BadRequestException("This module has no levels yet");
@@ -940,22 +955,78 @@ export class CurriculumService {
     };
   }
 
-  private async orderedLevelIds(moduleId: string): Promise<string[]> {
-    const sectionRows = await this.db
-      .select()
+  /** One round-trip for ordered level ids across many modules (no per-section loop). */
+  private async orderedLevelIdsByModules(
+    moduleIds: string[],
+  ): Promise<Map<string, string[]>> {
+    const result = new Map<string, string[]>();
+    for (const id of moduleIds) result.set(id, []);
+    if (moduleIds.length === 0) return result;
+
+    const rows = await this.db
+      .select({
+        moduleId: sections.moduleId,
+        levelId: levels.id,
+        sectionSort: sections.sortOrder,
+        levelSort: levels.sortOrder,
+      })
       .from(sections)
-      .where(eq(sections.moduleId, moduleId))
-      .orderBy(asc(sections.sortOrder));
-    const ids: string[] = [];
-    for (const section of sectionRows) {
-      const levelRows = await this.db
-        .select()
-        .from(levels)
-        .where(eq(levels.sectionId, section.id))
-        .orderBy(asc(levels.sortOrder));
-      for (const level of levelRows) ids.push(level.id);
+      .innerJoin(levels, eq(levels.sectionId, sections.id))
+      .where(inArray(sections.moduleId, moduleIds));
+
+    const byModule = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const list = byModule.get(row.moduleId) ?? [];
+      list.push(row);
+      byModule.set(row.moduleId, list);
     }
-    return ids;
+    for (const moduleId of moduleIds) {
+      const list = (byModule.get(moduleId) ?? []).sort((a, b) => {
+        if (a.sectionSort !== b.sectionSort) return a.sectionSort - b.sectionSort;
+        return a.levelSort - b.levelSort;
+      });
+      result.set(
+        moduleId,
+        list.map((row) => row.levelId),
+      );
+    }
+    return result;
+  }
+
+  private async orderedLevelIds(moduleId: string): Promise<string[]> {
+    const map = await this.orderedLevelIdsByModules([moduleId]);
+    return map.get(moduleId) ?? [];
+  }
+
+  private async levelsBySectionIds(sectionIds: string[]) {
+    const result = new Map<string, (typeof levels.$inferSelect)[]>();
+    for (const id of sectionIds) result.set(id, []);
+    if (sectionIds.length === 0) return result;
+    const rows = await this.db
+      .select()
+      .from(levels)
+      .where(inArray(levels.sectionId, sectionIds))
+      .orderBy(asc(levels.sortOrder));
+    for (const row of rows) {
+      const list = result.get(row.sectionId) ?? [];
+      list.push(row);
+      result.set(row.sectionId, list);
+    }
+    return result;
+  }
+
+  private async sectionCountsByModules(moduleIds: string[]) {
+    const result = new Map<string, number>();
+    for (const id of moduleIds) result.set(id, 0);
+    if (moduleIds.length === 0) return result;
+    const rows = await this.db
+      .select({ moduleId: sections.moduleId })
+      .from(sections)
+      .where(inArray(sections.moduleId, moduleIds));
+    for (const row of rows) {
+      result.set(row.moduleId, (result.get(row.moduleId) ?? 0) + 1);
+    }
+    return result;
   }
 
   private async completedSet(learnerId: string): Promise<Set<string>> {

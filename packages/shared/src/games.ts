@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_LESSON_MARKDOWN_CHARS } from "./limits";
 
 const nonEmpty = z.string().trim().min(1);
 const optionalWhy = z.string().trim().max(280).optional();
@@ -17,7 +18,7 @@ export const quizQuestionSchema = z
 
 export const quizGameSchema = z.object({
   type: z.literal("quiz"),
-  questions: z.array(quizQuestionSchema).min(1),
+  questions: z.array(quizQuestionSchema).min(1).max(40),
 });
 
 export const memorySideSchema = z
@@ -99,7 +100,7 @@ export type SortGame = z.infer<typeof sortGameSchema>;
 export type GameContent = z.infer<typeof gameContentSchema>;
 
 export const lessonContentSchema = z.object({
-  markdown: z.string(),
+  markdown: z.string().max(MAX_LESSON_MARKDOWN_CHARS),
   youtubeVideoId: z.string().regex(/^[A-Za-z0-9_-]{11}$/).nullable(),
 });
 
