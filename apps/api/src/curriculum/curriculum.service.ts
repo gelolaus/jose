@@ -46,6 +46,7 @@ import {
   gameContentSchema,
   getModuleTemplate,
   gradeAssessmentFinish,
+  instructorReviewStatusSchema,
   isAvatarId,
   isLevelLocked,
   lessonBlocksSchema,
@@ -88,6 +89,7 @@ import {
   type GameContent,
   type GameType,
   validateQuestionImport,
+  type InstructorReviewStatus,
   type Learner,
   type LessonBlocks,
   type LessonEditorial,
@@ -2136,12 +2138,18 @@ export class CurriculumService {
     );
     const completed = await this.completedSet(learnerId);
     const statuses = deriveLevelStatuses(ordered, completed);
+    const liveSections = await this.activeSections(mod.id);
+    const liveById = new Map(liveSections.map((section) => [section.id, section]));
     let globalIndex = 0;
     const pathSections = snapshot.sections.map((section) => ({
       id: section.id,
       title: section.title,
       subtitle: section.subtitle,
       themeColor: section.themeColor,
+      objectives: this.parseChapterObjectives(liveById.get(section.id)?.objectivesJson),
+      instructorReviewStatus: this.parseInstructorReviewStatus(
+        liveById.get(section.id)?.instructorReviewStatus,
+      ),
       nodes: section.levels.map((level) => {
         const status = statuses[level.id] ?? "locked";
         const node = {
@@ -2317,6 +2325,10 @@ export class CurriculumService {
         title: section.title,
         subtitle: section.subtitle,
         themeColor: section.themeColor,
+        objectives: this.parseChapterObjectives(section.objectivesJson),
+        instructorReviewStatus: this.parseInstructorReviewStatus(
+          section.instructorReviewStatus,
+        ),
         nodes: levelRows.map((level) => {
           const kind = level.kind as NodeKind;
           const status = statuses[level.id] ?? "locked";
@@ -2758,6 +2770,25 @@ export class CurriculumService {
     const editorial =
       content?.editorial ?? this.parseLessonEditorial(content?.editorialJson);
     return { markdown, youtubeVideoId, blocks, editorial };
+  }
+
+  private parseInstructorReviewStatus(
+    raw?: string | null,
+  ): InstructorReviewStatus {
+    const parsed = instructorReviewStatusSchema.safeParse(raw);
+    return parsed.success ? parsed.data : "unreviewed";
+  }
+
+  private parseChapterObjectives(raw?: string | null): string[] {
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return Array.isArray(parsed)
+        ? parsed.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+        : [];
+    } catch {
+      return [];
+    }
   }
 
   private parseLessonEditorial(raw?: string | null): LessonEditorial {

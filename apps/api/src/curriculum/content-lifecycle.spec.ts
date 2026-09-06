@@ -2,7 +2,7 @@ import { Test, type TestingModule } from "@nestjs/testing";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assessPublishReadiness, csvSafeCell, type SessionUser } from "@jose/shared";
+import { assessPublishReadiness, csvSafeCell, emptyLessonEditorial, type SessionUser } from "@jose/shared";
 import { type INestApplication } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { AppModule } from "../app.module";
@@ -306,6 +306,7 @@ describe("content lifecycle + classroom", () => {
               lesson: {
                 markdown: content?.markdown ?? "",
                 youtubeVideoId: null,
+                editorial: emptyLessonEditorial(),
               },
             },
           ],
