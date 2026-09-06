@@ -281,7 +281,7 @@ export const migration006ContentClassroom: Migration = {
     const statements = [
       `CREATE TABLE IF NOT EXISTS module_revisions (
         id TEXT PRIMARY KEY,
-        module_id TEXT NOT NULL REFERENCES modules(id),
+        module_id TEXT NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
         revision_number INTEGER NOT NULL,
         snapshot_json TEXT NOT NULL,
         created_at INTEGER NOT NULL,
@@ -309,17 +309,17 @@ export const migration006ContentClassroom: Migration = {
         created_at INTEGER NOT NULL
       )`,
       `CREATE TABLE IF NOT EXISTS class_members (
-        class_id TEXT NOT NULL REFERENCES classes(id),
-        learner_id TEXT NOT NULL REFERENCES learners(id),
+        class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+        learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
         joined_at INTEGER NOT NULL,
         archived_at INTEGER,
         PRIMARY KEY (class_id, learner_id)
       )`,
       `CREATE TABLE IF NOT EXISTS assignments (
         id TEXT PRIMARY KEY,
-        class_id TEXT NOT NULL REFERENCES classes(id),
-        module_id TEXT NOT NULL REFERENCES modules(id),
-        content_revision_id TEXT NOT NULL REFERENCES module_revisions(id),
+        class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+        module_id TEXT NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
+        content_revision_id TEXT NOT NULL REFERENCES module_revisions(id) ON DELETE CASCADE,
         due_at INTEGER,
         assigned_at INTEGER NOT NULL,
         archived_at INTEGER

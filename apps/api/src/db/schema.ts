@@ -47,7 +47,7 @@ export const moduleRevisions = sqliteTable("module_revisions", {
   id: text("id").primaryKey(),
   moduleId: text("module_id")
     .notNull()
-    .references(() => modules.id),
+    .references(() => modules.id, { onDelete: "cascade" }),
   revisionNumber: integer("revision_number").notNull(),
   snapshotJson: text("snapshot_json").notNull(),
   createdAt: integer("created_at").notNull(),
@@ -300,10 +300,10 @@ export const classMembers = sqliteTable(
   {
     classId: text("class_id")
       .notNull()
-      .references(() => classes.id),
+      .references(() => classes.id, { onDelete: "cascade" }),
     learnerId: text("learner_id")
       .notNull()
-      .references(() => learners.id),
+      .references(() => learners.id, { onDelete: "cascade" }),
     joinedAt: integer("joined_at").notNull(),
     archivedAt: integer("archived_at"),
   },
