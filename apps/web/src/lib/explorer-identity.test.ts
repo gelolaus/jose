@@ -60,6 +60,20 @@ describe("clearSensitiveClientState", () => {
     expect(window.sessionStorage.getItem(EXPLORER_STORAGE_KEY)).toBeNull();
   });
 
+  it("leaves account-keyed journal blobs for the same account after sign-out", () => {
+    writeExplorerIdentity({ displayName: "Luna", avatarId: "star" });
+    window.localStorage.setItem("jose.journal.v1:account:usr-a", JSON.stringify({ ok: true }));
+    window.localStorage.setItem("jose.journal.v1", JSON.stringify({ legacy: true }));
+    window.localStorage.setItem("jose.lesson-packs.v1", "packs");
+    window.localStorage.setItem("jose.lesson-packs.v1:account:usr-a", "packs");
+    clearSensitiveClientState();
+    expect(window.localStorage.getItem("jose.journal.v1:account:usr-a")).toBeTruthy();
+    expect(window.localStorage.getItem("jose.journal.v1")).toBeNull();
+    expect(window.localStorage.getItem("jose.lesson-packs.v1")).toBeNull();
+    expect(window.localStorage.getItem("jose.lesson-packs.v1:account:usr-a")).toBeNull();
+    expect(window.localStorage.getItem(EXPLORER_STORAGE_KEY)).toBeNull();
+  });
+
   it("leaves nothing behind for the next person on a shared computer", () => {
     writeExplorerIdentity({ displayName: "Alice", avatarId: "sun" });
     clearSensitiveClientState();

@@ -351,11 +351,16 @@ function MemoryPlay({
             const open =
               flipped.includes(card.id) ||
               (onEvaluate ? matchedIds.has(card.id) : matched.has(card.pairId));
+            const faceLabel = card.text?.trim()
+              ? card.text
+              : card.imageUrl
+                ? "Image card"
+                : "Blank card";
             return (
               <li key={card.id} className="[perspective:1000px]">
                 <button
                   type="button"
-                  aria-label={`Card ${card.id}`}
+                  aria-label={open ? `Revealed: ${faceLabel}` : "Hidden card"}
                   onClick={() => flip(card)}
                   className="block w-full [transform-style:preserve-3d]"
                 >

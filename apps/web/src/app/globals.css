@@ -482,3 +482,21 @@ html[data-presentation="focus"] .jose-surface {
 .jose-login__preset {
   width: 100%;
 }
+
+html[data-reduce-motion="true"] *,
+html[data-reduce-motion="true"] *::before,
+html[data-reduce-motion="true"] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+html[data-text-size="lg"] {
+  font-size: 112.5%;
+}
+
+html[data-text-size="xl"] {
+  font-size: 125%;
+}
+

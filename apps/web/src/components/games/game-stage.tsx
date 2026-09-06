@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Heart, Star } from "lucide-react";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import type { WhyPayload } from "./play-types";
 
 export function HeartsHud({ hearts, max = 5 }: { hearts: number; max?: number }) {
@@ -35,8 +36,9 @@ export function WhySheet({
   const titleId = useId();
   const bodyId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(true, dialogRef, true);
+
   useEffect(() => {
-    dialogRef.current?.focus();
     const t = window.setTimeout(() => {
       readyRef.current = true;
       setReady(true);
@@ -73,7 +75,7 @@ export function WhySheet({
           type="button"
           disabled={!ready}
           onClick={onDismiss}
-          className="mt-5 w-full rounded-full bg-violet-600 px-5 py-3.5 text-base font-extrabold text-white shadow-md disabled:opacity-50"
+          className="mt-5 min-h-11 w-full rounded-full bg-violet-600 px-5 py-3.5 text-base font-extrabold text-white shadow-md disabled:opacity-50"
         >
           {ready ? "Got it" : "…"}
         </button>

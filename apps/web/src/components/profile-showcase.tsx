@@ -62,6 +62,18 @@ export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
           >
             Edit explorer
           </Link>
+          <Link
+            href="/profile/preferences"
+            className="min-h-11 rounded-xl bg-violet-100 px-6 py-3 text-base font-semibold text-violet-800 shadow-sm"
+          >
+            Language & reading
+          </Link>
+          <Link
+            href="/journal"
+            className="min-h-11 rounded-xl bg-amber-100 px-6 py-3 text-base font-semibold text-amber-900 shadow-sm"
+          >
+            Field journal
+          </Link>
           {!loading && canTeach ? (
             <Link
               href="/teach"

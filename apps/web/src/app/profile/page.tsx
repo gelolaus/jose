@@ -1,6 +1,6 @@
-import { UnavailableState } from "@/app/learn/page";
 import { AppShell } from "@/components/learning-shell";
 import { ProfileShowcase } from "@/components/profile-showcase";
+import { RecoveryState } from "@/components/recovery-state";
 import { SignInRequired } from "@/components/sign-in-required";
 import { fetchProfileStats } from "@/lib/server-api";
 import type { Metadata } from "next";
@@ -24,10 +24,11 @@ export default async function ProfilePage() {
     }
     return (
       <AppShell>
-        <UnavailableState
-          title="Profile is temporarily unavailable"
+        <RecoveryState
+          title="Profile unavailable"
           error={result.error}
           href="/profile"
+          status={result.status}
         />
       </AppShell>
     );

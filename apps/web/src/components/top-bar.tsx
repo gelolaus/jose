@@ -21,12 +21,18 @@ export function TopBar({ courseTitle, streak, hearts, xp }: TopBarProps) {
           </h1>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          <Chip tone="sky" icon={Zap} label={`${xp} XP`} />
-          <Chip tone="coral" icon={Flame} label={`${streak}`} />
+          <Chip tone="sky" icon={Zap} label={`${xp} XP`} accessibleName={`${xp} experience points`} />
+          <Chip
+            tone="coral"
+            icon={Flame}
+            label={`${streak}`}
+            accessibleName={`${streak} day streak`}
+          />
           <Chip
             tone="rose"
             icon={Heart}
             label={`${hearts}`}
+            accessibleName={`${hearts} optional arcade challenge lives`}
             title="Arcade challenge lives (optional)"
           />
         </div>
@@ -39,11 +45,13 @@ function Chip({
   label,
   tone,
   icon: Icon,
+  accessibleName,
   title,
 }: {
   label: string;
   tone: "sky" | "coral" | "rose";
   icon: LucideIcon;
+  accessibleName: string;
   title?: string;
 }) {
   const tones = {
@@ -53,11 +61,13 @@ function Chip({
   };
   return (
     <span
+      role="status"
       title={title}
-      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold tabular-nums sm:px-3.5 sm:py-2 sm:text-base ${tones[tone]}`}
+      aria-label={accessibleName}
+      className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold tabular-nums sm:px-3.5 sm:py-2 sm:text-base ${tones[tone]}`}
     >
       <Icon className="size-4 sm:size-5" strokeWidth={2.25} aria-hidden />
-      {label}
+      <span aria-hidden>{label}</span>
     </span>
   );
 }

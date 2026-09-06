@@ -641,5 +641,5 @@ function errorMessage(error: unknown) {
   if (error instanceof Error && error.name === "ZodError") {
     return "Invalid payload from API";
   }
-  return "Can't reach the Jose API. Is it running on port 3001?";
+  return "Learning content is temporarily unavailable.";
 }

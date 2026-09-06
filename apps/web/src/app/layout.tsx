@@ -1,16 +1,21 @@
 import type { Metadata, Viewport } from "next";
 import { Literata, Source_Sans_3 } from "next/font/google";
 import { ToastProvider } from "@/components/toast";
+import { PreferencesBoot } from "@/components/preferences-boot";
 import "./globals.css";
 
 const sans = Source_Sans_3({
   subsets: ["latin"],
   variable: "--font-jose-sans",
+  display: "swap",
+  preload: true,
 });
 
 const display = Literata({
   subsets: ["latin"],
   variable: "--font-jose-display",
+  display: "swap",
+  preload: true,
 });
 
 export const metadata: Metadata = {
@@ -40,6 +45,7 @@ export default function RootLayout({
       className={`${sans.variable} ${display.variable} h-full`}
     >
       <body className="min-h-full antialiased">
+        <PreferencesBoot />
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

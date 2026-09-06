@@ -1,6 +1,9 @@
 "use client";
 
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import { LessonBlocksView } from "@/components/lesson-blocks-view";
+import { LessonJournalActions } from "@/components/lesson-journal-actions";
+import { ExplanationNote, SourceQuote } from "@/components/source-quote";
 import { YoutubeEmbed } from "@/components/youtube-embed";
 import { completeLevel } from "@/lib/path-api";
 import { emptyLessonEditorial, type LessonContent } from "@jose/shared";
@@ -29,6 +32,7 @@ export function LessonPlayer({
   const [showDeeper, setShowDeeper] = useState(false);
   const editorial = lesson.editorial ?? emptyLessonEditorial();
   const useBlocks = Boolean(lesson.blocks && lesson.blocks.length > 0);
+  const excerptPreview = lesson.markdown.replace(/[#>*_`\[\]]/g, "").slice(0, 180);
 
   async function onContinue() {
     setBusy(true);
@@ -50,9 +54,30 @@ export function LessonPlayer({
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
+      <Breadcrumbs
+        items={[
+          { href: "/learn", label: "Learn" },
+          { href: `/learn/${moduleId}`, label: "Path" },
+          { label: title },
+        ]}
+      />
       <h1 className="font-display text-3xl font-semibold tracking-tight text-[var(--jose-ink)] sm:text-4xl">
         {title}
       </h1>
+      <LessonJournalActions
+        moduleId={moduleId}
+        levelId={levelId}
+        title={title}
+        excerpt={excerptPreview}
+      />
+      <ExplanationNote>
+        Explanations and paraphrases appear in this style. Original historical quotations use the
+        amber source block so source wording stays distinguishable from teaching text.
+      </ExplanationNote>
+      <SourceQuote citation="Preserve original quotations beside any future translation">
+        Curated source excerpts will appear here when authors mark them. Do not auto-translate
+        assessment keys without editorial review.
+      </SourceQuote>
 
       {editorial.objectives.length > 0 ? (
         <section className="rounded-xl border border-[var(--jose-rule)] bg-[var(--jose-wash)] px-4 py-3">

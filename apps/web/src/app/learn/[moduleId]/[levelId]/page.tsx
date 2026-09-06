@@ -1,8 +1,8 @@
-import { UnavailableState } from "@/app/learn/page";
 import { ChestPlayer } from "@/components/chest-player";
 import { GamePlayer } from "@/components/game-player";
 import { AppShell } from "@/components/learning-shell";
 import { LessonPlayer } from "@/components/lesson-player";
+import { RecoveryState } from "@/components/recovery-state";
 import { SignInRequired } from "@/components/sign-in-required";
 import { fetchPlayLevel } from "@/lib/server-api";
 import { ArrowLeft } from "lucide-react";
@@ -37,10 +37,11 @@ export default async function PlayLevelPage({ params }: Props) {
     if (result.status === 404) notFound();
     return (
       <AppShell>
-        <UnavailableState
-          title="Can't load this level"
+        <RecoveryState
+          title="This activity is unavailable"
           error={result.error}
           href={`/learn/${moduleId}`}
+          status={result.status}
         />
       </AppShell>
     );
@@ -58,10 +59,10 @@ export default async function PlayLevelPage({ params }: Props) {
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
             <Link
               href={data.mapHref ?? `/learn/${moduleId}`}
-              className="inline-flex items-center gap-2 rounded-xl bg-stone-100 px-4 py-2 text-sm font-semibold text-stone-700"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-stone-100 px-4 py-2 text-sm font-semibold text-stone-700"
             >
               <ArrowLeft className="size-4" strokeWidth={2.25} aria-hidden />
-              Path
+              Back to path
             </Link>
             <p className="truncate font-display text-lg font-semibold tracking-tight text-[var(--jose-ink)] md:text-xl">
               {data.level.sectionTitle}
