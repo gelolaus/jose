@@ -62,13 +62,19 @@ export function defaultExplorerIdentity(
   };
 }
 
-/** Clears cosmetic/local learner state after logout so the next user cannot see it. */
+/** Clears cosmetic/local learner state after logout so the next user cannot see it.
+ * Account-keyed journal blobs stay on device under `jose.journal.v1:account:*`
+ * so a name change or later sign-in cannot attach another person's notes.
+ * Lesson packs, drafts, and display-name journal blobs still evict.
+ */
 export function clearSensitiveClientState(): void {
   if (typeof window === "undefined") return;
   const keysToRemove: string[] = [];
   for (let i = 0; i < window.localStorage.length; i += 1) {
     const key = window.localStorage.key(i);
-    if (key && (key === EXPLORER_STORAGE_KEY || key.startsWith("jose."))) {
+    if (!key) continue;
+    const keepAccountJournal = key.startsWith("jose.journal.v1:account:");
+    if (key === EXPLORER_STORAGE_KEY || (key.startsWith("jose.") && !keepAccountJournal)) {
       keysToRemove.push(key);
     }
   }

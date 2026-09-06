@@ -1,6 +1,7 @@
 "use client";
 
 import { COVER_COLORS, FieldLabel, TeachTitle } from "@/components/teach-shell";
+import { accessibleColorName, meetsWcagAa } from "@/lib/contrast";
 import { createTeachModuleFromWizard, fetchTeachTemplates } from "@/lib/path-api";
 import type { ModuleTemplateId, ModuleTemplateMeta } from "@jose/shared";
 import { useRouter } from "next/navigation";
@@ -99,7 +100,9 @@ export default function NewModulePage() {
                 <button
                   key={color}
                   type="button"
-                  aria-label={color}
+                  aria-label={`${accessibleColorName(color)}${
+                    meetsWcagAa("#ffffff", color, true) ? "" : " (low contrast with white)"
+                  }`}
                   onClick={() => setCoverColor(color)}
                   className={`size-10 rounded-2xl ring-2 ${
                     coverColor === color ? "ring-slate-800" : "ring-transparent"

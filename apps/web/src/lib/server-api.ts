@@ -9,6 +9,9 @@ import {
   fetchModulePath as baseFetchModulePath,
   fetchModules as baseFetchModules,
   fetchPlayLevel as baseFetchPlayLevel,
+  fetchPracticeReview as baseFetchPracticeReview,
+  fetchPracticePlayLevel as baseFetchPracticePlayLevel,
+  fetchProfileStats as baseFetchProfileStats,
   fetchTeachLevel as baseFetchTeachLevel,
   fetchTeachModule as baseFetchTeachModule,
   fetchTeachModules as baseFetchTeachModules,
@@ -49,6 +52,18 @@ export async function fetchDemoPath() {
 
 export async function fetchPlayLevel(levelId: string) {
   return baseFetchPlayLevel(levelId, await options());
+}
+
+export async function fetchPracticeReview() {
+  return baseFetchPracticeReview(await options());
+}
+
+export async function fetchPracticePlayLevel(levelId: string) {
+  return baseFetchPracticePlayLevel(levelId, await options());
+}
+
+export async function fetchProfileStats() {
+  return baseFetchProfileStats(await options());
 }
 
 export async function fetchTeachModules() {

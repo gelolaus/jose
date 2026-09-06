@@ -1,6 +1,17 @@
+/**
+ * Hearts are **arcade challenge lives** only.
+ * Core path learning and teacher assignments never spend or require hearts.
+ * HEARTS_EMPTY applies only to optional arcade challenge sessions.
+ */
 export const MAX_HEARTS = 5;
 export const HEART_DRIP_MS = 15 * 60 * 1000;
 export const HEARTS_EMPTY_CODE = "HEARTS_EMPTY";
+
+export type PlayEconomyMode = "learning" | "arcade_challenge";
+
+export function heartsAffectPlay(mode: PlayEconomyMode): boolean {
+  return mode === "arcade_challenge";
+}
 
 export function applyHeartDrip(
   hearts: number,

@@ -235,6 +235,8 @@ export const finishAttemptResultSchema = z.object({
   learner: learnerSchema,
   /** True when this response reused a prior finish (idempotent retry). */
   deduplicated: z.boolean(),
+  nextLevelId: z.string().min(1).nullable().optional(),
+  continueHref: z.string().min(1).optional(),
 });
 
 export type FinishAttemptResult = z.infer<typeof finishAttemptResultSchema>;

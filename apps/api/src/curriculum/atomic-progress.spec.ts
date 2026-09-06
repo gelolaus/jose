@@ -160,7 +160,7 @@ describe("atomic progress and economy writes", () => {
     expect(await xpOf()).toBe(before + 20);
   });
 
-  it("does not double-spend hearts when the same miss is retried", async () => {
+  it("does not spend hearts on path misses, including retries", async () => {
     await service.completeLevel("ateneo-welcome", student.learnerId);
     await database.db
       .update(learners)
@@ -171,13 +171,16 @@ describe("atomic progress and economy writes", () => {
     const first = await service.recordMiss("ateneo-quiz", student.learnerId, {
       idempotencyKey: key,
     });
-    expect(first.learner.hearts).toBe(4);
+    expect(first.learner.hearts).toBe(5);
 
     const retry = await service.recordMiss("ateneo-quiz", student.learnerId, {
       idempotencyKey: key,
     });
-    expect(retry.learner.hearts).toBe(4);
-    expect(await heartsOf()).toBe(4);
+    expect(retry.learner.hearts).toBe(5);
+    expect(await heartsOf()).toBe(5);
+
+    const arcade = await service.recordArcadeMiss(student.learnerId);
+    expect(arcade.learner.hearts).toBe(4);
   });
 
   it("rolls back half-created levels when a fault is injected mid-create", async () => {

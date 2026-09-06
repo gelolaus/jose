@@ -10,20 +10,31 @@ type TopBarProps = {
 
 export function TopBar({ courseTitle, streak, hearts, xp }: TopBarProps) {
   return (
-    <header className="border-b border-black/5 bg-white/95 backdrop-blur-md">
+    <header className="border-b border-[var(--jose-rule)] bg-[var(--jose-paper)]/95 backdrop-blur-md">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-violet-500 lg:hidden">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-teal-800 lg:hidden">
             Jose
           </p>
-          <h1 className="truncate font-display text-lg font-semibold leading-tight tracking-tight text-slate-800 sm:text-2xl md:text-3xl">
+          <h1 className="truncate font-display text-lg font-semibold leading-tight tracking-tight text-[var(--jose-ink)] sm:text-2xl md:text-3xl">
             {courseTitle}
           </h1>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          <Chip tone="sky" icon={Zap} label={`${xp} XP`} />
-          <Chip tone="coral" icon={Flame} label={`${streak}`} />
-          <Chip tone="rose" icon={Heart} label={`${hearts}`} />
+          <Chip tone="sky" icon={Zap} label={`${xp} XP`} accessibleName={`${xp} experience points`} />
+          <Chip
+            tone="coral"
+            icon={Flame}
+            label={`${streak}`}
+            accessibleName={`${streak} day streak`}
+          />
+          <Chip
+            tone="rose"
+            icon={Heart}
+            label={`${hearts}`}
+            accessibleName={`${hearts} optional arcade challenge lives`}
+            title="Arcade challenge lives (optional)"
+          />
         </div>
       </div>
     </header>
@@ -34,22 +45,29 @@ function Chip({
   label,
   tone,
   icon: Icon,
+  accessibleName,
+  title,
 }: {
   label: string;
   tone: "sky" | "coral" | "rose";
   icon: LucideIcon;
+  accessibleName: string;
+  title?: string;
 }) {
   const tones = {
-    sky: "bg-sky-100 text-sky-700",
-    coral: "bg-orange-100 text-orange-700",
-    rose: "bg-rose-100 text-rose-700",
+    sky: "bg-cyan-100 text-cyan-900",
+    coral: "bg-orange-100 text-orange-900",
+    rose: "bg-rose-100 text-rose-900",
   };
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-extrabold tabular-nums sm:px-3.5 sm:py-2 sm:text-base ${tones[tone]}`}
+      role="status"
+      title={title}
+      aria-label={accessibleName}
+      className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold tabular-nums sm:px-3.5 sm:py-2 sm:text-base ${tones[tone]}`}
     >
-      <Icon className="size-4 sm:size-5" strokeWidth={2.5} aria-hidden />
-      {label}
+      <Icon className="size-4 sm:size-5" strokeWidth={2.25} aria-hidden />
+      <span aria-hidden>{label}</span>
     </span>
   );
 }
@@ -63,7 +81,7 @@ export function IconBubble({
 }) {
   return (
     <div
-      className={`flex size-28 items-center justify-center rounded-[2rem] bg-white shadow-md ring-1 ring-black/5 md:size-32 ${className}`}
+      className={`flex size-28 items-center justify-center rounded-2xl bg-white shadow-md ring-1 ring-black/5 md:size-32 ${className}`}
     >
       {children}
     </div>

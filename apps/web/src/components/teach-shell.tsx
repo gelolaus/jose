@@ -65,7 +65,8 @@ export function TeachShell({ children }: { children: ReactNode }) {
         <nav className="flex flex-1 flex-col gap-2.5" aria-label="Teacher">
           <Link
             href="/teach"
-            className={`flex items-center gap-3.5 rounded-3xl px-4 py-3.5 text-lg font-extrabold ${
+            aria-current={modulesActive ? "page" : undefined}
+            className={`flex min-h-11 items-center gap-3.5 rounded-3xl px-4 py-3.5 text-lg font-extrabold ${
               modulesActive
                 ? "bg-violet-100 text-violet-700 shadow-sm"
                 : "text-slate-600 hover:bg-slate-50"
@@ -140,9 +141,17 @@ export function TeachTitle({
   );
 }
 
-export function FieldLabel({ children }: { children: ReactNode }) {
+export function FieldLabel({
+  children,
+  htmlFor,
+}: {
+  children: ReactNode;
+  htmlFor?: string;
+}) {
   return (
-    <label className="block text-sm font-extrabold text-slate-600">{children}</label>
+    <label htmlFor={htmlFor} className="block text-sm font-extrabold text-slate-600">
+      {children}
+    </label>
   );
 }
 

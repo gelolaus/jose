@@ -6,7 +6,6 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
   DEMO_LEARNER_ID,
-  HEARTS_EMPTY_CODE,
   modulesResponseSchema,
   pathResponseSchema,
   type SessionUser,
@@ -101,7 +100,7 @@ describe("CurriculumService", () => {
     await expect(service.deleteModule("rizal")).rejects.toThrow(/cannot be archived/i);
   });
 
-  it("spends a heart on a miss and refills after a lesson", async () => {
+  it("records path misses for practice without spending hearts or locking the game", async () => {
     await service.completeLevel("ateneo-welcome", student.learnerId);
     await database.db
       .update(learners)
@@ -112,31 +111,25 @@ describe("CurriculumService", () => {
       idempotencyKey: `miss-${randomUUID()}`,
     });
     const afterMiss = await service.getLearner(student.learnerId);
-    expect(afterMiss.hearts).toBe(before.hearts - 1);
+    expect(afterMiss.hearts).toBe(before.hearts);
 
     await database.db
       .update(learners)
       .set({ hearts: 1, heartsUpdatedAt: Date.now() })
       .where(eq(learners.id, student.learnerId));
     await service.completeLevel("childhood-born", student.learnerId);
-    expect((await service.getLearner(student.learnerId)).hearts).toBe(5);
+    expect((await service.getLearner(student.learnerId)).hearts).toBe(1);
   });
 
-  it("blocks starting a game at zero hearts", async () => {
+  it("still lets a student start a path game at zero hearts", async () => {
     await service.completeLevel("ateneo-welcome", student.learnerId);
     await database.db
       .update(learners)
       .set({ hearts: 0, heartsUpdatedAt: Date.now() })
       .where(eq(learners.id, student.learnerId));
-    try {
-      await service.getPlayLevel("ateneo-quiz", student.learnerId);
-      throw new Error("expected HEARTS_EMPTY");
-    } catch (error) {
-      expect(error).toBeInstanceOf(HttpException);
-      expect((error as HttpException).getResponse()).toMatchObject({
-        code: HEARTS_EMPTY_CODE,
-      });
-    }
+    const play = await service.getPlayLevel("ateneo-quiz", student.learnerId);
+    expect(play.level.kind).toBe("game");
+    expect(play.nextLevelId).toBeTruthy();
     await database.db
       .update(learners)
       .set({ hearts: 5, heartsUpdatedAt: Date.now() })

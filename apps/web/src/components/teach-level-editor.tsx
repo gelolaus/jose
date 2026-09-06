@@ -97,9 +97,10 @@ function TitleForm({
         void onSave(value);
       }}
     >
-      <FieldLabel>Level title</FieldLabel>
+      <FieldLabel htmlFor="level-title">Level title</FieldLabel>
       <div className="flex gap-2">
         <input
+          id="level-title"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           className="flex-1 rounded-2xl bg-white px-4 py-3 font-bold ring-1 ring-black/10"
@@ -134,15 +135,17 @@ function LessonForm({
         void onSave({ markdown: md, youtubeUrl });
       }}
     >
-      <FieldLabel>Markdown</FieldLabel>
+      <FieldLabel htmlFor="lesson-markdown">Markdown</FieldLabel>
       <textarea
+        id="lesson-markdown"
         value={md}
         onChange={(e) => setMd(e.target.value)}
         rows={16}
         className="w-full rounded-2xl bg-white px-4 py-3 font-mono text-sm ring-1 ring-black/10"
       />
-      <FieldLabel>YouTube URL (optional)</FieldLabel>
+      <FieldLabel htmlFor="lesson-youtube">YouTube URL (optional)</FieldLabel>
       <input
+        id="lesson-youtube"
         value={youtubeUrl}
         onChange={(e) => setYoutubeUrl(e.target.value)}
         placeholder="https://www.youtube.com/watch?v=…"

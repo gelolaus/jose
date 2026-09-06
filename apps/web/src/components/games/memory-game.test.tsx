@@ -21,8 +21,19 @@ function play() {
   return { onMiss, onFinish };
 }
 
+/** Deck order with Math.random mocked to 0.999: 0-a, 0-b, 1-a, 1-b */
+const cardIndex: Record<string, number> = {
+  "0-a": 0,
+  "0-b": 1,
+  "1-a": 2,
+  "1-b": 3,
+};
+
 function tap(id: string) {
-  fireEvent.click(screen.getByRole("button", { name: `Card ${id}` }));
+  const buttons = screen.getAllByRole("button");
+  const index = cardIndex[id];
+  if (index === undefined) throw new Error(`unknown card ${id}`);
+  fireEvent.click(buttons[index]!);
 }
 
 describe("MemoryGame play", () => {
@@ -35,6 +46,13 @@ describe("MemoryGame play", () => {
     cleanup();
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it("announces revealed card content for screen readers", () => {
+    play();
+    tap("0-a");
+    expect(screen.getByRole("button", { name: "Revealed: Paris" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Hidden card" })).toHaveLength(3);
   });
 
   it("does not spend a heart on a mismatch", async () => {

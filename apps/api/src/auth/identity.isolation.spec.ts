@@ -97,6 +97,8 @@ describe("Per-account learner isolation (issue #3)", () => {
       alice.learnerId,
     );
 
+    await curriculum.recordArcadeMiss(alice.learnerId);
+
     const aliceAfter = await curriculum.getLearner(alice.learnerId);
     const bobAfter = await curriculum.getLearner(bob.learnerId);
     expect(aliceAfter.xp).toBeGreaterThan(bobAfter.xp);
