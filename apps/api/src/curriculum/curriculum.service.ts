@@ -252,23 +252,22 @@ export class CurriculumService {
       .select()
       .from(modules)
       .orderBy(desc(modules.featured), asc(modules.sortOrder));
+    const collaboratorModuleIds =
+      user.role === "admin"
+        ? null
+        : new Set(
+            (
+              await this.db
+                .select({ moduleId: moduleCollaborators.moduleId })
+                .from(moduleCollaborators)
+                .where(eq(moduleCollaborators.userId, user.id))
+            ).map((row) => row.moduleId),
+          );
     const result: TeachModule[] = [];
     for (const row of rows) {
       if (user.role !== "admin") {
         const isOwner = row.ownerUserId != null && row.ownerUserId === user.id;
-        if (!isOwner) {
-          const [grant] = await this.db
-            .select()
-            .from(moduleCollaborators)
-            .where(
-              and(
-                eq(moduleCollaborators.moduleId, row.id),
-                eq(moduleCollaborators.userId, user.id),
-              ),
-            )
-            .limit(1);
-          if (!grant) continue;
-        }
+        if (!isOwner && !collaboratorModuleIds?.has(row.id)) continue;
       }
       result.push(await this.toTeachModule(row));
     }

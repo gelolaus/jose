@@ -59,7 +59,10 @@ export async function requestMailboxCode(email?: string): Promise<
   if (!res.ok) {
     throw new Error(json.message ?? "Could not send verification code");
   }
-  return json;
+  return {
+    ...pendingAdmissionStatusSchema.parse(json),
+    devCode: typeof json.devCode === "string" ? json.devCode : undefined,
+  };
 }
 
 export async function verifyMailboxCode(

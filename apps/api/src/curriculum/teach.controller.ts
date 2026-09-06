@@ -74,7 +74,9 @@ export class TeachController {
     await this.authorization.assertCanManageCollaborators(user, id);
     const parsed = grantCollaboratorBodySchema.safeParse(body);
     if (!parsed.success) {
-      throw new BadRequestException("email is required");
+      throw new BadRequestException(
+        parsed.error.issues.map((issue) => issue.message).join("; ") || "Invalid body",
+      );
     }
     const collaborator = await this.users.findByAdmissionEmail(parsed.data.email);
     if (!collaborator) {

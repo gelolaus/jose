@@ -21,9 +21,9 @@ import {
 export async function serverCookieHeader(): Promise<string | undefined> {
   try {
     const store = await cookies();
-    const all = store.getAll();
-    if (all.length === 0) return undefined;
-    return all.map((c) => `${c.name}=${c.value}`).join("; ");
+    const session = store.get("jose_session");
+    if (!session) return undefined;
+    return `${session.name}=${session.value}`;
   } catch {
     // Outside a request scope (static prerender) there is nothing to forward.
     return undefined;
