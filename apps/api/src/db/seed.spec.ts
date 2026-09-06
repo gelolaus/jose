@@ -49,16 +49,18 @@ describe("explicit versioned seeding", () => {
       const first = await applyPendingSeeds(opened.db, { includeDemo: true });
       expect(first).toEqual([
         { id: SEED_IDS.curriculum, status: "applied" },
+        { id: SEED_IDS.gameRelease, status: "applied" },
         { id: SEED_IDS.demoLearner, status: "applied" },
       ]);
       const second = await applyPendingSeeds(opened.db, { includeDemo: true });
       expect(second).toEqual([
         { id: SEED_IDS.curriculum, status: "skipped" },
+        { id: SEED_IDS.gameRelease, status: "skipped" },
         { id: SEED_IDS.demoLearner, status: "skipped" },
       ]);
       const history = await opened.db.select().from(seedHistory);
       expect(history.map((row) => row.id).sort()).toEqual(
-        [SEED_IDS.curriculum, SEED_IDS.demoLearner].sort(),
+        [SEED_IDS.curriculum, SEED_IDS.gameRelease, SEED_IDS.demoLearner].sort(),
       );
     } finally {
       closeAndRemove(opened);
