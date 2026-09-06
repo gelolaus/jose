@@ -263,12 +263,96 @@ export const migration005AuthoringStudio: Migration = {
   },
 };
 
+/** Published snapshots, archive/trash, and classroom tables. Does not create users. */
+export const migration006ContentClassroom: Migration = {
+  id: "006_content_classroom",
+  async up(client) {
+    await client.execute("PRAGMA foreign_keys = ON");
+    await ensureColumn(client, "modules", "objectives", "TEXT");
+    await ensureColumn(client, "modules", "author_reviewed_at", "INTEGER");
+    await ensureColumn(client, "modules", "published_revision_id", "TEXT");
+    await ensureColumn(client, "modules", "archived_at", "INTEGER");
+    await ensureColumn(client, "modules", "trashed_at", "INTEGER");
+    await ensureColumn(client, "modules", "status", "TEXT");
+    await ensureColumn(client, "sections", "archived_at", "INTEGER");
+    await ensureColumn(client, "levels", "archived_at", "INTEGER");
+    await ensureColumn(client, "learner_progress", "published_revision_id", "TEXT");
+    await ensureColumn(client, "attempts", "published_revision_id", "TEXT");
+    const statements = [
+      `CREATE TABLE IF NOT EXISTS module_revisions (
+        id TEXT PRIMARY KEY,
+        module_id TEXT NOT NULL REFERENCES modules(id),
+        revision_number INTEGER NOT NULL,
+        snapshot_json TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        created_by TEXT NOT NULL,
+        published_at INTEGER,
+        note TEXT
+      )`,
+      `CREATE TABLE IF NOT EXISTS content_audit (
+        id TEXT PRIMARY KEY,
+        module_id TEXT NOT NULL,
+        actor_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        detail_json TEXT,
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS classes (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        teacher_id TEXT NOT NULL,
+        invite_code_hash TEXT NOT NULL,
+        invite_code_hint TEXT NOT NULL,
+        invite_failures INTEGER NOT NULL DEFAULT 0,
+        invite_locked_until INTEGER,
+        archived_at INTEGER,
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS class_members (
+        class_id TEXT NOT NULL REFERENCES classes(id),
+        learner_id TEXT NOT NULL REFERENCES learners(id),
+        joined_at INTEGER NOT NULL,
+        archived_at INTEGER,
+        PRIMARY KEY (class_id, learner_id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS assignments (
+        id TEXT PRIMARY KEY,
+        class_id TEXT NOT NULL REFERENCES classes(id),
+        module_id TEXT NOT NULL REFERENCES modules(id),
+        content_revision_id TEXT NOT NULL REFERENCES module_revisions(id),
+        due_at INTEGER,
+        assigned_at INTEGER NOT NULL,
+        archived_at INTEGER
+      )`,
+      `CREATE TABLE IF NOT EXISTS invite_attempts (
+        id TEXT PRIMARY KEY,
+        actor_id TEXT NOT NULL,
+        invite_code_hash TEXT NOT NULL,
+        success INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_module_revisions_module
+        ON module_revisions (module_id, revision_number)`,
+      `CREATE INDEX IF NOT EXISTS idx_content_audit_module
+        ON content_audit (module_id, created_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_classes_teacher
+        ON classes (teacher_id, created_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_assignments_class
+        ON assignments (class_id, assigned_at)`,
+    ];
+    for (const sql of statements) {
+      await client.execute(sql);
+    }
+  },
+};
+
 export const MIGRATIONS: Migration[] = [
   migration001InitialSchema,
   migration002QueryIndexes,
   migration003IdentityAndAuth,
   migration004AssessmentAttempts,
   migration005AuthoringStudio,
+  migration006ContentClassroom,
 ];
 
 export async function ensureColumn(

@@ -15,6 +15,8 @@ import {
   duplicateTeachLevel,
   duplicateTeachModule,
   duplicateTeachSection,
+  extractPublishReadiness,
+  fetchPublishReadiness,
   fetchTeachLevel,
   fetchTeachModule,
   importTeachQuestions,
@@ -22,14 +24,17 @@ import {
   patchTeachLevel,
   patchTeachModule,
   patchTeachSection,
+  publishTeachModule,
   putTeachGame,
   putTeachLesson,
+  unpublishTeachModule,
 } from "@/lib/path-api";
 import type {
   GameContent,
   GameType,
   LessonBlocks,
   ModuleTemplateId,
+  PublishIssue,
   TeachLevelDetail,
   TeachModuleDetail,
 } from "@jose/shared";
@@ -78,6 +83,7 @@ export function TeachModuleWorkspace({
   );
   const [pane, setPane] = useState<Pane>("edit");
   const [error, setError] = useState<string | null>(null);
+  const [publishIssues, setPublishIssues] = useState<PublishIssue[]>([]);
   const [opError, setOpError] = useState<Record<string, string>>({});
   const [level, setLevel] = useState<TeachLevelDetail | null>(null);
   const [levelLoading, setLevelLoading] = useState(false);
@@ -192,6 +198,12 @@ export function TeachModuleWorkspace({
               onChange={setMod}
               setError={setError}
               pending={pending}
+              issues={publishIssues}
+              onIssues={setPublishIssues}
+              onJumpToLevel={(levelId) => {
+                setSelection({ type: "level", levelId });
+                setPane("edit");
+              }}
             />
           ) : null}
           {selection.type === "section" ? (
@@ -233,6 +245,29 @@ export function TeachModuleWorkspace({
             Preview / validation
           </p>
           <ul className="mt-3 space-y-2">
+            {publishIssues.map((issue) => (
+              <li key={`${issue.code}-${issue.path}`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (issue.levelId) {
+                      setSelection({ type: "level", levelId: issue.levelId });
+                      setPane("edit");
+                    } else {
+                      setSelection({ type: "module" });
+                      setPane("edit");
+                    }
+                  }}
+                  className={`w-full rounded-xl px-3 py-2 text-left text-sm font-semibold ring-1 ${
+                    issue.severity === "blocker"
+                      ? "bg-rose-50 text-rose-800 ring-rose-100"
+                      : "bg-amber-50 text-amber-900 ring-amber-100"
+                  }`}
+                >
+                  {issue.message}
+                </button>
+              </li>
+            ))}
             {validation.map((item) => (
               <li
                 key={item}
@@ -654,19 +689,26 @@ function ModuleEditorPane({
   onChange,
   setError,
   pending,
+  issues,
+  onIssues,
+  onJumpToLevel,
 }: {
   mod: TeachModuleDetail;
   onChange: (mod: TeachModuleDetail) => void;
   setError: (value: string | null) => void;
   pending: PendingMap;
+  issues: PublishIssue[];
+  onIssues: (issues: PublishIssue[]) => void;
+  onJumpToLevel: (levelId: string) => void;
 }) {
   const [title, setTitle] = useState(mod.title);
   const [subtitle, setSubtitle] = useState(mod.subtitle);
   const [coverColor, setCoverColor] = useState(mod.coverColor);
+  const [objectives, setObjectives] = useState(mod.objectives ?? "");
 
   const draft = useMemo(
-    () => ({ title, subtitle, coverColor }),
-    [title, subtitle, coverColor],
+    () => ({ title, subtitle, coverColor, objectives: objectives.trim() || null }),
+    [title, subtitle, coverColor, objectives],
   );
 
   const autosave = useDraftAutosave({
@@ -695,6 +737,9 @@ function ModuleEditorPane({
             setTitle(recovered.title);
             setSubtitle(recovered.subtitle);
             setCoverColor(recovered.coverColor);
+            if ("objectives" in recovered) {
+              setObjectives(recovered.objectives ?? "");
+            }
           }}
           onDiscard={() => autosave.discardRecovery()}
         />
@@ -710,6 +755,14 @@ function ModuleEditorPane({
         value={subtitle}
         onChange={(e) => setSubtitle(e.target.value)}
         className="w-full rounded-2xl bg-white px-4 py-3 font-bold ring-1 ring-black/10"
+      />
+      <FieldLabel>Chapter objectives</FieldLabel>
+      <textarea
+        value={objectives}
+        onChange={(e) => setObjectives(e.target.value)}
+        rows={3}
+        className="w-full rounded-2xl bg-white px-4 py-3 font-bold ring-1 ring-black/10"
+        placeholder="What should students understand after this module?"
       />
       <div className="flex flex-wrap gap-2">
         {COVER_COLORS.map((color) => (
@@ -737,20 +790,61 @@ function ModuleEditorPane({
           type="button"
           disabled={pending.isPending("publish")}
           onClick={async () => {
-            const result = await pending.run("publish", () =>
-              patchTeachModule(mod.id, {
-                published: !mod.published,
-                expectedRevision: mod.revision,
-              }),
-            );
-            if (result.ok) onChange(result.data);
-            else setError(result.error);
+            if (mod.published) {
+              const result = await pending.run("publish", () => unpublishTeachModule(mod.id));
+              if (result.ok) {
+                onChange(result.data);
+                onIssues([]);
+              } else setError(result.error);
+              return;
+            }
+            const result = await pending.run("publish", async () => {
+              const published = await publishTeachModule(mod.id);
+              return published.module;
+            });
+            if (result.ok) {
+              onChange(result.data);
+              onIssues([]);
+            } else {
+              setError(result.error);
+              const readiness = extractPublishReadiness(
+                // pending.run wraps Error messages; re-fetch readiness for field links
+                new Error(result.error),
+              );
+              if (readiness) {
+                onIssues([...readiness.blockers, ...readiness.warnings]);
+              } else {
+                try {
+                  const checked = await fetchPublishReadiness(mod.id);
+                  onIssues([...checked.blockers, ...checked.warnings]);
+                } catch {
+                  onIssues([]);
+                }
+              }
+            }
           }}
           className="rounded-full bg-teal-100 px-4 py-2 text-sm font-extrabold text-teal-900 disabled:opacity-50"
         >
           {mod.published ? "Unpublish" : "Publish"}
         </button>
       </div>
+      {issues.length > 0 ? (
+        <ul className="space-y-2">
+          {issues.map((issue) => (
+            <li key={`${issue.code}-${issue.path}`}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (issue.levelId) onJumpToLevel(issue.levelId);
+                }}
+                className="w-full rounded-xl bg-rose-50 px-3 py-2 text-left text-sm font-semibold text-rose-800"
+              >
+                {issue.message}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -1236,8 +1330,8 @@ function validateModule(mod: TeachModuleDetail, level: TeachLevelDetail | null) 
     const empty = !(level.lesson.blocks?.length || level.lesson.markdown.trim());
     if (empty) notes.push("Current lesson is empty");
   }
-  if (mod.published) notes.push("Published — edits still save to the live module until revisions land");
-  else notes.push("Draft — publish when lesson + quiz are ready");
+  if (mod.published) notes.push("Published — students stay on the frozen revision; drafts stay private");
+  else notes.push("Draft — publish runs the quality checklist before students see this");
   if (notes.length === 0) notes.push("Looks ready to playtest");
   return notes;
 }

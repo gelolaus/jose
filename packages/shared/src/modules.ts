@@ -48,6 +48,7 @@ export const playLevelResponseSchema = z.object({
   game: assessmentGameSchema.optional(),
   attempt: attemptInfoSchema.optional(),
   chest: z.object({ message: z.string().min(1) }).optional(),
+  contentRevisionId: z.string().min(1).nullable().optional(),
 });
 
 /** Legacy client-scored posts are rejected. */
@@ -57,6 +58,7 @@ export const attemptBodySchema = z
     maxScore: z.number().int().nonnegative().optional(),
     payload: z.unknown().optional(),
     clientAttemptId: z.string().trim().min(1).max(128).optional(),
+    contentRevisionId: z.string().min(1).optional(),
   })
   .superRefine((body, ctx) => {
     if (body.score !== undefined || body.maxScore !== undefined) {

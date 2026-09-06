@@ -8,6 +8,9 @@ import {
   modulesResponseSchema,
   pathResponseSchema,
   playLevelResponseSchema,
+  publishReadinessSchema,
+  studentAssignmentSchema,
+  classSummarySchema,
   teachAssetSchema,
   teachLevelDetailSchema,
   teachModuleDetailSchema,
@@ -19,6 +22,7 @@ import {
   type ModuleTemplateId,
   type PathResponse,
   type PlayLevelResponse,
+  type PublishReadiness,
   type TeachAsset,
   type TeachLevelDetail,
   type TeachModule,
@@ -80,6 +84,7 @@ async function apiFetch(
       res.status,
       extractApiCode(json),
       extractCurrentRevision(json),
+      json,
     );
   }
   return json;
@@ -91,10 +96,25 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code?: string,
     readonly currentRevision?: number,
+    readonly payload?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
   }
+}
+
+export function extractPublishReadiness(error: unknown): PublishReadiness | null {
+  if (!(error instanceof ApiError) || error.payload == null) return null;
+  const payload = error.payload;
+  if (typeof payload !== "object") return null;
+  const record = payload as { readiness?: unknown; message?: unknown };
+  const candidate =
+    record.readiness ??
+    (record.message && typeof record.message === "object"
+      ? (record.message as { readiness?: unknown }).readiness
+      : undefined);
+  const parsed = publishReadinessSchema.safeParse(candidate);
+  return parsed.success ? parsed.data : null;
 }
 
 export function isNotFoundError(error: unknown): boolean {
@@ -371,12 +391,63 @@ export async function duplicateTeachLevel(id: string, title?: string) {
   return teachLevelDetailSchema.parse(json);
 }
 
-export async function moveTeachLevel(id: string, direction: "up" | "down") {
+export async function moveTeachLevel(
+  id: string,
+  body: { direction?: "up" | "down"; targetSectionId?: string; index?: number } | "up" | "down",
+) {
+  const payload = typeof body === "string" ? { direction: body } : body;
   const json = await apiFetch(`/teach/levels/${id}/move`, {
     method: "POST",
-    body: JSON.stringify({ direction }),
+    body: JSON.stringify(payload),
   });
   return teachModuleDetailSchema.parse(json);
+}
+
+export async function moveTeachSection(
+  id: string,
+  body: { direction?: "up" | "down"; index?: number },
+) {
+  const json = await apiFetch(`/teach/sections/${id}/move`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return teachModuleDetailSchema.parse(json);
+}
+
+export async function fetchPublishReadiness(id: string): Promise<PublishReadiness> {
+  const json = await apiFetch(`/teach/modules/${id}/readiness`);
+  return publishReadinessSchema.parse(json);
+}
+
+export async function publishTeachModule(id: string) {
+  const json = await apiFetch(`/teach/modules/${id}/publish`, {
+    method: "POST",
+    body: JSON.stringify({ authorReviewed: true }),
+  });
+  return json as { module: TeachModuleDetail };
+}
+
+export async function unpublishTeachModule(id: string): Promise<TeachModuleDetail> {
+  const json = await apiFetch(`/teach/modules/${id}/unpublish`, {
+    method: "POST",
+    body: "{}",
+  });
+  return teachModuleDetailSchema.parse(json);
+}
+
+export async function restoreTeachModule(id: string): Promise<TeachModuleDetail> {
+  const json = await apiFetch(`/teach/modules/${id}/restore`, { method: "POST", body: "{}" });
+  return teachModuleDetailSchema.parse(json);
+}
+
+export async function fetchMyAssignments() {
+  const json = await apiFetch("/assignments/mine");
+  return studentAssignmentSchema.array().parse(json);
+}
+
+export async function fetchTeachClasses(options?: ApiCallOptions) {
+  const json = await apiFetch("/teach/classes", undefined, options);
+  return classSummarySchema.array().parse(json);
 }
 
 export async function putTeachLesson(

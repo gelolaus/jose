@@ -69,13 +69,67 @@ export class TeachController {
     @Body() body: unknown,
   ) {
     await this.authorization.assertCanAccessModule(user, id);
-    return this.curriculum.patchModule(id, body);
+    return this.curriculum.patchModule(id, body, user);
   }
 
   @Delete("modules/:id")
   async remove(@CurrentUser() user: SessionUser, @Param("id") id: string) {
     await this.authorization.assertCanAccessModule(user, id);
-    return this.curriculum.deleteModule(id);
+    return this.curriculum.deleteModule(id, user);
+  }
+
+  @Post("modules/:id/restore")
+  async restore(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    await this.authorization.assertCanAccessModule(user, id);
+    return this.curriculum.restoreModule(id, user);
+  }
+
+  @Post("modules/:id/permanent-delete")
+  async permanentDelete(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    await this.authorization.assertCanAccessModule(user, id);
+    return this.curriculum.permanentDeleteModule(id, body, user);
+  }
+
+  @Get("modules/:id/readiness")
+  async readiness(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    await this.authorization.assertCanAccessModule(user, id);
+    return this.curriculum.getPublishReadiness(id);
+  }
+
+  @Post("modules/:id/publish")
+  async publish(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    await this.authorization.assertCanAccessModule(user, id);
+    return this.curriculum.publishModule(id, body, user);
+  }
+
+  @Post("modules/:id/unpublish")
+  async unpublish(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    await this.authorization.assertCanAccessModule(user, id);
+    return this.curriculum.unpublishModule(id, user);
+  }
+
+  @Get("modules/:id/revisions")
+  async revisions(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    await this.authorization.assertCanAccessModule(user, id);
+    return this.curriculum.listRevisions(id);
+  }
+
+  @Post("modules/:id/revisions/:revisionId/rollback")
+  async rollback(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Param("revisionId") revisionId: string,
+  ) {
+    await this.authorization.assertCanAccessModule(user, id);
+    return this.curriculum.rollbackModule(id, revisionId, user);
   }
 
   @Post("modules/:id/collaborators")
@@ -184,7 +238,18 @@ export class TeachController {
   async deleteSection(@CurrentUser() user: SessionUser, @Param("id") id: string) {
     const section = await this.curriculum.requireSectionPublic(id);
     await this.authorization.assertCanAccessModule(user, section.moduleId);
-    return this.curriculum.deleteSection(id);
+    return this.curriculum.deleteSection(id, user);
+  }
+
+  @Post("sections/:id/move")
+  async moveSection(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const section = await this.curriculum.requireSectionPublic(id);
+    await this.authorization.assertCanAccessModule(user, section.moduleId);
+    return this.curriculum.moveSection(id, body, user);
   }
 
   @Post("sections/:id/duplicate")
@@ -231,7 +296,7 @@ export class TeachController {
   async deleteLevel(@CurrentUser() user: SessionUser, @Param("id") id: string) {
     const moduleId = await this.curriculum.moduleIdForLevel(id);
     await this.authorization.assertCanAccessModule(user, moduleId);
-    return this.curriculum.deleteLevel(id);
+    return this.curriculum.deleteLevel(id, user);
   }
 
   @Post("levels/:id/duplicate")
@@ -253,7 +318,19 @@ export class TeachController {
   ) {
     const moduleId = await this.curriculum.moduleIdForLevel(id);
     await this.authorization.assertCanAccessModule(user, moduleId);
-    return this.curriculum.moveLevel(id, body);
+    return this.curriculum.moveLevel(id, body, user);
+  }
+
+  @Post("levels/bulk-move")
+  async bulkMove(@CurrentUser() user: SessionUser, @Body() body: unknown) {
+    const parsed = body as { levelIds?: string[] };
+    const firstId = parsed?.levelIds?.[0];
+    if (!firstId) {
+      return this.curriculum.bulkMoveLevels(body, user);
+    }
+    const moduleId = await this.curriculum.moduleIdForLevel(firstId);
+    await this.authorization.assertCanAccessModule(user, moduleId);
+    return this.curriculum.bulkMoveLevels(body, user);
   }
 
   @Put("levels/:id/lesson")

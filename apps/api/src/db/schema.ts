@@ -35,6 +35,34 @@ export const modules = sqliteTable("modules", {
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
   revision: integer("revision").notNull().default(0),
+  objectives: text("objectives"),
+  authorReviewedAt: integer("author_reviewed_at"),
+  publishedRevisionId: text("published_revision_id"),
+  archivedAt: integer("archived_at"),
+  trashedAt: integer("trashed_at"),
+  status: text("status"),
+});
+
+export const moduleRevisions = sqliteTable("module_revisions", {
+  id: text("id").primaryKey(),
+  moduleId: text("module_id")
+    .notNull()
+    .references(() => modules.id),
+  revisionNumber: integer("revision_number").notNull(),
+  snapshotJson: text("snapshot_json").notNull(),
+  createdAt: integer("created_at").notNull(),
+  createdBy: text("created_by").notNull(),
+  publishedAt: integer("published_at"),
+  note: text("note"),
+});
+
+export const contentAudit = sqliteTable("content_audit", {
+  id: text("id").primaryKey(),
+  moduleId: text("module_id").notNull(),
+  actorId: text("actor_id").notNull(),
+  action: text("action").notNull(),
+  detailJson: text("detail_json"),
+  createdAt: integer("created_at").notNull(),
 });
 
 /** Explicit per-module edit grants. Owning a module is never implied by role or domain. */
@@ -66,6 +94,7 @@ export const sections = sqliteTable("sections", {
   subtitle: text("subtitle").notNull(),
   themeColor: text("theme_color").notNull(),
   sortOrder: integer("sort_order").notNull(),
+  archivedAt: integer("archived_at"),
 });
 
 export const levels = sqliteTable("levels", {
@@ -78,6 +107,7 @@ export const levels = sqliteTable("levels", {
   gameType: text("game_type"),
   sortOrder: integer("sort_order").notNull(),
   revision: integer("revision").notNull().default(0),
+  archivedAt: integer("archived_at"),
 });
 
 export const lessonContent = sqliteTable("lesson_content", {
@@ -120,6 +150,7 @@ export const learnerProgress = sqliteTable(
       .notNull()
       .references(() => levels.id, { onDelete: "cascade" }),
     completedAt: integer("completed_at").notNull(),
+    publishedRevisionId: text("published_revision_id"),
   },
   (table) => ({
     pk: primaryKey({ columns: [table.learnerId, table.levelId] }),
@@ -135,6 +166,7 @@ export const attempts = sqliteTable("attempts", {
     .notNull()
     .references(() => levels.id, { onDelete: "cascade" }),
   contentRevision: text("content_revision").notNull().default(""),
+  publishedRevisionId: text("published_revision_id"),
   mode: text("mode").notNull().default("assessment"),
   status: text("status").notNull().default("finished"),
   clientAttemptId: text("client_attempt_id"),
@@ -248,5 +280,58 @@ export const mailboxVerifications = sqliteTable("mailbox_verifications", {
   expiresAt: integer("expires_at").notNull(),
   lastSentAt: integer("last_sent_at").notNull(),
   consumedAt: integer("consumed_at"),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const classes = sqliteTable("classes", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  teacherId: text("teacher_id").notNull(),
+  inviteCodeHash: text("invite_code_hash").notNull(),
+  inviteCodeHint: text("invite_code_hint").notNull(),
+  inviteFailures: integer("invite_failures").notNull().default(0),
+  inviteLockedUntil: integer("invite_locked_until"),
+  archivedAt: integer("archived_at"),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const classMembers = sqliteTable(
+  "class_members",
+  {
+    classId: text("class_id")
+      .notNull()
+      .references(() => classes.id),
+    learnerId: text("learner_id")
+      .notNull()
+      .references(() => learners.id),
+    joinedAt: integer("joined_at").notNull(),
+    archivedAt: integer("archived_at"),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.classId, table.learnerId] }),
+  }),
+);
+
+export const assignments = sqliteTable("assignments", {
+  id: text("id").primaryKey(),
+  classId: text("class_id")
+    .notNull()
+    .references(() => classes.id),
+  moduleId: text("module_id")
+    .notNull()
+    .references(() => modules.id),
+  contentRevisionId: text("content_revision_id")
+    .notNull()
+    .references(() => moduleRevisions.id),
+  dueAt: integer("due_at"),
+  assignedAt: integer("assigned_at").notNull(),
+  archivedAt: integer("archived_at"),
+});
+
+export const inviteAttempts = sqliteTable("invite_attempts", {
+  id: text("id").primaryKey(),
+  actorId: text("actor_id").notNull(),
+  inviteCodeHash: text("invite_code_hash").notNull(),
+  success: integer("success", { mode: "boolean" }).notNull(),
   createdAt: integer("created_at").notNull(),
 });

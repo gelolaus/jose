@@ -16,7 +16,7 @@ import { AppModule } from "../app.module";
 import { CurriculumService } from "./curriculum.service";
 import { DatabaseService } from "../db/database.service";
 import { applyPendingSeeds } from "../db/seed";
-import { attempts, gameContent, learnerProgress, learners, modules } from "../db/schema";
+import { attempts, gameContent, learnerProgress, learners, moduleRevisions, modules } from "../db/schema";
 import { createTestAccount, type TestAccount } from "../auth/test-session.helper";
 
 function teacherUser(account: TestAccount): SessionUser {
@@ -97,8 +97,8 @@ describe("CurriculumService", () => {
     expect(JSON.stringify(play.game)).not.toMatch(/correctIndex/);
   });
 
-  it("refuses to delete the featured module", async () => {
-    await expect(service.deleteModule("rizal")).rejects.toThrow(/cannot be deleted/i);
+  it("refuses to archive the featured module", async () => {
+    await expect(service.deleteModule("rizal")).rejects.toThrow(/cannot be archived/i);
   });
 
   it("spends a heart on a miss and refills after a lesson", async () => {
@@ -420,6 +420,27 @@ describe("authoritative assessment", () => {
       .update(gameContent)
       .set({ json: JSON.stringify(parsed) })
       .where(eq(gameContent.levelId, "ateneo-quiz"));
+    const [mod] = await database.db.select().from(modules).where(eq(modules.id, "ateneo-days"));
+    if (mod?.publishedRevisionId) {
+      const [revision] = await database.db
+        .select()
+        .from(moduleRevisions)
+        .where(eq(moduleRevisions.id, mod.publishedRevisionId));
+      if (revision) {
+        const snapshot = JSON.parse(revision.snapshotJson) as {
+          sections: Array<{ levels: Array<{ id: string; game?: unknown }> }>;
+        };
+        for (const section of snapshot.sections) {
+          for (const level of section.levels) {
+            if (level.id === "ateneo-quiz") level.game = parsed;
+          }
+        }
+        await database.db
+          .update(moduleRevisions)
+          .set({ snapshotJson: JSON.stringify(snapshot) })
+          .where(eq(moduleRevisions.id, revision.id));
+      }
+    }
     try {
       await service.finishAttempt(
         play.attempt!.id,

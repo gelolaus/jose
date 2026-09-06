@@ -12,6 +12,7 @@ import {
   fetchTeachLevel as baseFetchTeachLevel,
   fetchTeachModule as baseFetchTeachModule,
   fetchTeachModules as baseFetchTeachModules,
+  fetchTeachClasses as baseFetchTeachClasses,
 } from "./path-api";
 
 /**
@@ -52,6 +53,10 @@ export async function fetchPlayLevel(levelId: string) {
 
 export async function fetchTeachModules() {
   return baseFetchTeachModules(await options());
+}
+
+export async function fetchTeachClasses() {
+  return baseFetchTeachClasses(await options());
 }
 
 export async function fetchTeachModule(id: string) {

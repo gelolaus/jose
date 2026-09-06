@@ -12,3 +12,6 @@ export * from "./teach";
 export * from "./auth";
 export * from "./pagination";
 export * from "./limits";
+export * from "./publish";
+export * from "./classroom";
+export * from "./revisions";
