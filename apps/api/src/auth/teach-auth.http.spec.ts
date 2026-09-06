@@ -7,6 +7,7 @@ import request from "supertest";
 import { eq } from "drizzle-orm";
 import { AppModule } from "../app.module";
 import { DatabaseService } from "../db/database.service";
+import { applyPendingSeeds } from "../db/seed";
 import { modules, users } from "../db/schema";
 import { SESSION_COOKIE } from "./crypto.util";
 import { createTestAccount, type TestAccount } from "./test-session.helper";
@@ -50,6 +51,7 @@ describe("Teacher studio authorization over HTTP (issues #3 and #4)", () => {
     app = moduleRef.createNestApplication();
     await app.init();
     database = moduleRef.get(DatabaseService);
+    await applyPendingSeeds(database.db);
 
     student = await createTestAccount(database, {
       admissionEmail: "student@student.apc.edu.ph",

@@ -71,7 +71,10 @@ describe("TimelineGame play", () => {
     tapEvent("Teodora teaches");
     tapStop(2);
     fireEvent.click(screen.getByRole("button", { name: "Check" }));
-    expect(onFinish).toHaveBeenCalledWith(2, 3, 1);
+    expect(onFinish).toHaveBeenCalledWith(2, 3, 1, {
+      type: "timeline",
+      order: ["a", "b", "c"],
+    });
   });
 
   it("keeps an event selected after pointerdown plus click", () => {

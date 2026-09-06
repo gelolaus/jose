@@ -1,5 +1,5 @@
 import { DEMO_LEARNER_ID, emptyGameContent, type GameContent } from "@jose/shared";
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { JoseDb } from "./database.service";
 import {
   gameContent,
@@ -9,7 +9,22 @@ import {
   levels,
   modules,
   sections,
+  seedHistory,
 } from "./schema";
+
+export const SEED_IDS = {
+  curriculum: "curriculum@1",
+  demoLearner: "demo-learner@1",
+} as const;
+
+export type ApplySeedsOptions = {
+  includeDemo?: boolean;
+};
+
+export type SeedApplyResult = {
+  id: string;
+  status: "applied" | "skipped";
+};
 
 const now = 1_724_000_000_000;
 
@@ -418,272 +433,124 @@ function game(
   };
 }
 
-export async function seedIfEmpty(db: JoseDb) {
-  const existing = await db.select({ id: modules.id }).from(modules).limit(1);
-  if (existing.length === 0) {
-    // Demo profile only. No seeded users, and never a seeded admin.
-    await db.insert(learners).values({
-      id: DEMO_LEARNER_ID,
-      userId: null,
-      displayName: "Explorer",
-      avatarId: "compass",
-      streak: 3,
-      hearts: 5,
-      heartsUpdatedAt: now,
-      xp: 120,
-    });
-
-    await insertModule(db, {
-      id: "rizal",
-      title: "Work and Life of Rizal",
-      subtitle: "From Calamba to Bagumbayan",
-      coverColor: "#A855F7",
-      sortOrder: 0,
-      published: true,
-      featured: true,
-      sections: [
-        {
-          id: "childhood",
-          title: "Childhood",
-          subtitle: "Calamba beginnings",
-          themeColor: "#A855F7",
-          levels: [
-            lesson("childhood-born", "Born in Calamba"),
-            lesson("childhood-family", "The Mercado family"),
-            lesson("childhood-stories", "Stories from Teodora"),
-            game("childhood-timeline", "Put the years in order", CHILDHOOD_TIMELINE),
-            { id: "childhood-chest", title: "Childhood treasure", kind: "chest" },
-          ],
-        },
-        {
-          id: "education",
-          title: "Education",
-          subtitle: "Biñan to Madrid",
-          themeColor: "#22C55E",
-          levels: [
-            lesson("edu-binan", "School in Biñan"),
-            lesson("edu-ateneo", "Ateneo Municipal"),
-            lesson("edu-ust", "University of Santo Tomas"),
-            lesson("edu-madrid", "Studies in Madrid"),
-            game("edu-quiz", "School check", EDUCATION_QUIZ),
-          ],
-        },
-        {
-          id: "travels",
-          title: "Travels",
-          subtitle: "Europe and beyond",
-          themeColor: "#38BDF8",
-          levels: [
-            lesson("travel-paris", "Paris days"),
-            lesson("travel-germany", "Germany & science"),
-            game("travel-memory", "Match the cities", TRAVELS_MEMORY),
-            { id: "travel-chest", title: "Traveler's chest", kind: "chest" },
-          ],
-        },
-        {
-          id: "novels",
-          title: "Noli & Fili",
-          subtitle: "Novels and reform",
-          themeColor: "#F97316",
-          levels: [
-            lesson("noli", "Noli Me Tangere"),
-            lesson("fili", "El Filibusterismo"),
-            lesson("reform", "La Liga Filipina"),
-            game("novels-sort", "Which novel?", NOVELS_SORT),
-          ],
-        },
-        {
-          id: "martyrdom",
-          title: "Martyrdom",
-          subtitle: "Trial and Bagumbayan",
-          themeColor: "#EF4444",
-          levels: [
-            lesson("arrest", "Arrest & trial"),
-            lesson("mi-ultimo", "Mi Último Adiós"),
-            lesson("bagumbayan", "Bagumbayan"),
-            game("martyrdom-blank", "Finish the farewell", MARTYRDOM_BLANK),
-            { id: "legacy-chest", title: "Legacy chest", kind: "chest" },
-          ],
-        },
-      ],
-    });
-
-    await insertModule(db, {
-      id: "ateneo-days",
-      title: "Ateneo days",
-      subtitle: "A deep dive into school life",
-      coverColor: "#22C55E",
-      sortOrder: 1,
-      published: true,
-      featured: false,
-      sections: [
-        {
-          id: "ateneo-days-main",
-          title: "Ateneo Municipal",
-          subtitle: "Grades, friends, and first poems",
-          themeColor: "#22C55E",
-          levels: [
-            {
-              id: "ateneo-welcome",
-              title: "Life at Ateneo",
-              kind: "lesson",
-              markdown: `## Life at Ateneo
-
-Rizal entered the **Ateneo Municipal de Manila** in 1872. Jesuit teachers ran a strict but lively school.
-
-He boarded in Manila, wrote poems for school programs, and finished as one of the top students. This module stays here on purpose — the big Life of Rizal path only gets a short stop.
-
-### What to notice
-
-- He was not only a reader. He drew, sculpted, and fenced.
-- Awards like *Sobresaliente* were public. Standing in class mattered.
-- School friends and Jesuit mentors show up again in later letters.`,
-            },
-            game("ateneo-quiz", "Ateneo quiz", ATENEO_QUIZ),
-            game("ateneo-match", "Match the school words", ATENEO_MEMORY),
-            game("ateneo-timeline", "Ateneo years", ATENEO_TIMELINE),
-            game("ateneo-blank", "Fill the school facts", ATENEO_BLANK),
-            game("ateneo-sort", "This school or later?", ATENEO_SORT),
-          ],
-        },
-      ],
-    });
-
-    const completed = [
-      "childhood-born",
-      "childhood-family",
-      "childhood-stories",
-      "childhood-chest",
-      "edu-binan",
-    ];
-    await db.insert(learnerProgress).values(
-      completed.map((levelId) => ({
-        learnerId: DEMO_LEARNER_ID,
-        levelId,
-        completedAt: now,
-      })),
+/**
+ * Applies pending versioned seeds. Already-recorded seeds are skipped, so
+ * editorial deletions survive restarts and re-runs of the seed command.
+ */
+export async function applyPendingSeeds(
+  db: JoseDb,
+  options: ApplySeedsOptions = {},
+): Promise<SeedApplyResult[]> {
+  const results: SeedApplyResult[] = [];
+  results.push(
+    await applySeedOnce(db, SEED_IDS.curriculum, () => seedCurriculumV1(db)),
+  );
+  if (options.includeDemo) {
+    results.push(
+      await applySeedOnce(db, SEED_IDS.demoLearner, () => seedDemoLearnerV1(db)),
     );
   }
-
-  await ensureSeededGames(db);
-  await ensureAteneoDays(db);
+  return results;
 }
 
-const EXTRAS: {
-  id: string;
-  sectionId: string;
-  afterId: string;
-  title: string;
-  game: GameContent;
-}[] = [
-  {
-    id: "childhood-timeline",
-    sectionId: "childhood",
-    afterId: "childhood-stories",
-    title: "Put the years in order",
-    game: CHILDHOOD_TIMELINE,
-  },
-  {
-    id: "edu-quiz",
-    sectionId: "education",
-    afterId: "edu-madrid",
-    title: "School check",
-    game: EDUCATION_QUIZ,
-  },
-  {
-    id: "travel-memory",
-    sectionId: "travels",
-    afterId: "travel-germany",
-    title: "Match the cities",
-    game: TRAVELS_MEMORY,
-  },
-  {
-    id: "novels-sort",
-    sectionId: "novels",
-    afterId: "reform",
-    title: "Which novel?",
-    game: NOVELS_SORT,
-  },
-  {
-    id: "martyrdom-blank",
-    sectionId: "martyrdom",
-    afterId: "bagumbayan",
-    title: "Finish the farewell",
-    game: MARTYRDOM_BLANK,
-  },
-  {
-    id: "ateneo-timeline",
-    sectionId: "ateneo-days-main",
-    afterId: "ateneo-match",
-    title: "Ateneo years",
-    game: ATENEO_TIMELINE,
-  },
-  {
-    id: "ateneo-blank",
-    sectionId: "ateneo-days-main",
-    afterId: "ateneo-timeline",
-    title: "Fill the school facts",
-    game: ATENEO_BLANK,
-  },
-  {
-    id: "ateneo-sort",
-    sectionId: "ateneo-days-main",
-    afterId: "ateneo-blank",
-    title: "This school or later?",
-    game: ATENEO_SORT,
-  },
-];
-
-async function ensureSeededGames(db: JoseDb) {
-  for (const extra of EXTRAS) {
-    const [exists] = await db
-      .select({ id: levels.id })
-      .from(levels)
-      .where(eq(levels.id, extra.id))
-      .limit(1);
-    if (exists) continue;
-    const [anchor] = await db
-      .select()
-      .from(levels)
-      .where(eq(levels.id, extra.afterId))
-      .limit(1);
-    if (!anchor) continue;
-    const insertAt = anchor.sortOrder + 1;
-    const later = await db
-      .select()
-      .from(levels)
-      .where(
-        and(eq(levels.sectionId, extra.sectionId), gte(levels.sortOrder, insertAt)),
-      );
-    for (const row of later) {
-      await db
-        .update(levels)
-        .set({ sortOrder: row.sortOrder + 1 })
-        .where(eq(levels.id, row.id));
-    }
-    await db.insert(levels).values({
-      id: extra.id,
-      sectionId: extra.sectionId,
-      title: extra.title,
-      kind: "game",
-      gameType: extra.game.type,
-      sortOrder: insertAt,
-    });
-    await db.insert(gameContent).values({
-      levelId: extra.id,
-      json: JSON.stringify(extra.game),
-    });
-  }
-}
-
-async function ensureAteneoDays(db: JoseDb) {
-  const [exists] = await db
-    .select({ id: modules.id })
-    .from(modules)
-    .where(eq(modules.id, "ateneo-days"))
+async function applySeedOnce(
+  db: JoseDb,
+  id: string,
+  run: () => Promise<void>,
+): Promise<SeedApplyResult> {
+  const [existing] = await db
+    .select({ id: seedHistory.id })
+    .from(seedHistory)
+    .where(eq(seedHistory.id, id))
     .limit(1);
-  if (exists) return;
-  await insertModule(db, {
+  if (existing) {
+    return { id, status: "skipped" };
+  }
+  await run();
+  await db.insert(seedHistory).values({
+    id,
+    appliedAt: Date.now(),
+  });
+  return { id, status: "applied" };
+}
+
+async function seedCurriculumV1(db: JoseDb) {
+  await insertModuleIfMissing(db, {
+    id: "rizal",
+    title: "Work and Life of Rizal",
+    subtitle: "From Calamba to Bagumbayan",
+    coverColor: "#A855F7",
+    sortOrder: 0,
+    published: true,
+    featured: true,
+    sections: [
+      {
+        id: "childhood",
+        title: "Childhood",
+        subtitle: "Calamba beginnings",
+        themeColor: "#A855F7",
+        levels: [
+          lesson("childhood-born", "Born in Calamba"),
+          lesson("childhood-family", "The Mercado family"),
+          lesson("childhood-stories", "Stories from Teodora"),
+          game("childhood-timeline", "Put the years in order", CHILDHOOD_TIMELINE),
+          { id: "childhood-chest", title: "Childhood treasure", kind: "chest" },
+        ],
+      },
+      {
+        id: "education",
+        title: "Education",
+        subtitle: "Biñan to Madrid",
+        themeColor: "#22C55E",
+        levels: [
+          lesson("edu-binan", "School in Biñan"),
+          lesson("edu-ateneo", "Ateneo Municipal"),
+          lesson("edu-ust", "University of Santo Tomas"),
+          lesson("edu-madrid", "Studies in Madrid"),
+          game("edu-quiz", "School check", EDUCATION_QUIZ),
+        ],
+      },
+      {
+        id: "travels",
+        title: "Travels",
+        subtitle: "Europe and beyond",
+        themeColor: "#38BDF8",
+        levels: [
+          lesson("travel-paris", "Paris days"),
+          lesson("travel-germany", "Germany & science"),
+          game("travel-memory", "Match the cities", TRAVELS_MEMORY),
+          { id: "travel-chest", title: "Traveler's chest", kind: "chest" },
+        ],
+      },
+      {
+        id: "novels",
+        title: "Noli & Fili",
+        subtitle: "Novels and reform",
+        themeColor: "#F97316",
+        levels: [
+          lesson("noli", "Noli Me Tangere"),
+          lesson("fili", "El Filibusterismo"),
+          lesson("reform", "La Liga Filipina"),
+          game("novels-sort", "Which novel?", NOVELS_SORT),
+        ],
+      },
+      {
+        id: "martyrdom",
+        title: "Martyrdom",
+        subtitle: "Trial and Bagumbayan",
+        themeColor: "#EF4444",
+        levels: [
+          lesson("arrest", "Arrest & trial"),
+          lesson("mi-ultimo", "Mi Último Adiós"),
+          lesson("bagumbayan", "Bagumbayan"),
+          game("martyrdom-blank", "Finish the farewell", MARTYRDOM_BLANK),
+          { id: "legacy-chest", title: "Legacy chest", kind: "chest" },
+        ],
+      },
+    ],
+  });
+
+  await insertModuleIfMissing(db, {
     id: "ateneo-days",
     title: "Ateneo days",
     subtitle: "A deep dive into school life",
@@ -725,7 +592,59 @@ He boarded in Manila, wrote poems for school programs, and finished as one of th
   });
 }
 
-async function insertModule(
+async function seedDemoLearnerV1(db: JoseDb) {
+  const [existing] = await db
+    .select({ id: learners.id })
+    .from(learners)
+    .where(eq(learners.id, DEMO_LEARNER_ID))
+    .limit(1);
+  if (!existing) {
+    await db.insert(learners).values({
+      id: DEMO_LEARNER_ID,
+      userId: null,
+      displayName: "Explorer",
+      avatarId: "compass",
+      streak: 3,
+      hearts: 5,
+      heartsUpdatedAt: now,
+      xp: 120,
+    });
+  }
+
+  const completed = [
+    "childhood-born",
+    "childhood-family",
+    "childhood-stories",
+    "childhood-chest",
+    "edu-binan",
+  ];
+  for (const levelId of completed) {
+    const [already] = await db
+      .select()
+      .from(learnerProgress)
+      .where(
+        and(
+          eq(learnerProgress.learnerId, DEMO_LEARNER_ID),
+          eq(learnerProgress.levelId, levelId),
+        ),
+      )
+      .limit(1);
+    if (already) continue;
+    const [levelExists] = await db
+      .select({ id: levels.id })
+      .from(levels)
+      .where(eq(levels.id, levelId))
+      .limit(1);
+    if (!levelExists) continue;
+    await db.insert(learnerProgress).values({
+      learnerId: DEMO_LEARNER_ID,
+      levelId,
+      completedAt: now,
+    });
+  }
+}
+
+async function insertModuleIfMissing(
   db: JoseDb,
   input: {
     id: string;
@@ -744,51 +663,68 @@ async function insertModule(
     }[];
   },
 ) {
-  await db.insert(modules).values({
-    id: input.id,
-    title: input.title,
-    subtitle: input.subtitle,
-    coverColor: input.coverColor,
-    sortOrder: input.sortOrder,
-    published: input.published,
-    featured: input.featured,
-    // Seeded curriculum has no owner; only admins can edit it.
-    ownerUserId: null,
-    createdAt: now,
-    updatedAt: now,
-  });
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(modules)
+      .values({
+        id: input.id,
+        title: input.title,
+        subtitle: input.subtitle,
+        coverColor: input.coverColor,
+        sortOrder: input.sortOrder,
+        published: input.published,
+        featured: input.featured,
+        // Seeded curriculum has no owner; only admins can edit it.
+        ownerUserId: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoNothing();
 
-  for (const [sIndex, section] of input.sections.entries()) {
-    await db.insert(sections).values({
-      id: section.id,
-      moduleId: input.id,
-      title: section.title,
-      subtitle: section.subtitle,
-      themeColor: section.themeColor,
-      sortOrder: sIndex,
-    });
-    for (const [lIndex, level] of section.levels.entries()) {
-      await db.insert(levels).values({
-        id: level.id,
-        sectionId: section.id,
-        title: level.title,
-        kind: level.kind,
-        gameType: level.gameType ?? null,
-        sortOrder: lIndex,
-      });
-      if (level.kind === "lesson") {
-        await db.insert(lessonContent).values({
-          levelId: level.id,
-          markdown: level.markdown ?? `## ${level.title}`,
-          youtubeVideoId: null,
-        });
-      }
-      if (level.kind === "game") {
-        const json = JSON.stringify(
-          level.game ?? emptyGameContent(level.gameType ?? "quiz"),
-        );
-        await db.insert(gameContent).values({ levelId: level.id, json });
+    for (const [sIndex, section] of input.sections.entries()) {
+      await tx
+        .insert(sections)
+        .values({
+          id: section.id,
+          moduleId: input.id,
+          title: section.title,
+          subtitle: section.subtitle,
+          themeColor: section.themeColor,
+          sortOrder: sIndex,
+        })
+        .onConflictDoNothing();
+      for (const [lIndex, level] of section.levels.entries()) {
+        await tx
+          .insert(levels)
+          .values({
+            id: level.id,
+            sectionId: section.id,
+            title: level.title,
+            kind: level.kind,
+            gameType: level.gameType ?? null,
+            sortOrder: lIndex,
+          })
+          .onConflictDoNothing();
+        if (level.kind === "lesson") {
+          await tx
+            .insert(lessonContent)
+            .values({
+              levelId: level.id,
+              markdown: level.markdown ?? `## ${level.title}`,
+              youtubeVideoId: null,
+            })
+            .onConflictDoNothing();
+        }
+        if (level.kind === "game") {
+          const json = JSON.stringify(
+            level.game ?? emptyGameContent(level.gameType ?? "quiz"),
+          );
+          await tx
+            .insert(gameContent)
+            .values({ levelId: level.id, json })
+            .onConflictDoNothing();
+        }
       }
     }
-  }
+  });
 }

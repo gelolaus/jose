@@ -31,7 +31,14 @@ sign-in, and without `JOSE_AUTH_MODE` there is no way to sign in at all.
 - API: http://localhost:3001/health  
 - Teacher studio: Profile → Teacher studio, or http://localhost:3000/teach  
 
-The API creates `apps/api/data/jose.sqlite` and seeds **Work and Life of Rizal** plus the **Ateneo days** deep dive on first boot.
+The API creates `apps/api/data/jose.sqlite` on first boot but does **not** insert curriculum or demo progress automatically. After a fresh database (or deploy), seed explicitly:
+
+```bash
+npm run db:seed                 # curriculum@1 only — honest empty learner stats
+npm run db:seed -- --demo       # also apply demo-learner@1 (local shared Explorer only)
+```
+
+Re-running the seed command skips already-applied versions, so deleting a seeded extra or the Ateneo module survives restart. `JOSE_DEMO_MODE` never invents XP for a signed-in student; production refuses to boot with it enabled.
 
 ## Accounts and sign-in
 

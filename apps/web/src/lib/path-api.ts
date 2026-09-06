@@ -1,4 +1,7 @@
 import {
+  evaluateEventResultSchema,
+  finishAttemptResultSchema,
+  missBodySchema,
   missResponseSchema,
   modulesResponseSchema,
   pathResponseSchema,
@@ -6,6 +9,8 @@ import {
   teachLevelDetailSchema,
   teachModuleDetailSchema,
   teachModuleSchema,
+  type FinishAnswers,
+  type FinishAttemptResult,
   type ModulesResponse,
   type PathResponse,
   type PlayLevelResponse,
@@ -160,22 +165,34 @@ export async function completeLevel(levelId: string) {
   return apiFetch(`/levels/${levelId}/complete`, { method: "POST", body: "{}" });
 }
 
-export async function recordMiss(levelId: string) {
+export async function recordMiss(levelId: string, idempotencyKey: string) {
   const json = await apiFetch(`/levels/${levelId}/miss`, {
     method: "POST",
-    body: "{}",
+    body: JSON.stringify(missBodySchema.parse({ idempotencyKey })),
   });
   return missResponseSchema.parse(json);
 }
 
-export async function submitAttempt(
-  levelId: string,
-  body: { score: number; maxScore: number; payload?: unknown },
+export async function evaluateAttempt(
+  attemptId: string,
+  body: import("@jose/shared").AttemptEvent,
 ) {
-  return apiFetch(`/levels/${levelId}/attempts`, {
+  const json = await apiFetch(`/attempts/${attemptId}/events`, {
     method: "POST",
     body: JSON.stringify(body),
   });
+  return evaluateEventResultSchema.parse(json);
+}
+
+export async function finishAttempt(
+  attemptId: string,
+  body: { answers: FinishAnswers; clientAttemptId?: string },
+): Promise<FinishAttemptResult> {
+  const json = await apiFetch(`/attempts/${attemptId}/finish`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return finishAttemptResultSchema.parse(json);
 }
 
 export async function grantTeachCollaborator(moduleId: string, email: string) {

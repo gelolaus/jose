@@ -65,10 +65,29 @@ const STATEMENTS = [
     id TEXT PRIMARY KEY,
     learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
     level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+    content_revision TEXT NOT NULL DEFAULT '',
+    mode TEXT NOT NULL DEFAULT 'assessment',
+    status TEXT NOT NULL DEFAULT 'finished',
+    client_attempt_id TEXT,
     score INTEGER NOT NULL,
     max_score INTEGER NOT NULL,
+    stars INTEGER,
     payload TEXT,
-    created_at INTEGER NOT NULL
+    secret_json TEXT,
+    events_json TEXT,
+    created_at INTEGER NOT NULL,
+    finished_at INTEGER
+  )`,
+  `CREATE TABLE IF NOT EXISTS miss_receipts (
+    learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+    idempotency_key TEXT NOT NULL,
+    level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (learner_id, idempotency_key)
+  )`,
+  `CREATE TABLE IF NOT EXISTS seed_history (
+    id TEXT PRIMARY KEY,
+    applied_at INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
@@ -138,6 +157,8 @@ const STATEMENTS = [
 
 export async function ensureSchema(client: Client) {
   await client.execute("PRAGMA foreign_keys = ON");
+  await client.execute("PRAGMA journal_mode = WAL");
+  await client.execute("PRAGMA busy_timeout = 5000");
   for (const sql of STATEMENTS) {
     await client.execute(sql);
   }
@@ -167,6 +188,21 @@ export async function ensureSchema(client: Client) {
     "learners_user_id",
     `CREATE UNIQUE INDEX IF NOT EXISTS learners_user_id ON learners(user_id)
       WHERE user_id IS NOT NULL`,
+  );
+  await ensureColumn(client, "attempts", "content_revision", "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(client, "attempts", "mode", "TEXT NOT NULL DEFAULT 'assessment'");
+  await ensureColumn(client, "attempts", "status", "TEXT NOT NULL DEFAULT 'finished'");
+  await ensureColumn(client, "attempts", "client_attempt_id", "TEXT");
+  await ensureColumn(client, "attempts", "stars", "INTEGER");
+  await ensureColumn(client, "attempts", "secret_json", "TEXT");
+  await ensureColumn(client, "attempts", "events_json", "TEXT");
+  await ensureColumn(client, "attempts", "finished_at", "INTEGER");
+  await ensureIndex(
+    client,
+    "attempts_learner_client_attempt",
+    `CREATE UNIQUE INDEX IF NOT EXISTS attempts_learner_client_attempt
+      ON attempts(learner_id, client_attempt_id)
+      WHERE client_attempt_id IS NOT NULL`,
   );
 }
 

@@ -1,10 +1,17 @@
 "use client";
 
-import type { BlankGame as BlankContent } from "@jose/shared";
+import type { AssessmentBlank, BlankGame as BlankContent } from "@jose/shared";
 import { shuffledCopy } from "@jose/shared";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { PlayBoardProps } from "./play-types";
+
+type BlankPlayContent = BlankContent | AssessmentBlank;
+
+function isAuthorBlank(game: BlankPlayContent): game is BlankContent {
+  const item = game.items[0];
+  return Boolean(item && "answer" in item);
+}
 
 export function BlankGame({
   game,
@@ -12,18 +19,27 @@ export function BlankGame({
   disabled = false,
   onMiss,
   onFinish,
+  onEvaluate,
   onChange,
 }: {
-  game: BlankContent;
+  game: BlankPlayContent;
   mode?: "play" | "build";
   disabled?: boolean;
   onChange?: (game: BlankContent) => void;
 } & Partial<PlayBoardProps>) {
-  if (mode === "build" && onChange) {
+  if (mode === "build" && onChange && isAuthorBlank(game)) {
     return <BlankBuild game={game} onChange={onChange} />;
   }
   if (!onMiss || !onFinish) return null;
-  return <BlankPlay game={game} disabled={disabled} onMiss={onMiss} onFinish={onFinish} />;
+  return (
+    <BlankPlay
+      game={game}
+      disabled={disabled}
+      onMiss={onMiss}
+      onFinish={onFinish}
+      onEvaluate={onEvaluate}
+    />
+  );
 }
 
 function BlankPlay({
@@ -31,47 +47,93 @@ function BlankPlay({
   disabled,
   onMiss,
   onFinish,
-}: { game: BlankContent } & PlayBoardProps) {
+  onEvaluate,
+}: { game: BlankPlayContent } & PlayBoardProps) {
+  const author = isAuthorBlank(game);
   const [banks, setBanks] = useState(() =>
-    game.items.map((item) => [item.answer, ...item.decoys]),
+    game.items.map((item) =>
+      author && "answer" in item
+        ? [item.answer, ...item.decoys]
+        : "options" in item
+          ? [...item.options]
+          : [],
+    ),
   );
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setBanks(
-        game.items.map((item) =>
-          shuffledCopy([item.answer, ...item.decoys]),
-        ),
+        game.items.map((item) => {
+          if (author && "answer" in item) {
+            return shuffledCopy([item.answer, ...item.decoys]);
+          }
+          if ("options" in item) return shuffledCopy([...item.options]);
+          return [];
+        }),
       );
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [game.items]);
+  }, [game.items, author]);
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
+  const [wasCorrect, setWasCorrect] = useState(false);
   const missesRef = useRef(0);
+  const wordsRef = useRef<string[]>([]);
   const item = game.items[index]!;
   const last = index === game.items.length - 1;
 
   async function choose(word: string) {
     if (disabled || picked) return;
-    const right = word.trim().toLowerCase() === item.answer.trim().toLowerCase();
     setPicked(word);
+
+    if (onEvaluate) {
+      const result = await onEvaluate({
+        type: "blank_choice",
+        itemIndex: index,
+        word,
+      });
+      wordsRef.current[index] = word;
+      setWasCorrect(result.correct);
+      if (result.correct) return;
+      missesRef.current += 1;
+      if (result.feedback) {
+        const miss = await onMiss(result.feedback);
+        if (miss === "empty") return;
+      } else {
+        await onMiss(null);
+      }
+      return;
+    }
+
+    if (!author || !("answer" in item)) return;
+    const right = word.trim().toLowerCase() === item.answer.trim().toLowerCase();
+    wordsRef.current[index] = word;
+    setWasCorrect(right);
     if (right) return;
-    const result = await onMiss({
+    const miss = await onMiss({
       title: item.answer,
       body: item.why?.trim() || `The missing word is ${item.answer}.`,
     });
     missesRef.current += 1;
-    if (result === "empty") return;
+    if (miss === "empty") return;
   }
 
   function next() {
     if (!picked) return;
     if (last) {
-      onFinish(game.items.length - missesRef.current, game.items.length, missesRef.current);
+      onFinish(
+        game.items.length - missesRef.current,
+        game.items.length,
+        missesRef.current,
+        {
+          type: "blank",
+          words: game.items.map((_, i) => wordsRef.current[i] ?? ""),
+        },
+      );
       return;
     }
     setIndex((i) => i + 1);
     setPicked(null);
+    setWasCorrect(false);
   }
 
   const filled = picked ?? "_____";
@@ -90,11 +152,11 @@ function BlankPlay({
       <div className="flex flex-wrap gap-2">
         {banks[index]!.map((word) => {
           const on = picked === word;
-          const right = word.trim().toLowerCase() === item.answer.trim().toLowerCase();
+          const right = Boolean(picked) && wasCorrect && on;
+          const wrong = Boolean(picked) && !wasCorrect && on;
           let tone = "bg-white text-slate-800 ring-black/10";
-          if (picked && on && right) tone = "bg-emerald-100 text-emerald-900 ring-emerald-300";
-          else if (picked && on && !right) tone = "bg-rose-100 text-rose-800 ring-rose-300";
-          else if (picked && right) tone = "bg-emerald-50 text-emerald-800 ring-emerald-200";
+          if (right) tone = "bg-emerald-100 text-emerald-900 ring-emerald-300";
+          else if (wrong) tone = "bg-rose-100 text-rose-800 ring-rose-300";
           return (
             <button
               key={word}

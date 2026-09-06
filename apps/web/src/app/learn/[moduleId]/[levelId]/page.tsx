@@ -91,12 +91,15 @@ export default async function PlayLevelPage({ params }: Props) {
           lesson={data.lesson}
         />
       ) : null}
-      {data.level.kind === "game" && data.game ? (
+      {data.level.kind === "game" && data.game && data.attempt ? (
         <GamePlayer
+          key={data.learner.id}
           levelId={levelId}
           moduleId={moduleId}
           title={data.level.title}
           game={data.game}
+          attempt={data.attempt}
+          accountId={data.learner.id}
           hearts={data.learner.hearts}
         />
       ) : null}

@@ -4,7 +4,10 @@ import type { WhyPayload } from "./play-types";
 type SortItem = SortGame["items"][number];
 type Placed = Record<string, string>;
 
-export function allChipsPlaced(items: SortItem[], placed: Placed): boolean {
+export function allChipsPlaced(
+  items: { id: string }[],
+  placed: Placed,
+): boolean {
   return items.every((item) => Boolean(placed[item.id]));
 }
 

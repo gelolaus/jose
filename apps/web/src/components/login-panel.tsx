@@ -10,6 +10,7 @@ import {
   logoutJose,
   microsoftStartUrl,
 } from "@/lib/auth-api";
+import { clearSensitiveClientState } from "@/lib/explorer-identity";
 
 type Props = {
   reason?: string;
@@ -96,6 +97,7 @@ export function LoginPanel({ reason, signedIn }: Props) {
                 onClick={() => {
                   startTransition(async () => {
                     await logoutJose();
+                    clearSensitiveClientState();
                     setUserLabel(null);
                     router.refresh();
                   });

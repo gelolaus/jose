@@ -1,9 +1,18 @@
 "use client";
 
-import type { QuizGame as QuizContent } from "@jose/shared";
+import type { AssessmentQuiz, QuizGame as QuizContent } from "@jose/shared";
 import { Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import type { PlayBoardProps } from "./play-types";
+
+type QuizPlayContent =
+  | QuizContent
+  | AssessmentQuiz;
+
+function isAuthorQuiz(game: QuizPlayContent): game is QuizContent {
+  const q = game.questions[0];
+  return Boolean(q && "correctIndex" in q);
+}
 
 export function QuizGame({
   game,
@@ -11,18 +20,27 @@ export function QuizGame({
   disabled = false,
   onMiss,
   onFinish,
+  onEvaluate,
   onChange,
 }: {
-  game: QuizContent;
+  game: QuizPlayContent;
   mode?: "play" | "build";
   disabled?: boolean;
   onChange?: (game: QuizContent) => void;
 } & Partial<PlayBoardProps>) {
-  if (mode === "build" && onChange) {
+  if (mode === "build" && onChange && isAuthorQuiz(game)) {
     return <QuizBuild game={game} onChange={onChange} />;
   }
   if (!onMiss || !onFinish) return null;
-  return <QuizPlay game={game} disabled={disabled} onMiss={onMiss} onFinish={onFinish} />;
+  return (
+    <QuizPlay
+      game={game}
+      disabled={disabled}
+      onMiss={onMiss}
+      onFinish={onFinish}
+      onEvaluate={onEvaluate}
+    />
+  );
 }
 
 function QuizPlay({
@@ -30,39 +48,78 @@ function QuizPlay({
   disabled,
   onMiss,
   onFinish,
-}: { game: QuizContent } & PlayBoardProps) {
+  onEvaluate,
+}: { game: QuizPlayContent } & PlayBoardProps) {
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
+  const [revealedCorrect, setRevealedCorrect] = useState<number | null>(null);
   const missesRef = useRef(0);
+  const choicesRef = useRef<number[]>([]);
   const question = game.questions[index]!;
   const last = index === game.questions.length - 1;
+  const author = isAuthorQuiz(game);
 
   async function choose(choiceIndex: number) {
     if (picked !== null || disabled) return;
-    const right = choiceIndex === question.correctIndex;
     setPicked(choiceIndex);
-    if (right) return;
-    const correct = question.choices[question.correctIndex]!;
-    const result = await onMiss({
+
+    if (onEvaluate) {
+      const result = await onEvaluate({
+        type: "quiz_choice",
+        questionIndex: index,
+        choiceIndex,
+      });
+      choicesRef.current[index] = choiceIndex;
+      if (result.correct) {
+        setRevealedCorrect(choiceIndex);
+        return;
+      }
+      missesRef.current += 1;
+      if (result.feedback) {
+        const miss = await onMiss(result.feedback);
+        if (miss === "empty") return;
+      } else {
+        await onMiss(null);
+      }
+      return;
+    }
+
+    if (!isAuthorQuiz(game)) return;
+    const authored = game.questions[index]!;
+    const right = choiceIndex === authored.correctIndex;
+    choicesRef.current[index] = choiceIndex;
+    if (right) {
+      setRevealedCorrect(authored.correctIndex);
+      return;
+    }
+    const correct = authored.choices[authored.correctIndex]!;
+    const miss = await onMiss({
       title: correct,
-      body: question.why?.trim() || `The right answer is ${correct}.`,
+      body: authored.why?.trim() || `The right answer is ${correct}.`,
     });
     missesRef.current += 1;
-    if (result === "empty") return;
+    setRevealedCorrect(authored.correctIndex);
+    if (miss === "empty") return;
   }
 
   function next() {
     if (picked === null) return;
     if (last) {
+      const answers = {
+        type: "quiz" as const,
+        choices: game.questions.map((_, i) => choicesRef.current[i] ?? -1),
+      };
       onFinish(
         game.questions.length - missesRef.current,
         game.questions.length,
         missesRef.current,
+        answers,
       );
       return;
     }
     setIndex((i) => i + 1);
     setPicked(null);
+    setRevealedCorrect(null);
   }
 
   return (
@@ -78,7 +135,7 @@ function QuizPlay({
       <ul className="space-y-2.5">
         {question.choices.map((choice, i) => {
           const selected = picked === i;
-          const right = i === question.correctIndex;
+          const right = revealedCorrect !== null && i === revealedCorrect;
           let tone = "bg-white ring-black/10 hover:bg-violet-50 node-3d";
           if (picked !== null && selected && right) tone = "bg-emerald-100 ring-emerald-300";
           else if (picked !== null && selected && !right) tone = "bg-rose-100 ring-rose-300 snap-back";
@@ -118,121 +175,96 @@ function QuizBuild({
   game: QuizContent;
   onChange: (game: QuizContent) => void;
 }) {
-  const [index, setIndex] = useState(0);
-  const question = game.questions[index]!;
+  const questions = game.questions;
 
-  function patch(next: typeof question) {
-    const questions = [...game.questions];
-    questions[index] = next;
-    onChange({ ...game, questions });
+  function patch(next: QuizContent["questions"][number], index: number) {
+    const copy = [...questions];
+    copy[index] = next;
+    onChange({ ...game, questions: copy });
   }
 
   return (
     <div className="space-y-4">
-      <p className="text-sm font-semibold text-slate-500">
-        Write the prompt on the stage. Tap the correct choice. Add a why for misses.
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {game.questions.map((_, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => setIndex(i)}
-            className={`rounded-full px-3 py-1.5 text-xs font-extrabold ${
-              i === index ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600"
-            }`}
-          >
-            Q{i + 1}
-          </button>
-        ))}
-      </div>
-      <label className="block rounded-[1.8rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-5 py-6">
-        <span className="text-xs font-extrabold uppercase tracking-wide text-violet-100">
-          Prompt
-        </span>
-        <textarea
-          value={question.prompt}
-          onChange={(e) => patch({ ...question, prompt: e.target.value })}
-          rows={3}
-          className="mt-2 w-full resize-none bg-transparent font-display text-2xl font-semibold text-white outline-none placeholder:text-white/50"
-        />
-      </label>
-      <ul className="space-y-2">
-        {question.choices.map((choice, i) => (
-          <li key={i} className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => patch({ ...question, correctIndex: i })}
-              className={`size-10 shrink-0 rounded-full text-xs font-extrabold ring-2 ${
-                question.correctIndex === i
-                  ? "bg-emerald-500 text-white ring-emerald-600"
-                  : "bg-white text-slate-500 ring-black/10"
-              }`}
-            >
-              {question.correctIndex === i ? "✓" : i + 1}
-            </button>
-            <input
-              value={choice}
-              onChange={(e) => {
-                const choices = [...question.choices];
-                choices[i] = e.target.value;
-                patch({ ...question, choices });
-              }}
-              className="flex-1 rounded-3xl bg-white px-4 py-3 font-extrabold ring-2 ring-black/10"
+      {questions.map((question, qi) => (
+        <div key={qi} className="space-y-3 rounded-[1.5rem] bg-slate-50 p-4 ring-1 ring-black/5">
+          <div className="flex items-start justify-between gap-2">
+            <label className="block flex-1 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+              Prompt
+              <input
+                value={question.prompt}
+                onChange={(e) => patch({ ...question, prompt: e.target.value }, qi)}
+                className="mt-1 w-full rounded-2xl bg-white px-3 py-2 text-sm font-semibold text-slate-800 ring-1 ring-black/10"
+              />
+            </label>
+            {questions.length > 1 ? (
+              <button
+                type="button"
+                aria-label="Remove question"
+                onClick={() =>
+                  onChange({
+                    ...game,
+                    questions: questions.filter((_, i) => i !== qi),
+                  })
+                }
+                className="rounded-full bg-white p-2 text-rose-600 ring-1 ring-black/10"
+              >
+                <Trash2 className="size-4" />
+              </button>
+            ) : null}
+          </div>
+          <ul className="space-y-2">
+            {question.choices.map((choice, i) => (
+              <li key={i} className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => patch({ ...question, correctIndex: i }, qi)}
+                  className={`flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-extrabold ${
+                    question.correctIndex === i
+                      ? "bg-emerald-500 text-white"
+                      : "bg-white text-slate-500 ring-1 ring-black/10"
+                  }`}
+                >
+                  {question.correctIndex === i ? "✓" : i + 1}
+                </button>
+                <input
+                  value={choice}
+                  onChange={(e) => {
+                    const choices = [...question.choices];
+                    choices[i] = e.target.value;
+                    patch({ ...question, choices }, qi);
+                  }}
+                  className="w-full rounded-2xl bg-white px-3 py-2 text-sm font-semibold text-slate-800 ring-1 ring-black/10"
+                />
+              </li>
+            ))}
+          </ul>
+          <label className="block text-xs font-extrabold uppercase tracking-wide text-slate-500">
+            Why
+            <textarea
+              value={question.why ?? ""}
+              onChange={(e) => patch({ ...question, why: e.target.value }, qi)}
+              rows={2}
+              className="mt-1 w-full rounded-2xl bg-white px-3 py-2 text-sm font-semibold text-slate-800 ring-1 ring-black/10"
             />
-          </li>
-        ))}
-      </ul>
+          </label>
+        </div>
+      ))}
       <button
         type="button"
-        className="text-xs font-extrabold text-violet-700"
         onClick={() =>
-          patch({
-            ...question,
-            choices: [...question.choices, `Choice ${question.choices.length + 1}`],
+          onChange({
+            ...game,
+            questions: [
+              ...questions,
+              { prompt: "New question", choices: ["A", "B"], correctIndex: 0 },
+            ],
           })
         }
+        className="inline-flex items-center gap-2 rounded-full bg-violet-600 px-4 py-2 text-sm font-extrabold text-white"
       >
-        Add choice
+        <Plus className="size-4" />
+        Add question
       </button>
-      <label className="block text-xs font-extrabold text-slate-500">
-        Why (shown on a miss)
-        <textarea
-          value={question.why ?? ""}
-          onChange={(e) => patch({ ...question, why: e.target.value || undefined })}
-          rows={2}
-          className="mt-1 w-full rounded-xl bg-white px-3 py-2 text-sm font-semibold ring-1 ring-black/10"
-        />
-      </label>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() =>
-            onChange({
-              ...game,
-              questions: [
-                ...game.questions,
-                { prompt: "New question", choices: ["A", "B"], correctIndex: 0 },
-              ],
-            })
-          }
-          className="inline-flex items-center gap-1 text-sm font-extrabold text-violet-700"
-        >
-          <Plus className="size-4" /> Add question
-        </button>
-        <button
-          type="button"
-          disabled={game.questions.length <= 1}
-          onClick={() => {
-            const questions = game.questions.filter((_, i) => i !== index);
-            onChange({ ...game, questions });
-            setIndex(Math.max(0, index - 1));
-          }}
-          className="ml-auto inline-flex items-center gap-1 text-sm font-extrabold text-rose-700 disabled:opacity-40"
-        >
-          <Trash2 className="size-4" /> Remove
-        </button>
-      </div>
     </div>
   );
 }

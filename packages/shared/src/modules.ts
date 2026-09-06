@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { gameContentSchema, lessonContentSchema } from "./games";
+import {
+  assessmentGameSchema,
+  attemptInfoSchema,
+} from "./assessment";
+import { lessonContentSchema } from "./games";
 import {
   gameTypeSchema,
   hexColorSchema,
@@ -39,14 +43,27 @@ export const playLevelResponseSchema = z.object({
   level: playLevelMetaSchema,
   learner: learnerSchema,
   lesson: lessonContentSchema.optional(),
-  game: gameContentSchema.optional(),
+  /** Assessment delivery only — answer keys are stripped. */
+  game: assessmentGameSchema.optional(),
+  attempt: attemptInfoSchema.optional(),
   chest: z.object({ message: z.string().min(1) }).optional(),
 });
 
-export const attemptBodySchema = z.object({
-  score: z.number().int().nonnegative(),
-  maxScore: z.number().int().nonnegative(),
-  payload: z.unknown().optional(),
+/** Legacy client-scored posts are rejected. */
+export const attemptBodySchema = z
+  .object({
+    score: z.number().int().nonnegative().optional(),
+    maxScore: z.number().int().nonnegative().optional(),
+    payload: z.unknown().optional(),
+    clientAttemptId: z.string().trim().min(1).max(128).optional(),
+  })
+  .refine((body) => body.score === undefined && body.maxScore === undefined, {
+    message: "Client scores are not accepted; finish the server-issued attempt instead",
+  });
+
+export const missBodySchema = z.object({
+  /** Stable key so retries of the same miss do not spend another heart. */
+  idempotencyKey: z.string().trim().min(1).max(128),
 });
 
 export const missResponseSchema = z.object({
@@ -63,4 +80,5 @@ export type ModuleCard = z.infer<typeof moduleCardSchema>;
 export type ModulesResponse = z.infer<typeof modulesResponseSchema>;
 export type PlayLevelResponse = z.infer<typeof playLevelResponseSchema>;
 export type AttemptBody = z.infer<typeof attemptBodySchema>;
+export type MissBody = z.infer<typeof missBodySchema>;
 export type MissResponse = z.infer<typeof missResponseSchema>;

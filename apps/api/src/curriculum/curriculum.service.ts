@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   BadRequestException,
   ForbiddenException,
@@ -13,14 +13,24 @@ import {
   MAX_HEARTS,
   applyHeartDrip,
   attemptBodySchema,
+  attemptEventSchema,
+  buildMemoryAssessment,
   createLevelBodySchema,
   createModuleBodySchema,
   createSectionBodySchema,
   deriveLevelStatuses,
   emptyGameContent,
+  evaluateBlankChoice,
+  evaluateMemoryMatch,
+  evaluateQuizChoice,
+  evaluateSortCheck,
+  evaluateTimelineCheck,
+  finishAttemptBodySchema,
   gameContentSchema,
+  gradeAssessmentFinish,
   isAvatarId,
   isLevelLocked,
+  missBodySchema,
   moveBodySchema,
   nodeIconFor,
   parseGameContent,
@@ -32,7 +42,15 @@ import {
   pathPosition,
   putGameBodySchema,
   putLessonBodySchema,
+  sanitizeGameForAssessment,
+  shuffledCopy,
+  stableStringify,
+  type AssessmentSecret,
+  type AttemptEvent,
   type AvatarId,
+  type EvaluateEventResult,
+  type FinishAttemptResult,
+  type GameContent,
   type GameType,
   type Learner,
   type ModulesResponse,
@@ -44,8 +62,8 @@ import {
   type TeachModule,
   type TeachModuleDetail,
 } from "@jose/shared";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { DatabaseService } from "../db/database.service";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { DatabaseService, type JoseDb } from "../db/database.service";
 import {
   attempts,
   gameContent,
@@ -53,12 +71,30 @@ import {
   learnerProgress,
   lessonContent,
   levels,
+  missReceipts,
   moduleCollaborators,
   modules,
   sections,
 } from "../db/schema";
 
 const FIRST_COMPLETE_XP = 10;
+
+type MutationFaultStep =
+  | "after-module-row"
+  | "after-section-row"
+  | "after-level-row"
+  | "after-level-content"
+  | "after-first-sort-swap"
+  | "after-progress-insert";
+
+type StoredEvent = AttemptEvent & {
+  result: EvaluateEventResult;
+  at: number;
+};
+
+function contentRevisionOf(game: GameContent): string {
+  return createHash("sha256").update(stableStringify(game)).digest("hex");
+}
 
 function parseBody<T>(
   schema: {
@@ -81,8 +117,35 @@ function parseBody<T>(
 export class CurriculumService {
   constructor(private readonly database: DatabaseService) {}
 
+  private mutationFault?: (step: MutationFaultStep) => void | Promise<void>;
+  private writeTail: Promise<void> = Promise.resolve();
+
+  /** @internal testing */
+  setMutationFault(hook?: (step: MutationFaultStep) => void | Promise<void>) {
+    this.mutationFault = hook;
+  }
+
   private get db() {
     return this.database.db;
+  }
+
+  private async maybeFault(step: MutationFaultStep) {
+    await this.mutationFault?.(step);
+  }
+
+  private enqueueWrite<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.writeTail.then(fn, fn);
+    this.writeTail = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  private runTx<T>(fn: (tx: JoseDb) => Promise<T>): Promise<T> {
+    return this.enqueueWrite(() =>
+      this.db.transaction((tx) => fn(tx as unknown as JoseDb)),
+    );
   }
 
   async getLearner(learnerId: string): Promise<Learner> {
@@ -128,14 +191,14 @@ export class CurriculumService {
     const [mod] = await this.db
       .select()
       .from(modules)
-      .where(eq(modules.featured, true))
+      .where(and(eq(modules.featured, true), eq(modules.published, true)))
       .limit(1);
     if (!mod) throw new NotFoundException("No featured module");
     return this.buildPath(mod, learnerId);
   }
 
   async getPlayLevel(levelId: string, learnerId: string): Promise<PlayLevelResponse> {
-    const ctx = await this.levelContext(levelId);
+    const ctx = await this.requireStudentVisibleLevel(levelId);
     const ordered = await this.orderedLevelIds(ctx.module.id);
     const completed = await this.completedSet(learnerId);
     if (isLevelLocked(ordered, completed, levelId)) {
@@ -172,11 +235,15 @@ export class CurriculumService {
         youtubeVideoId: content?.youtubeVideoId ?? null,
       };
     } else if (ctx.level.kind === "game") {
-      const [content] = await this.db
-        .select()
-        .from(gameContent)
-        .where(eq(gameContent.levelId, levelId));
-      payload.game = parseGameContent(JSON.parse(content?.json ?? "{}"));
+      const game = await this.loadGameContent(levelId);
+      const opened = await this.openAssessmentAttempt(levelId, learnerId, game);
+      payload.game = opened.play;
+      payload.attempt = {
+        id: opened.attemptId,
+        contentRevision: opened.contentRevision,
+        mode: "assessment",
+        status: "open",
+      };
     } else {
       payload.chest = {
         message: `You opened ${ctx.level.title}! Keep walking the path.`,
@@ -186,64 +253,234 @@ export class CurriculumService {
   }
 
   async completeLevel(levelId: string, learnerId: string) {
-    const ctx = await this.levelContext(levelId);
+    const ctx = await this.requireStudentVisibleLevel(levelId);
     if (ctx.level.kind === "game") {
       throw new BadRequestException("Finish the game to complete this level");
     }
     await this.ensureUnlocked(ctx.module.id, levelId, learnerId);
-    const first = await this.markComplete(levelId, learnerId);
-    if (ctx.level.kind === "lesson") {
-      await this.refillHearts(learnerId);
-    }
+    const first = await this.runTx(async (tx) => {
+      const awarded = await this.markComplete(levelId, learnerId, tx);
+      if (ctx.level.kind === "lesson") {
+        await this.refillHearts(learnerId, tx);
+      }
+      return awarded;
+    });
     const learner = await this.getLearner(learnerId);
     return { completed: true, firstTime: first, learner };
   }
 
-  async recordMiss(levelId: string, learnerId: string) {
-    const ctx = await this.levelContext(levelId);
+  async recordMiss(levelId: string, learnerId: string, body: unknown = {}) {
+    const data = parseBody(missBodySchema, body);
+    const ctx = await this.requireStudentVisibleLevel(levelId);
     if (ctx.level.kind !== "game") {
       throw new BadRequestException("Misses are only for game levels");
     }
     await this.ensureUnlocked(ctx.module.id, levelId, learnerId);
-    const learner = await this.syncedLearner(learnerId);
-    if (learner.hearts <= 0) {
-      throw this.heartsEmpty();
-    }
-    const leavingFull = learner.hearts >= MAX_HEARTS;
-    const row = await this.requireLearner(learnerId);
-    await this.db
-      .update(learners)
-      .set({
-        hearts: learner.hearts - 1,
-        heartsUpdatedAt: leavingFull ? Date.now() : row.heartsUpdatedAt,
-      })
-      .where(eq(learners.id, learnerId));
+
+    await this.runTx(async (tx) => {
+      await this.syncLearnerHearts(learnerId, tx);
+      const inserted = await tx
+        .insert(missReceipts)
+        .values({
+          learnerId,
+          idempotencyKey: data.idempotencyKey,
+          levelId,
+          createdAt: Date.now(),
+        })
+        .onConflictDoNothing()
+        .returning({ key: missReceipts.idempotencyKey });
+
+      if (inserted.length === 0) {
+        return;
+      }
+
+      const [row] = await tx.select().from(learners).where(eq(learners.id, learnerId));
+      if (!row || row.hearts <= 0) {
+        throw this.heartsEmpty();
+      }
+      const leavingFull = row.hearts >= MAX_HEARTS;
+      const spent = await tx
+        .update(learners)
+        .set({
+          hearts: sql`${learners.hearts} - 1`,
+          heartsUpdatedAt: leavingFull ? Date.now() : row.heartsUpdatedAt,
+        })
+        .where(and(eq(learners.id, learnerId), sql`${learners.hearts} > 0`))
+        .returning({ id: learners.id });
+      if (spent.length === 0) {
+        throw this.heartsEmpty();
+      }
+    });
     return { learner: await this.getLearner(learnerId) };
   }
 
+  /**
+   * Rejects legacy client-scored attempt posts. Assessment finishes must use
+   * the server-issued attempt id and answer events.
+   */
   async submitAttempt(levelId: string, body: unknown, learnerId: string) {
-    const data = parseBody(attemptBodySchema, body);
-    const ctx = await this.levelContext(levelId);
+    await this.requireStudentVisibleLevel(levelId);
+    void learnerId;
+    if (body && typeof body === "object" && ("score" in body || "maxScore" in body)) {
+      throw new BadRequestException(
+        "Client scores are not accepted; finish the server-issued attempt instead",
+      );
+    }
+    parseBody(attemptBodySchema, body ?? {});
+    throw new BadRequestException(
+      "Start play via GET /levels/:id, then POST /attempts/:attemptId/finish",
+    );
+  }
+
+  async evaluateAttempt(
+    attemptId: string,
+    body: unknown,
+    learnerId: string,
+  ): Promise<EvaluateEventResult> {
+    const event = parseBody(attemptEventSchema, body);
+    const attempt = await this.requireOpenAttempt(attemptId, learnerId);
+    const ctx = await this.requireStudentVisibleLevel(attempt.levelId);
+    void ctx;
+    const game = await this.loadGameContent(attempt.levelId);
+    this.assertAttemptRevision(attempt.contentRevision, game);
+
+    const secret = this.parseSecret(attempt.secretJson);
+    const result = this.gradeEvent(game, secret, event);
+    const misses = await this.runTx(async (tx) => {
+      const [freshAttempt] = await tx
+        .select()
+        .from(attempts)
+        .where(
+          and(
+            eq(attempts.id, attemptId),
+            eq(attempts.learnerId, learnerId),
+            eq(attempts.status, "open"),
+          ),
+        )
+        .limit(1);
+      if (!freshAttempt) {
+        throw new BadRequestException("Attempt is already finished");
+      }
+      const events = this.parseEvents(freshAttempt.eventsJson);
+      events.push({ ...event, result, at: Date.now() });
+      await tx
+        .update(attempts)
+        .set({ eventsJson: JSON.stringify(events) })
+        .where(eq(attempts.id, attemptId));
+      return events.reduce((sum, row) => sum + Math.max(0, row.result.misses), 0);
+    });
+    return {
+      ...result,
+      misses,
+    };
+  }
+
+  async finishAttempt(
+    attemptId: string,
+    body: unknown,
+    learnerId: string,
+  ): Promise<FinishAttemptResult> {
+    const data = parseBody(finishAttemptBodySchema, body ?? {});
+    if (data.clientAttemptId) {
+      const [prior] = await this.db
+        .select()
+        .from(attempts)
+        .where(
+          and(
+            eq(attempts.learnerId, learnerId),
+            eq(attempts.clientAttemptId, data.clientAttemptId),
+            eq(attempts.status, "finished"),
+          ),
+        )
+        .limit(1);
+      if (prior && prior.id !== attemptId) {
+        return this.finishedAttemptResult(prior, learnerId, true);
+      }
+    }
+
+    const attempt = await this.requireAttemptRow(attemptId);
+    if (attempt.learnerId !== learnerId) {
+      throw new ForbiddenException("This attempt belongs to another learner");
+    }
+    if (attempt.mode !== "assessment") {
+      throw new BadRequestException("Practice attempts are not finished through assessment");
+    }
+
+    if (attempt.status === "finished") {
+      if (attempt.payload && attempt.payload.includes('"abandoned":true')) {
+        throw new BadRequestException("This attempt was abandoned; reload the level");
+      }
+      return this.finishedAttemptResult(attempt, learnerId, true);
+    }
+
+    const ctx = await this.requireStudentVisibleLevel(attempt.levelId);
     if (ctx.level.kind !== "game") {
       throw new BadRequestException("Attempts are only for game levels");
     }
-    await this.ensureUnlocked(ctx.module.id, levelId, learnerId);
+    await this.ensureUnlocked(ctx.module.id, attempt.levelId, learnerId);
     const learnerBefore = await this.syncedLearner(learnerId);
     if (learnerBefore.hearts <= 0) {
       throw this.heartsEmpty();
     }
-    await this.db.insert(attempts).values({
-      id: randomUUID(),
-      learnerId,
-      levelId,
-      score: data.score,
-      maxScore: data.maxScore,
-      payload: data.payload === undefined ? null : JSON.stringify(data.payload),
-      createdAt: Date.now(),
+
+    const game = await this.loadGameContent(attempt.levelId);
+    this.assertAttemptRevision(attempt.contentRevision, game);
+
+    if (data.answers.type !== game.type) {
+      throw new BadRequestException("Answer type does not match this game");
+    }
+
+    const events = this.parseEvents(attempt.eventsJson);
+    const priorMisses = events.reduce(
+      (sum, row) => sum + Math.max(0, row.result.misses),
+      0,
+    );
+    const secret = this.parseSecret(attempt.secretJson);
+
+    let graded;
+    try {
+      graded = gradeAssessmentFinish(game, data.answers, priorMisses, secret);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "Could not grade attempt",
+      );
+    }
+
+    const finishedAt = Date.now();
+    const first = await this.runTx(async (tx) => {
+      const updated = await tx
+        .update(attempts)
+        .set({
+          status: "finished",
+          score: graded.score,
+          maxScore: graded.maxScore,
+          stars: graded.stars,
+          finishedAt,
+          clientAttemptId: data.clientAttemptId ?? attempt.clientAttemptId,
+          payload: JSON.stringify({
+            misses: graded.misses,
+            stars: graded.stars,
+            events: events.length,
+            answers: data.answers,
+            source: "server",
+          }),
+        })
+        .where(and(eq(attempts.id, attemptId), eq(attempts.status, "open")))
+        .returning({ id: attempts.id });
+      if (updated.length === 0) {
+        return false;
+      }
+      return this.markComplete(attempt.levelId, learnerId, tx);
     });
-    const first = await this.markComplete(levelId, learnerId);
-    const learner = await this.getLearner(learnerId);
-    return { completed: true, firstTime: first, learner };
+
+    const [fresh] = await this.db
+      .select()
+      .from(attempts)
+      .where(eq(attempts.id, attemptId));
+    if (!fresh || fresh.status !== "finished") {
+      throw new BadRequestException("Could not finish attempt");
+    }
+    return this.finishedAttemptResult(fresh, learnerId, fresh.finishedAt !== finishedAt, first);
   }
 
   /** Teachers only see modules they own or were explicitly granted; admins see all. */
@@ -313,25 +550,29 @@ export class CurriculumService {
     const sectionId = randomUUID();
     const t = Date.now();
     const maxSort = await this.maxModuleSort();
-    await this.db.insert(modules).values({
-      id,
-      title: data.title,
-      subtitle: data.subtitle,
-      coverColor: data.coverColor,
-      sortOrder: maxSort + 1,
-      published: false,
-      featured: false,
-      ownerUserId: user.id,
-      createdAt: t,
-      updatedAt: t,
-    });
-    await this.db.insert(sections).values({
-      id: sectionId,
-      moduleId: id,
-      title: "Levels",
-      subtitle: "Start adding lessons and games",
-      themeColor: data.coverColor,
-      sortOrder: 0,
+    await this.runTx(async (tx) => {
+      await tx.insert(modules).values({
+        id,
+        title: data.title,
+        subtitle: data.subtitle,
+        coverColor: data.coverColor,
+        sortOrder: maxSort + 1,
+        published: false,
+        featured: false,
+        ownerUserId: user.id,
+        createdAt: t,
+        updatedAt: t,
+      });
+      await this.maybeFault("after-module-row");
+      await tx.insert(sections).values({
+        id: sectionId,
+        moduleId: id,
+        title: "Levels",
+        subtitle: "Start adding lessons and games",
+        themeColor: data.coverColor,
+        sortOrder: 0,
+      });
+      await this.maybeFault("after-section-row");
     });
     return this.getTeachModule(id);
   }
@@ -394,9 +635,11 @@ export class CurriculumService {
     if (mod.featured) {
       throw new BadRequestException("The Life of Rizal module cannot be deleted");
     }
-    await this.deleteLevelsByModule(moduleId);
-    await this.db.delete(sections).where(eq(sections.moduleId, moduleId));
-    await this.db.delete(modules).where(eq(modules.id, moduleId));
+    await this.runTx(async (tx) => {
+      await this.deleteLevelsByModule(moduleId, tx);
+      await tx.delete(sections).where(eq(sections.moduleId, moduleId));
+      await tx.delete(modules).where(eq(modules.id, moduleId));
+    });
     return { ok: true };
   }
 
@@ -404,19 +647,22 @@ export class CurriculumService {
     await this.requireModule(moduleId);
     const data = parseBody(createSectionBodySchema, body);
     const id = randomUUID();
-    const siblings = await this.db
-      .select()
-      .from(sections)
-      .where(eq(sections.moduleId, moduleId));
-    await this.db.insert(sections).values({
-      id,
-      moduleId,
-      title: data.title,
-      subtitle: data.subtitle,
-      themeColor: data.themeColor,
-      sortOrder: siblings.length,
+    await this.runTx(async (tx) => {
+      const siblings = await tx
+        .select()
+        .from(sections)
+        .where(eq(sections.moduleId, moduleId));
+      await tx.insert(sections).values({
+        id,
+        moduleId,
+        title: data.title,
+        subtitle: data.subtitle,
+        themeColor: data.themeColor,
+        sortOrder: siblings.length,
+      });
+      await this.maybeFault("after-section-row");
+      await this.touchModule(moduleId, tx);
     });
-    await this.touchModule(moduleId);
     return this.getTeachModule(moduleId);
   }
 
@@ -444,13 +690,18 @@ export class CurriculumService {
     if (siblings.length <= 1) {
       throw new BadRequestException("A module needs at least one section");
     }
-    const levelRows = await this.db
-      .select()
-      .from(levels)
-      .where(eq(levels.sectionId, sectionId));
-    await this.deleteLevelRows(levelRows.map((l) => l.id));
-    await this.db.delete(sections).where(eq(sections.id, sectionId));
-    await this.touchModule(section.moduleId);
+    await this.runTx(async (tx) => {
+      const levelRows = await tx
+        .select()
+        .from(levels)
+        .where(eq(levels.sectionId, sectionId));
+      await this.deleteLevelRows(
+        levelRows.map((l) => l.id),
+        tx,
+      );
+      await tx.delete(sections).where(eq(sections.id, sectionId));
+      await this.touchModule(section.moduleId, tx);
+    });
     return this.getTeachModule(section.moduleId);
   }
 
@@ -458,31 +709,35 @@ export class CurriculumService {
     const section = await this.requireSection(sectionId);
     const data = parseBody(createLevelBodySchema, body);
     const id = randomUUID();
-    const siblings = await this.db
-      .select()
-      .from(levels)
-      .where(eq(levels.sectionId, sectionId));
-    await this.db.insert(levels).values({
-      id,
-      sectionId,
-      title: data.title,
-      kind: data.kind,
-      gameType: data.kind === "game" ? data.gameType! : null,
-      sortOrder: siblings.length,
+    await this.runTx(async (tx) => {
+      const siblings = await tx
+        .select()
+        .from(levels)
+        .where(eq(levels.sectionId, sectionId));
+      await tx.insert(levels).values({
+        id,
+        sectionId,
+        title: data.title,
+        kind: data.kind,
+        gameType: data.kind === "game" ? data.gameType! : null,
+        sortOrder: siblings.length,
+      });
+      await this.maybeFault("after-level-row");
+      if (data.kind === "lesson") {
+        await tx.insert(lessonContent).values({
+          levelId: id,
+          markdown: `## ${data.title}\n\nWrite the lesson here.`,
+          youtubeVideoId: null,
+        });
+      } else {
+        await tx.insert(gameContent).values({
+          levelId: id,
+          json: JSON.stringify(emptyGameContent(data.gameType!)),
+        });
+      }
+      await this.maybeFault("after-level-content");
+      await this.touchModule(section.moduleId, tx);
     });
-    if (data.kind === "lesson") {
-      await this.db.insert(lessonContent).values({
-        levelId: id,
-        markdown: `## ${data.title}\n\nWrite the lesson here.`,
-        youtubeVideoId: null,
-      });
-    } else {
-      await this.db.insert(gameContent).values({
-        levelId: id,
-        json: JSON.stringify(emptyGameContent(data.gameType!)),
-      });
-    }
-    await this.touchModule(section.moduleId);
     return this.getTeachLevel(id);
   }
 
@@ -507,35 +762,40 @@ export class CurriculumService {
     if (siblings.length <= 1) {
       throw new BadRequestException("A section needs at least one level");
     }
-    await this.deleteLevelRows([levelId]);
-    await this.touchModule(ctx.module.id);
+    await this.runTx(async (tx) => {
+      await this.deleteLevelRows([levelId], tx);
+      await this.touchModule(ctx.module.id, tx);
+    });
     return { ok: true };
   }
 
   async moveLevel(levelId: string, body: unknown) {
     const data = parseBody(moveBodySchema, body);
-    const ctx = await this.levelContext(levelId);
-    const siblings = await this.db
-      .select()
-      .from(levels)
-      .where(eq(levels.sectionId, ctx.section.id))
-      .orderBy(asc(levels.sortOrder));
-    const index = siblings.findIndex((row) => row.id === levelId);
-    const swapWith = data.direction === "up" ? index - 1 : index + 1;
-    if (index < 0 || swapWith < 0 || swapWith >= siblings.length) {
-      return this.getTeachModule(ctx.module.id);
-    }
-    const a = siblings[index]!;
-    const b = siblings[swapWith]!;
-    await this.db
-      .update(levels)
-      .set({ sortOrder: b.sortOrder })
-      .where(eq(levels.id, a.id));
-    await this.db
-      .update(levels)
-      .set({ sortOrder: a.sortOrder })
-      .where(eq(levels.id, b.id));
-    await this.touchModule(ctx.module.id);
+    const ctx = await this.requireAuthorizedTeacherPreview(levelId);
+    await this.runTx(async (tx) => {
+      const siblings = await tx
+        .select()
+        .from(levels)
+        .where(eq(levels.sectionId, ctx.section.id))
+        .orderBy(asc(levels.sortOrder));
+      const index = siblings.findIndex((row) => row.id === levelId);
+      const swapWith = data.direction === "up" ? index - 1 : index + 1;
+      if (index < 0 || swapWith < 0 || swapWith >= siblings.length) {
+        return;
+      }
+      const a = siblings[index]!;
+      const b = siblings[swapWith]!;
+      await tx
+        .update(levels)
+        .set({ sortOrder: b.sortOrder })
+        .where(eq(levels.id, a.id));
+      await this.maybeFault("after-first-sort-swap");
+      await tx
+        .update(levels)
+        .set({ sortOrder: a.sortOrder })
+        .where(eq(levels.id, b.id));
+      await this.touchModule(ctx.module.id, tx);
+    });
     return this.getTeachModule(ctx.module.id);
   }
 
@@ -718,18 +978,27 @@ export class CurriculumService {
     }
   }
 
-  private async markComplete(levelId: string, learnerId: string): Promise<boolean> {
-    const completed = await this.completedSet(learnerId);
-    if (completed.has(levelId)) return false;
-    await this.db.insert(learnerProgress).values({
-      learnerId,
-      levelId,
-      completedAt: Date.now(),
-    });
-    const learner = await this.requireLearner(learnerId);
-    await this.db
+  private async markComplete(
+    levelId: string,
+    learnerId: string,
+    executor: JoseDb = this.db,
+  ): Promise<boolean> {
+    const inserted = await executor
+      .insert(learnerProgress)
+      .values({
+        learnerId,
+        levelId,
+        completedAt: Date.now(),
+      })
+      .onConflictDoNothing()
+      .returning({ levelId: learnerProgress.levelId });
+    if (inserted.length === 0) {
+      return false;
+    }
+    await this.maybeFault("after-progress-insert");
+    await executor
       .update(learners)
-      .set({ xp: learner.xp + FIRST_COMPLETE_XP })
+      .set({ xp: sql`${learners.xp} + ${FIRST_COMPLETE_XP}` })
       .where(eq(learners.id, learnerId));
     return true;
   }
@@ -811,11 +1080,29 @@ export class CurriculumService {
     };
   }
 
-  private async refillHearts(learnerId: string) {
-    await this.db
+  private async refillHearts(learnerId: string, executor: JoseDb = this.db) {
+    await executor
       .update(learners)
       .set({ hearts: MAX_HEARTS, heartsUpdatedAt: Date.now() })
       .where(eq(learners.id, learnerId));
+  }
+
+  private async syncLearnerHearts(learnerId: string, executor: JoseDb) {
+    const [row] = await executor
+      .select()
+      .from(learners)
+      .where(eq(learners.id, learnerId));
+    if (!row) throw new NotFoundException("Learner not found");
+    const dripped = applyHeartDrip(row.hearts, row.heartsUpdatedAt, Date.now());
+    if (dripped.changed) {
+      await executor
+        .update(learners)
+        .set({
+          hearts: dripped.hearts,
+          heartsUpdatedAt: dripped.heartsUpdatedAt,
+        })
+        .where(eq(learners.id, learnerId));
+    }
   }
 
   private heartsEmpty() {
@@ -864,42 +1151,277 @@ export class CurriculumService {
     return { level, section, module: mod };
   }
 
+  /** Student-visible content: requires the module to be published. */
+  private async requireStudentVisibleLevel(levelId: string) {
+    const ctx = await this.levelContext(levelId);
+    if (!ctx.module.published) {
+      throw new NotFoundException("Level not found");
+    }
+    return ctx;
+  }
+
+  /**
+   * Authorized teacher preview/edit path: unpublished drafts are allowed.
+   * Role/ownership is enforced by teach route guards, not here.
+   */
+  private async requireAuthorizedTeacherPreview(levelId: string) {
+    return this.levelContext(levelId);
+  }
+
   private async maxModuleSort() {
     const rows = await this.db.select({ sortOrder: modules.sortOrder }).from(modules);
     return rows.reduce((max, row) => Math.max(max, row.sortOrder), -1);
   }
 
-  private async touchModule(moduleId: string) {
-    await this.db
+  private async touchModule(moduleId: string, executor: JoseDb = this.db) {
+    await executor
       .update(modules)
       .set({ updatedAt: Date.now() })
       .where(eq(modules.id, moduleId));
   }
 
-  private async deleteLevelsByModule(moduleId: string) {
-    const sectionRows = await this.db
+  private async deleteLevelsByModule(moduleId: string, executor: JoseDb = this.db) {
+    const sectionRows = await executor
       .select()
       .from(sections)
       .where(eq(sections.moduleId, moduleId));
     const ids: string[] = [];
     for (const section of sectionRows) {
-      const levelRows = await this.db
+      const levelRows = await executor
         .select()
         .from(levels)
         .where(eq(levels.sectionId, section.id));
       ids.push(...levelRows.map((l) => l.id));
     }
-    await this.deleteLevelRows(ids);
+    await this.deleteLevelRows(ids, executor);
   }
 
-  private async deleteLevelRows(ids: string[]) {
+  private async deleteLevelRows(ids: string[], executor: JoseDb = this.db) {
     if (ids.length === 0) return;
-    await this.db.delete(attempts).where(inArray(attempts.levelId, ids));
-    await this.db
+    await executor.delete(missReceipts).where(inArray(missReceipts.levelId, ids));
+    await executor.delete(attempts).where(inArray(attempts.levelId, ids));
+    await executor
       .delete(learnerProgress)
       .where(inArray(learnerProgress.levelId, ids));
-    await this.db.delete(lessonContent).where(inArray(lessonContent.levelId, ids));
-    await this.db.delete(gameContent).where(inArray(gameContent.levelId, ids));
-    await this.db.delete(levels).where(inArray(levels.id, ids));
+    await executor.delete(lessonContent).where(inArray(lessonContent.levelId, ids));
+    await executor.delete(gameContent).where(inArray(gameContent.levelId, ids));
+    await executor.delete(levels).where(inArray(levels.id, ids));
+  }
+
+  private async finishedAttemptResult(
+    attempt: typeof attempts.$inferSelect,
+    learnerId: string,
+    deduplicated: boolean,
+    firstTime?: boolean,
+  ): Promise<FinishAttemptResult> {
+    const learner = await this.getLearner(learnerId);
+    return {
+      attemptId: attempt.id,
+      mode: "assessment",
+      completed: true,
+      firstTime: firstTime ?? false,
+      score: attempt.score,
+      maxScore: attempt.maxScore,
+      stars: (attempt.stars === 2 || attempt.stars === 3 ? attempt.stars : 1) as 1 | 2 | 3,
+      learner,
+      deduplicated,
+    };
+  }
+
+  private async openAssessmentAttempt(
+    levelId: string,
+    learnerId: string,
+    game: GameContent,
+  ) {
+    return this.runTx(async (tx) => {
+      const revision = contentRevisionOf(game);
+      const [existing] = await tx
+        .select()
+        .from(attempts)
+        .where(
+          and(
+            eq(attempts.learnerId, learnerId),
+            eq(attempts.levelId, levelId),
+            eq(attempts.status, "open"),
+            eq(attempts.mode, "assessment"),
+            eq(attempts.contentRevision, revision),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        const secret = this.parseSecret(existing.secretJson);
+        const play = this.playPayloadFromSecret(game, secret);
+        return { attemptId: existing.id, contentRevision: revision, play };
+      }
+
+      await tx
+        .update(attempts)
+        .set({
+          status: "finished",
+          finishedAt: Date.now(),
+          payload: JSON.stringify({ abandoned: true }),
+        })
+        .where(
+          and(
+            eq(attempts.learnerId, learnerId),
+            eq(attempts.levelId, levelId),
+            eq(attempts.status, "open"),
+          ),
+        );
+
+      const built =
+        game.type === "memory"
+          ? buildMemoryAssessment(game, () => randomUUID())
+          : sanitizeGameForAssessment(game);
+      const attemptId = randomUUID();
+      await tx.insert(attempts).values({
+        id: attemptId,
+        learnerId,
+        levelId,
+        contentRevision: revision,
+        mode: "assessment",
+        status: "open",
+        clientAttemptId: null,
+        score: 0,
+        maxScore: 0,
+        stars: null,
+        payload: null,
+        secretJson: JSON.stringify(built.secret),
+        eventsJson: "[]",
+        createdAt: Date.now(),
+        finishedAt: null,
+      });
+      return { attemptId, contentRevision: revision, play: built.play };
+    });
+  }
+
+  private playPayloadFromSecret(game: GameContent, secret: AssessmentSecret) {
+    if (game.type === "memory" && secret.memoryPairMap) {
+      const byPair = new Map<number, string[]>();
+      for (const [id, pairIndex] of Object.entries(secret.memoryPairMap)) {
+        const list = byPair.get(pairIndex) ?? [];
+        list.push(id);
+        byPair.set(pairIndex, list);
+      }
+      const fixed: { id: string; text?: string; imageUrl?: string }[] = [];
+      for (const [_pairIndex, ids] of byPair) {
+        const pairIndex = Number(_pairIndex);
+        const pair = game.pairs[pairIndex]!;
+        const [idA, idB] = ids;
+        fixed.push({
+          id: idA!,
+          ...(pair.a.text ? { text: pair.a.text } : {}),
+          ...(pair.a.imageUrl ? { imageUrl: pair.a.imageUrl } : {}),
+        });
+        fixed.push({
+          id: idB!,
+          ...(pair.b.text ? { text: pair.b.text } : {}),
+          ...(pair.b.imageUrl ? { imageUrl: pair.b.imageUrl } : {}),
+        });
+      }
+      return {
+        type: "memory" as const,
+        pairCount: game.pairs.length,
+        cards: shuffledCopy(fixed),
+      };
+    }
+    return sanitizeGameForAssessment(game, secret).play;
+  }
+
+  private gradeEvent(
+    game: GameContent,
+    secret: AssessmentSecret,
+    event: AttemptEvent,
+  ): EvaluateEventResult {
+    switch (event.type) {
+      case "quiz_choice":
+        if (game.type !== "quiz") throw new BadRequestException("Event type mismatch");
+        return evaluateQuizChoice(game, event.questionIndex, event.choiceIndex);
+      case "blank_choice":
+        if (game.type !== "blank") throw new BadRequestException("Event type mismatch");
+        return evaluateBlankChoice(game, event.itemIndex, event.word);
+      case "memory_match":
+        if (game.type !== "memory") throw new BadRequestException("Event type mismatch");
+        if (!secret.memoryPairMap) {
+          throw new BadRequestException("Memory attempt is missing pair map");
+        }
+        return evaluateMemoryMatch(
+          secret.memoryPairMap,
+          event.cardA,
+          event.cardB,
+          (pairIndex) => game.pairs[pairIndex]?.why,
+        );
+      case "timeline_check":
+        if (game.type !== "timeline") throw new BadRequestException("Event type mismatch");
+        return evaluateTimelineCheck(game, event.order);
+      case "sort_check":
+        if (game.type !== "sort") throw new BadRequestException("Event type mismatch");
+        return evaluateSortCheck(game, event.placements);
+    }
+  }
+
+  private async loadGameContent(levelId: string): Promise<GameContent> {
+    const [content] = await this.db
+      .select()
+      .from(gameContent)
+      .where(eq(gameContent.levelId, levelId));
+    return parseGameContent(JSON.parse(content?.json ?? "{}"));
+  }
+
+  private assertAttemptRevision(revision: string, game: GameContent) {
+    const current = contentRevisionOf(game);
+    if (revision !== current) {
+      throw new ConflictRevision();
+    }
+  }
+
+  private async requireOpenAttempt(attemptId: string, learnerId: string) {
+    const attempt = await this.requireAttemptRow(attemptId);
+    if (attempt.learnerId !== learnerId) {
+      throw new ForbiddenException("This attempt belongs to another learner");
+    }
+    if (attempt.status !== "open") {
+      throw new BadRequestException("Attempt is already finished");
+    }
+    return attempt;
+  }
+
+  private async requireAttemptRow(attemptId: string) {
+    const [row] = await this.db.select().from(attempts).where(eq(attempts.id, attemptId));
+    if (!row) throw new NotFoundException("Attempt not found");
+    return row;
+  }
+
+  private parseSecret(raw: string | null): AssessmentSecret {
+    if (!raw) return {};
+    try {
+      return JSON.parse(raw) as AssessmentSecret;
+    } catch {
+      return {};
+    }
+  }
+
+  private parseEvents(raw: string | null): StoredEvent[] {
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw) as StoredEvent[];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+}
+
+class ConflictRevision extends HttpException {
+  constructor() {
+    super(
+      {
+        statusCode: HttpStatus.CONFLICT,
+        code: "STALE_CONTENT_REVISION",
+        message: "This attempt is for an older revision of the game. Reload to continue.",
+      },
+      HttpStatus.CONFLICT,
+    );
   }
 }
