@@ -13,30 +13,49 @@ import {
   notifyExplorerIdentityChanged,
   useExplorerIdentity,
 } from "@/lib/use-explorer-identity";
+import { updateProfile } from "@/lib/auth-api";
+import { useJoseSession } from "@/lib/use-jose-session";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 export function ProfileEditForm() {
   const identity = useExplorerIdentity(DEFAULT_DISPLAY_NAME);
+  const { authenticated, learner, loading } = useJoseSession();
+  if (loading) {
+    return (
+      <p className="mx-auto max-w-lg px-5 py-10 font-semibold text-slate-600">
+        Loading your explorer…
+      </p>
+    );
+  }
+  // A signed-in learner edits the server profile; anonymous demo play stays local.
+  const initial =
+    authenticated && learner
+      ? { displayName: learner.displayName, avatarId: learner.avatarId }
+      : identity;
   return (
     <ProfileEditFields
-      key={`${identity.displayName}:${identity.avatarId}`}
-      initial={identity}
+      key={`${initial.displayName}:${initial.avatarId}`}
+      initial={initial}
+      authenticated={authenticated}
     />
   );
 }
 
 function ProfileEditFields({
   initial,
+  authenticated,
 }: {
   initial: { displayName: string; avatarId: AvatarId };
+  authenticated: boolean;
 }) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(initial.displayName);
   const [avatarId, setAvatarId] = useState<AvatarId>(initial.avatarId);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  function onSave(event: FormEvent) {
+  async function onSave(event: FormEvent) {
     event.preventDefault();
     const name = normalizeDisplayName(displayName);
     if (!name) {
@@ -47,9 +66,21 @@ function ProfileEditFields({
       setError("Pick an avatar to continue.");
       return;
     }
+    if (authenticated) {
+      setSaving(true);
+      try {
+        await updateProfile({ displayName: name, avatarId });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not save your profile");
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+    }
     writeExplorerIdentity({ displayName: name, avatarId });
     notifyExplorerIdentityChanged();
     router.push("/profile");
+    router.refresh();
   }
 
   return (
@@ -64,7 +95,9 @@ function ProfileEditFields({
             Edit explorer
           </h1>
           <p className="mt-1 text-sm font-semibold text-slate-500 md:text-base">
-            Local flair only — no account yet
+            {authenticated
+              ? "Saved to your APC account"
+              : "Local flair only — sign in to keep it"}
           </p>
         </div>
       </div>
@@ -130,9 +163,10 @@ function ProfileEditFields({
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
         <button
           type="submit"
-          className="rounded-full bg-rose-500 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
+          disabled={saving}
+          className="rounded-full bg-rose-500 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm disabled:opacity-60"
         >
-          Save
+          {saving ? "Saving…" : "Save"}
         </button>
         <button
           type="button"

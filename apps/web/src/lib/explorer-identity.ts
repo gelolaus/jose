@@ -1,32 +1,27 @@
+import {
+  AVATAR_IDS,
+  DEFAULT_AVATAR_ID,
+  DEFAULT_DISPLAY_NAME,
+  isAvatarId,
+  normalizeDisplayName,
+  type AvatarId,
+} from "@jose/shared";
+
+export {
+  AVATAR_IDS,
+  DEFAULT_AVATAR_ID,
+  DEFAULT_DISPLAY_NAME,
+  isAvatarId,
+  normalizeDisplayName,
+};
+export type { AvatarId };
+
 export const EXPLORER_STORAGE_KEY = "jose.explorer";
-export const DEFAULT_AVATAR_ID = "compass";
-export const DEFAULT_DISPLAY_NAME = "Explorer";
-
-export const AVATAR_IDS = [
-  "compass",
-  "sun",
-  "book",
-  "star",
-  "leaf",
-  "ship",
-] as const;
-
-export type AvatarId = (typeof AVATAR_IDS)[number];
 
 export type ExplorerIdentity = {
   displayName: string;
   avatarId: AvatarId;
 };
-
-export function isAvatarId(value: string): value is AvatarId {
-  return (AVATAR_IDS as readonly string[]).includes(value);
-}
-
-export function normalizeDisplayName(raw: string): string | null {
-  const displayName = raw.trim();
-  if (displayName.length < 1 || displayName.length > 20) return null;
-  return displayName;
-}
 
 export function parseExplorerIdentity(raw: unknown): ExplorerIdentity | null {
   if (!raw || typeof raw !== "object") return null;
@@ -65,4 +60,20 @@ export function defaultExplorerIdentity(
     displayName: normalizeDisplayName(displayName) ?? DEFAULT_DISPLAY_NAME,
     avatarId: DEFAULT_AVATAR_ID,
   };
+}
+
+/** Clears cosmetic/local learner state after logout so the next user cannot see it. */
+export function clearSensitiveClientState(): void {
+  if (typeof window === "undefined") return;
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < window.localStorage.length; i += 1) {
+    const key = window.localStorage.key(i);
+    if (key && (key === EXPLORER_STORAGE_KEY || key.startsWith("jose."))) {
+      keysToRemove.push(key);
+    }
+  }
+  for (const key of keysToRemove) {
+    window.localStorage.removeItem(key);
+  }
+  window.sessionStorage.removeItem(EXPLORER_STORAGE_KEY);
 }

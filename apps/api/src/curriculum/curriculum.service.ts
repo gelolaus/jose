@@ -8,7 +8,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
-  DEMO_LEARNER_ID,
+  DEFAULT_AVATAR_ID,
   HEARTS_EMPTY_CODE,
   MAX_HEARTS,
   applyHeartDrip,
@@ -19,6 +19,7 @@ import {
   deriveLevelStatuses,
   emptyGameContent,
   gameContentSchema,
+  isAvatarId,
   isLevelLocked,
   moveBodySchema,
   nodeIconFor,
@@ -31,17 +32,19 @@ import {
   pathPosition,
   putGameBodySchema,
   putLessonBodySchema,
+  type AvatarId,
   type GameType,
   type Learner,
   type ModulesResponse,
   type NodeKind,
   type PathResponse,
   type PlayLevelResponse,
+  type SessionUser,
   type TeachLevelDetail,
   type TeachModule,
   type TeachModuleDetail,
 } from "@jose/shared";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { DatabaseService } from "../db/database.service";
 import {
   attempts,
@@ -50,6 +53,7 @@ import {
   learnerProgress,
   lessonContent,
   levels,
+  moduleCollaborators,
   modules,
   sections,
 } from "../db/schema";
@@ -81,12 +85,12 @@ export class CurriculumService {
     return this.database.db;
   }
 
-  async getLearner(): Promise<Learner> {
-    return this.syncedLearner();
+  async getLearner(learnerId: string): Promise<Learner> {
+    return this.syncedLearner(learnerId);
   }
 
-  async listPublishedModules(): Promise<ModulesResponse> {
-    const learner = await this.getLearner();
+  async listPublishedModules(learnerId: string): Promise<ModulesResponse> {
+    const learner = await this.getLearner(learnerId);
     const rows = await this.db
       .select()
       .from(modules)
@@ -96,7 +100,7 @@ export class CurriculumService {
     const cards = [];
     for (const row of rows) {
       const ordered = await this.orderedLevelIds(row.id);
-      const completed = await this.completedSet();
+      const completed = await this.completedSet(learnerId);
       const completedCount = ordered.filter((id) => completed.has(id)).length;
       cards.push({
         id: row.id,
@@ -112,34 +116,34 @@ export class CurriculumService {
     return { learner, modules: cards };
   }
 
-  async getModulePath(moduleId: string): Promise<PathResponse> {
+  async getModulePath(moduleId: string, learnerId: string): Promise<PathResponse> {
     const mod = await this.requireModule(moduleId);
     if (!mod.published) {
       throw new NotFoundException("Module not published");
     }
-    return this.buildPath(mod);
+    return this.buildPath(mod, learnerId);
   }
 
-  async getFeaturedPath(): Promise<PathResponse> {
+  async getFeaturedPath(learnerId: string): Promise<PathResponse> {
     const [mod] = await this.db
       .select()
       .from(modules)
       .where(eq(modules.featured, true))
       .limit(1);
     if (!mod) throw new NotFoundException("No featured module");
-    return this.buildPath(mod);
+    return this.buildPath(mod, learnerId);
   }
 
-  async getPlayLevel(levelId: string): Promise<PlayLevelResponse> {
+  async getPlayLevel(levelId: string, learnerId: string): Promise<PlayLevelResponse> {
     const ctx = await this.levelContext(levelId);
     const ordered = await this.orderedLevelIds(ctx.module.id);
-    const completed = await this.completedSet();
+    const completed = await this.completedSet(learnerId);
     if (isLevelLocked(ordered, completed, levelId)) {
       throw new ForbiddenException("Finish the previous level first");
     }
     const statuses = deriveLevelStatuses(ordered, completed);
     const status = statuses[levelId] ?? "current";
-    const learner = await this.syncedLearner();
+    const learner = await this.syncedLearner(learnerId);
     if (ctx.level.kind === "game" && learner.hearts <= 0) {
       throw this.heartsEmpty();
     }
@@ -181,74 +185,91 @@ export class CurriculumService {
     return payload;
   }
 
-  async completeLevel(levelId: string) {
+  async completeLevel(levelId: string, learnerId: string) {
     const ctx = await this.levelContext(levelId);
     if (ctx.level.kind === "game") {
       throw new BadRequestException("Finish the game to complete this level");
     }
-    await this.ensureUnlocked(ctx.module.id, levelId);
-    const first = await this.markComplete(levelId);
+    await this.ensureUnlocked(ctx.module.id, levelId, learnerId);
+    const first = await this.markComplete(levelId, learnerId);
     if (ctx.level.kind === "lesson") {
-      await this.refillHearts();
+      await this.refillHearts(learnerId);
     }
-    const learner = await this.getLearner();
+    const learner = await this.getLearner(learnerId);
     return { completed: true, firstTime: first, learner };
   }
 
-  async recordMiss(levelId: string) {
+  async recordMiss(levelId: string, learnerId: string) {
     const ctx = await this.levelContext(levelId);
     if (ctx.level.kind !== "game") {
       throw new BadRequestException("Misses are only for game levels");
     }
-    await this.ensureUnlocked(ctx.module.id, levelId);
-    const learner = await this.syncedLearner();
+    await this.ensureUnlocked(ctx.module.id, levelId, learnerId);
+    const learner = await this.syncedLearner(learnerId);
     if (learner.hearts <= 0) {
       throw this.heartsEmpty();
     }
     const leavingFull = learner.hearts >= MAX_HEARTS;
-    const row = await this.requireLearner();
+    const row = await this.requireLearner(learnerId);
     await this.db
       .update(learners)
       .set({
         hearts: learner.hearts - 1,
         heartsUpdatedAt: leavingFull ? Date.now() : row.heartsUpdatedAt,
       })
-      .where(eq(learners.id, DEMO_LEARNER_ID));
-    return { learner: await this.getLearner() };
+      .where(eq(learners.id, learnerId));
+    return { learner: await this.getLearner(learnerId) };
   }
 
-  async submitAttempt(levelId: string, body: unknown) {
+  async submitAttempt(levelId: string, body: unknown, learnerId: string) {
     const data = parseBody(attemptBodySchema, body);
     const ctx = await this.levelContext(levelId);
     if (ctx.level.kind !== "game") {
       throw new BadRequestException("Attempts are only for game levels");
     }
-    await this.ensureUnlocked(ctx.module.id, levelId);
-    const learnerBefore = await this.syncedLearner();
+    await this.ensureUnlocked(ctx.module.id, levelId, learnerId);
+    const learnerBefore = await this.syncedLearner(learnerId);
     if (learnerBefore.hearts <= 0) {
       throw this.heartsEmpty();
     }
     await this.db.insert(attempts).values({
       id: randomUUID(),
-      learnerId: DEMO_LEARNER_ID,
+      learnerId,
       levelId,
       score: data.score,
       maxScore: data.maxScore,
       payload: data.payload === undefined ? null : JSON.stringify(data.payload),
       createdAt: Date.now(),
     });
-    const first = await this.markComplete(levelId);
-    const learner = await this.getLearner();
+    const first = await this.markComplete(levelId, learnerId);
+    const learner = await this.getLearner(learnerId);
     return { completed: true, firstTime: first, learner };
   }
 
-  async listTeachModules(): Promise<TeachModule[]> {
+  /** Teachers only see modules they own or were explicitly granted; admins see all. */
+  async listTeachModules(user: SessionUser): Promise<TeachModule[]> {
     const rows = await this.db
       .select()
       .from(modules)
       .orderBy(desc(modules.featured), asc(modules.sortOrder));
     const result: TeachModule[] = [];
     for (const row of rows) {
+      if (user.role !== "admin") {
+        const isOwner = row.ownerUserId != null && row.ownerUserId === user.id;
+        if (!isOwner) {
+          const [grant] = await this.db
+            .select()
+            .from(moduleCollaborators)
+            .where(
+              and(
+                eq(moduleCollaborators.moduleId, row.id),
+                eq(moduleCollaborators.userId, user.id),
+              ),
+            )
+            .limit(1);
+          if (!grant) continue;
+        }
+      }
       result.push(await this.toTeachModule(row));
     }
     return result;
@@ -287,7 +308,7 @@ export class CurriculumService {
     return { ...summary, sections: detailSections };
   }
 
-  async createModule(body: unknown) {
+  async createModule(body: unknown, user: SessionUser) {
     const data = parseBody(createModuleBodySchema, body);
     const id = randomUUID();
     const sectionId = randomUUID();
@@ -301,6 +322,7 @@ export class CurriculumService {
       sortOrder: maxSort + 1,
       published: false,
       featured: false,
+      ownerUserId: user.id,
       createdAt: t,
       updatedAt: t,
     });
@@ -313,6 +335,34 @@ export class CurriculumService {
       sortOrder: 0,
     });
     return this.getTeachModule(id);
+  }
+
+  async addModuleCollaborator(
+    moduleId: string,
+    userId: string,
+    grantedByUserId: string,
+  ) {
+    await this.requireModule(moduleId);
+    await this.db
+      .insert(moduleCollaborators)
+      .values({
+        moduleId,
+        userId,
+        grantedByUserId,
+        createdAt: Date.now(),
+      })
+      .onConflictDoNothing();
+    return { ok: true, moduleId, userId };
+  }
+
+  /** Route guards resolve a section's module before any edit is allowed. */
+  async requireSectionPublic(sectionId: string) {
+    return this.requireSection(sectionId);
+  }
+
+  async moduleIdForLevel(levelId: string) {
+    const ctx = await this.levelContext(levelId);
+    return ctx.module.id;
   }
 
   async patchModule(moduleId: string, body: unknown) {
@@ -569,10 +619,13 @@ export class CurriculumService {
     };
   }
 
-  private async buildPath(mod: typeof modules.$inferSelect): Promise<PathResponse> {
-    const learner = await this.getLearner();
+  private async buildPath(
+    mod: typeof modules.$inferSelect,
+    learnerId: string,
+  ): Promise<PathResponse> {
+    const learner = await this.getLearner(learnerId);
     const ordered = await this.orderedLevelIds(mod.id);
-    const completed = await this.completedSet();
+    const completed = await this.completedSet(learnerId);
     const statuses = deriveLevelStatuses(ordered, completed);
     const sectionRows = await this.db
       .select()
@@ -646,35 +699,39 @@ export class CurriculumService {
     return ids;
   }
 
-  private async completedSet(): Promise<Set<string>> {
+  private async completedSet(learnerId: string): Promise<Set<string>> {
     const rows = await this.db
       .select()
       .from(learnerProgress)
-      .where(eq(learnerProgress.learnerId, DEMO_LEARNER_ID));
+      .where(eq(learnerProgress.learnerId, learnerId));
     return new Set(rows.map((row) => row.levelId));
   }
 
-  private async ensureUnlocked(moduleId: string, levelId: string) {
+  private async ensureUnlocked(
+    moduleId: string,
+    levelId: string,
+    learnerId: string,
+  ) {
     const ordered = await this.orderedLevelIds(moduleId);
-    const completed = await this.completedSet();
+    const completed = await this.completedSet(learnerId);
     if (isLevelLocked(ordered, completed, levelId)) {
       throw new ForbiddenException("Finish the previous level first");
     }
   }
 
-  private async markComplete(levelId: string): Promise<boolean> {
-    const completed = await this.completedSet();
+  private async markComplete(levelId: string, learnerId: string): Promise<boolean> {
+    const completed = await this.completedSet(learnerId);
     if (completed.has(levelId)) return false;
     await this.db.insert(learnerProgress).values({
-      learnerId: DEMO_LEARNER_ID,
+      learnerId,
       levelId,
       completedAt: Date.now(),
     });
-    const learner = await this.requireLearner();
+    const learner = await this.requireLearner(learnerId);
     await this.db
       .update(learners)
       .set({ xp: learner.xp + FIRST_COMPLETE_XP })
-      .where(eq(learners.id, DEMO_LEARNER_ID));
+      .where(eq(learners.id, learnerId));
     return true;
   }
 
@@ -726,11 +783,12 @@ export class CurriculumService {
       sortOrder: row.sortOrder,
       sectionCount: sectionRows.length,
       levelCount: ordered.length,
+      ownerUserId: row.ownerUserId ?? null,
     };
   }
 
-  private async syncedLearner(): Promise<Learner> {
-    const row = await this.requireLearner();
+  private async syncedLearner(learnerId: string): Promise<Learner> {
+    const row = await this.requireLearner(learnerId);
     const dripped = applyHeartDrip(row.hearts, row.heartsUpdatedAt, Date.now());
     if (dripped.changed) {
       await this.db
@@ -739,22 +797,26 @@ export class CurriculumService {
           hearts: dripped.hearts,
           heartsUpdatedAt: dripped.heartsUpdatedAt,
         })
-        .where(eq(learners.id, DEMO_LEARNER_ID));
+        .where(eq(learners.id, learnerId));
     }
+    const avatarId: AvatarId = isAvatarId(row.avatarId)
+      ? row.avatarId
+      : DEFAULT_AVATAR_ID;
     return {
       id: row.id,
       displayName: row.displayName,
+      avatarId,
       streak: row.streak,
       hearts: dripped.hearts,
       xp: row.xp,
     };
   }
 
-  private async refillHearts() {
+  private async refillHearts(learnerId: string) {
     await this.db
       .update(learners)
       .set({ hearts: MAX_HEARTS, heartsUpdatedAt: Date.now() })
-      .where(eq(learners.id, DEMO_LEARNER_ID));
+      .where(eq(learners.id, learnerId));
   }
 
   private heartsEmpty() {
@@ -768,12 +830,12 @@ export class CurriculumService {
     );
   }
 
-  private async requireLearner() {
+  private async requireLearner(learnerId: string) {
     const [row] = await this.db
       .select()
       .from(learners)
-      .where(eq(learners.id, DEMO_LEARNER_ID));
-    if (!row) throw new NotFoundException("Demo learner missing");
+      .where(eq(learners.id, learnerId));
+    if (!row) throw new NotFoundException("Learner not found");
     return row;
   }
 

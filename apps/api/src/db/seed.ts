@@ -421,9 +421,12 @@ function game(
 export async function seedIfEmpty(db: JoseDb) {
   const existing = await db.select({ id: modules.id }).from(modules).limit(1);
   if (existing.length === 0) {
+    // Demo profile only. No seeded users, and never a seeded admin.
     await db.insert(learners).values({
       id: DEMO_LEARNER_ID,
+      userId: null,
       displayName: "Explorer",
+      avatarId: "compass",
       streak: 3,
       hearts: 5,
       heartsUpdatedAt: now,
@@ -749,6 +752,8 @@ async function insertModule(
     sortOrder: input.sortOrder,
     published: input.published,
     featured: input.featured,
+    // Seeded curriculum has no owner; only admins can edit it.
+    ownerUserId: null,
     createdAt: now,
     updatedAt: now,
   });

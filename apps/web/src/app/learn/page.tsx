@@ -1,7 +1,8 @@
 import { AppShell } from "@/components/learning-shell";
 import { ModuleGrid } from "@/components/module-grid";
 import { TopBar } from "@/components/top-bar";
-import { fetchModules } from "@/lib/path-api";
+import { SignInRequired } from "@/components/sign-in-required";
+import { fetchModules } from "@/lib/server-api";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -15,6 +16,13 @@ export default async function LearnPage() {
   const result = await fetchModules();
 
   if (!result.ok) {
+    if (result.status === 401) {
+      return (
+        <AppShell>
+          <SignInRequired />
+        </AppShell>
+      );
+    }
     return (
       <AppShell>
         <NapState title="Modules are napping" error={result.error} href="/learn" />

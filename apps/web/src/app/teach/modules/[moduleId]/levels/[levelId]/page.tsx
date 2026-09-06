@@ -1,5 +1,6 @@
 import { TeachLevelEditor } from "@/components/teach-level-editor";
-import { fetchTeachLevel, isNotFoundError } from "@/lib/path-api";
+import { isNotFoundError } from "@/lib/path-api";
+import { fetchTeachLevel } from "@/lib/server-api";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";

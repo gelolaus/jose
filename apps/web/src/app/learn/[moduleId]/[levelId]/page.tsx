@@ -5,7 +5,8 @@ import { GamePlayer } from "@/components/game-player";
 import { HeartsBreak } from "@/components/games/game-stage";
 import { AppShell } from "@/components/learning-shell";
 import { LessonPlayer } from "@/components/lesson-player";
-import { fetchPlayLevel } from "@/lib/path-api";
+import { SignInRequired } from "@/components/sign-in-required";
+import { fetchPlayLevel } from "@/lib/server-api";
 import { ArrowLeft, Heart } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -31,6 +32,13 @@ export default async function PlayLevelPage({ params }: Props) {
       return (
         <AppShell>
           <HeartsBreak moduleId={moduleId} />
+        </AppShell>
+      );
+    }
+    if (result.status === 401) {
+      return (
+        <AppShell>
+          <SignInRequired />
         </AppShell>
       );
     }

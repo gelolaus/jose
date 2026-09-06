@@ -1,91 +1,189 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
   Put,
+  UseGuards,
 } from "@nestjs/common";
+import { grantCollaboratorBodySchema, type SessionUser } from "@jose/shared";
+import { AuthorizationService } from "../auth/authorization.service";
+import { CurrentUser, SessionAuthGuard } from "../auth/session.guard";
+import { TeacherRoleGuard } from "../auth/teacher-role.guard";
+import { UsersService } from "../auth/users.service";
 import { CurriculumService } from "./curriculum.service";
 
+/**
+ * Teacher studio. `SessionAuthGuard` proves a real session exists and
+ * `TeacherRoleGuard` proves the stored role allows the studio; every route below
+ * additionally proves ownership (or an explicit collaborator grant) for the
+ * module the request touches, including routes addressed by section or level id.
+ */
 @Controller("teach")
+@UseGuards(SessionAuthGuard, TeacherRoleGuard)
 export class TeachController {
-  constructor(private readonly curriculum: CurriculumService) {}
+  constructor(
+    private readonly curriculum: CurriculumService,
+    private readonly authorization: AuthorizationService,
+    private readonly users: UsersService,
+  ) {}
 
   @Get("modules")
-  list() {
-    return this.curriculum.listTeachModules();
+  list(@CurrentUser() user: SessionUser) {
+    return this.curriculum.listTeachModules(user);
   }
 
   @Post("modules")
-  create(@Body() body: unknown) {
-    return this.curriculum.createModule(body);
+  create(@CurrentUser() user: SessionUser, @Body() body: unknown) {
+    return this.curriculum.createModule(body, user);
   }
 
   @Get("modules/:id")
-  get(@Param("id") id: string) {
+  async get(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    await this.authorization.assertCanAccessModule(user, id);
     return this.curriculum.getTeachModule(id);
   }
 
   @Patch("modules/:id")
-  patch(@Param("id") id: string, @Body() body: unknown) {
+  async patch(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    await this.authorization.assertCanAccessModule(user, id);
     return this.curriculum.patchModule(id, body);
   }
 
   @Delete("modules/:id")
-  remove(@Param("id") id: string) {
+  async remove(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    await this.authorization.assertCanAccessModule(user, id);
     return this.curriculum.deleteModule(id);
   }
 
+  @Post("modules/:id/collaborators")
+  async addCollaborator(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    await this.authorization.assertCanManageCollaborators(user, id);
+    const parsed = grantCollaboratorBodySchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException("email is required");
+    }
+    const collaborator = await this.users.findByAdmissionEmail(parsed.data.email);
+    if (!collaborator) {
+      throw new NotFoundException(
+        "No Jose account for that APC mailbox. They must sign in with Microsoft first.",
+      );
+    }
+    if (collaborator.role !== "teacher" && collaborator.role !== "admin") {
+      throw new BadRequestException(
+        "Collaborators must already have the teacher role; an APC email alone is not enough",
+      );
+    }
+    return this.curriculum.addModuleCollaborator(id, collaborator.id, user.id);
+  }
+
   @Post("modules/:id/sections")
-  addSection(@Param("id") id: string, @Body() body: unknown) {
+  async addSection(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    await this.authorization.assertCanAccessModule(user, id);
     return this.curriculum.createSection(id, body);
   }
 
   @Patch("sections/:id")
-  patchSection(@Param("id") id: string, @Body() body: unknown) {
+  async patchSection(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const section = await this.curriculum.requireSectionPublic(id);
+    await this.authorization.assertCanAccessModule(user, section.moduleId);
     return this.curriculum.patchSection(id, body);
   }
 
   @Delete("sections/:id")
-  deleteSection(@Param("id") id: string) {
+  async deleteSection(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    const section = await this.curriculum.requireSectionPublic(id);
+    await this.authorization.assertCanAccessModule(user, section.moduleId);
     return this.curriculum.deleteSection(id);
   }
 
   @Post("sections/:id/levels")
-  addLevel(@Param("id") id: string, @Body() body: unknown) {
+  async addLevel(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const section = await this.curriculum.requireSectionPublic(id);
+    await this.authorization.assertCanAccessModule(user, section.moduleId);
     return this.curriculum.createLevel(id, body);
   }
 
   @Get("levels/:id")
-  getLevel(@Param("id") id: string) {
+  async getLevel(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    const moduleId = await this.curriculum.moduleIdForLevel(id);
+    await this.authorization.assertCanAccessModule(user, moduleId);
     return this.curriculum.getTeachLevel(id);
   }
 
   @Patch("levels/:id")
-  patchLevel(@Param("id") id: string, @Body() body: unknown) {
+  async patchLevel(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const moduleId = await this.curriculum.moduleIdForLevel(id);
+    await this.authorization.assertCanAccessModule(user, moduleId);
     return this.curriculum.patchLevel(id, body);
   }
 
   @Delete("levels/:id")
-  deleteLevel(@Param("id") id: string) {
+  async deleteLevel(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    const moduleId = await this.curriculum.moduleIdForLevel(id);
+    await this.authorization.assertCanAccessModule(user, moduleId);
     return this.curriculum.deleteLevel(id);
   }
 
   @Post("levels/:id/move")
-  move(@Param("id") id: string, @Body() body: unknown) {
+  async move(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const moduleId = await this.curriculum.moduleIdForLevel(id);
+    await this.authorization.assertCanAccessModule(user, moduleId);
     return this.curriculum.moveLevel(id, body);
   }
 
   @Put("levels/:id/lesson")
-  putLesson(@Param("id") id: string, @Body() body: unknown) {
+  async putLesson(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const moduleId = await this.curriculum.moduleIdForLevel(id);
+    await this.authorization.assertCanAccessModule(user, moduleId);
     return this.curriculum.putLesson(id, body);
   }
 
   @Put("levels/:id/game")
-  putGame(@Param("id") id: string, @Body() body: unknown) {
+  async putGame(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const moduleId = await this.curriculum.moduleIdForLevel(id);
+    await this.authorization.assertCanAccessModule(user, moduleId);
     return this.curriculum.putGame(id, body);
   }
 }

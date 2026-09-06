@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
+  EXPLORER_STORAGE_KEY,
+  clearSensitiveClientState,
   normalizeDisplayName,
   parseExplorerIdentity,
+  writeExplorerIdentity,
 } from "./explorer-identity";
 
 describe("normalizeDisplayName", () => {
@@ -34,5 +37,39 @@ describe("parseExplorerIdentity", () => {
   it("rejects non-objects", () => {
     expect(parseExplorerIdentity(null)).toBeNull();
     expect(parseExplorerIdentity("nope")).toBeNull();
+  });
+});
+
+describe("clearSensitiveClientState", () => {
+  afterEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
+  it("removes explorer identity and other jose.* keys on sign-out", () => {
+    writeExplorerIdentity({ displayName: "Luna", avatarId: "star" });
+    window.localStorage.setItem("jose.draft", "secret");
+    window.localStorage.setItem("unrelated", "keep");
+    window.sessionStorage.setItem(EXPLORER_STORAGE_KEY, "stale");
+
+    clearSensitiveClientState();
+
+    expect(window.localStorage.getItem(EXPLORER_STORAGE_KEY)).toBeNull();
+    expect(window.localStorage.getItem("jose.draft")).toBeNull();
+    expect(window.localStorage.getItem("unrelated")).toBe("keep");
+    expect(window.sessionStorage.getItem(EXPLORER_STORAGE_KEY)).toBeNull();
+  });
+
+  it("leaves nothing behind for the next person on a shared computer", () => {
+    writeExplorerIdentity({ displayName: "Alice", avatarId: "sun" });
+    clearSensitiveClientState();
+    writeExplorerIdentity({ displayName: "Bob", avatarId: "ship" });
+
+    const raw = window.localStorage.getItem(EXPLORER_STORAGE_KEY);
+    expect(raw).toBeTruthy();
+    expect(parseExplorerIdentity(JSON.parse(raw!))).toEqual({
+      displayName: "Bob",
+      avatarId: "ship",
+    });
   });
 });
