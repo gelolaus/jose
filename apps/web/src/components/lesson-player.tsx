@@ -15,13 +15,11 @@ export function LessonPlayer({
   moduleId,
   title,
   lesson,
-  contentRevisionId,
 }: {
   levelId: string;
   moduleId: string;
   title: string;
   lesson: LessonContent;
-  contentRevisionId?: string | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -31,9 +29,7 @@ export function LessonPlayer({
     setBusy(true);
     setError(null);
     try {
-      await completeLevel(levelId, {
-        contentRevisionId: contentRevisionId ?? undefined,
-      });
+      await completeLevel(levelId);
       router.push(`/learn/${moduleId}`);
       router.refresh();
     } catch (err) {
