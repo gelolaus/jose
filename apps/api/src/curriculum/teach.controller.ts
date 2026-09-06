@@ -1,3 +1,4 @@
+import type { Response } from "express";
 import {
   BadRequestException,
   Body,
@@ -9,6 +10,8 @@ import {
   Patch,
   Post,
   Put,
+  Res,
+  StreamableFile,
   UseGuards,
 } from "@nestjs/common";
 import { grantCollaboratorBodySchema, type SessionUser } from "@jose/shared";
@@ -33,6 +36,11 @@ export class TeachController {
     private readonly users: UsersService,
   ) {}
 
+  @Get("templates")
+  templates() {
+    return this.curriculum.listTemplates();
+  }
+
   @Get("modules")
   list(@CurrentUser() user: SessionUser) {
     return this.curriculum.listTeachModules(user);
@@ -41,6 +49,11 @@ export class TeachController {
   @Post("modules")
   create(@CurrentUser() user: SessionUser, @Body() body: unknown) {
     return this.curriculum.createModule(body, user);
+  }
+
+  @Post("modules/wizard")
+  createWizard(@CurrentUser() user: SessionUser, @Body() body: unknown) {
+    return this.curriculum.createModuleFromWizard(body, user);
   }
 
   @Get("modules/:id")
@@ -92,6 +105,60 @@ export class TeachController {
     return this.curriculum.addModuleCollaborator(id, collaborator.id, user.id);
   }
 
+  @Post("modules/:id/duplicate")
+  async duplicateModule(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    await this.authorization.assertCanAccessModule(user, id);
+    return this.curriculum.duplicateModule(id, body ?? {}, user);
+  }
+
+  @Post("modules/:id/apply-template")
+  async applyTemplate(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    await this.authorization.assertCanAccessModule(user, id);
+    return this.curriculum.applyTemplate(id, body);
+  }
+
+  @Get("modules/:id/assets")
+  async listAssets(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    await this.authorization.assertCanAccessModule(user, id);
+    return this.curriculum.listAssets(id);
+  }
+
+  @Post("modules/:id/assets")
+  async createAsset(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    await this.authorization.assertCanAccessModule(user, id);
+    return this.curriculum.createAsset(id, body);
+  }
+
+  @Get("assets/:id")
+  async getAsset(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const moduleId = await this.curriculum.moduleIdForAsset(id);
+    await this.authorization.assertCanAccessModule(user, moduleId);
+    const asset = await this.curriculum.getAsset(id);
+    const buffer = Buffer.from(asset.dataBase64, "base64");
+    res.set({
+      "Content-Type": asset.mime,
+      "Content-Length": String(buffer.length),
+      "Cache-Control": "private, max-age=3600",
+    });
+    return new StreamableFile(buffer);
+  }
+
   @Post("modules/:id/sections")
   async addSection(
     @CurrentUser() user: SessionUser,
@@ -118,6 +185,17 @@ export class TeachController {
     const section = await this.curriculum.requireSectionPublic(id);
     await this.authorization.assertCanAccessModule(user, section.moduleId);
     return this.curriculum.deleteSection(id);
+  }
+
+  @Post("sections/:id/duplicate")
+  async duplicateSection(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const section = await this.curriculum.requireSectionPublic(id);
+    await this.authorization.assertCanAccessModule(user, section.moduleId);
+    return this.curriculum.duplicateSection(id, body ?? {});
   }
 
   @Post("sections/:id/levels")
@@ -156,6 +234,17 @@ export class TeachController {
     return this.curriculum.deleteLevel(id);
   }
 
+  @Post("levels/:id/duplicate")
+  async duplicateLevel(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const moduleId = await this.curriculum.moduleIdForLevel(id);
+    await this.authorization.assertCanAccessModule(user, moduleId);
+    return this.curriculum.duplicateLevel(id, body ?? {});
+  }
+
   @Post("levels/:id/move")
   async move(
     @CurrentUser() user: SessionUser,
@@ -187,5 +276,16 @@ export class TeachController {
     const moduleId = await this.curriculum.moduleIdForLevel(id);
     await this.authorization.assertCanAccessModule(user, moduleId);
     return this.curriculum.putGame(id, body);
+  }
+
+  @Post("levels/:id/import-questions")
+  async importQuestions(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const moduleId = await this.curriculum.moduleIdForLevel(id);
+    await this.authorization.assertCanAccessModule(user, moduleId);
+    return this.curriculum.importQuestions(id, body);
   }
 }

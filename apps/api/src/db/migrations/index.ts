@@ -239,11 +239,36 @@ export const migration004AssessmentAttempts: Migration = {
   },
 };
 
+/** Draft revision counters, lesson blocks, and teacher source assets. */
+export const migration005AuthoringStudio: Migration = {
+  id: "005_authoring_studio",
+  async up(client) {
+    await ensureColumn(client, "modules", "revision", "INTEGER NOT NULL DEFAULT 0");
+    await ensureColumn(client, "levels", "revision", "INTEGER NOT NULL DEFAULT 0");
+    await ensureColumn(client, "lesson_content", "blocks_json", "TEXT");
+    await client.execute(`CREATE TABLE IF NOT EXISTS teach_assets (
+      id TEXT PRIMARY KEY,
+      module_id TEXT NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
+      filename TEXT NOT NULL,
+      mime TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      alt TEXT NOT NULL,
+      attribution TEXT,
+      data_base64 TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )`);
+    await client.execute(
+      `CREATE INDEX IF NOT EXISTS idx_teach_assets_module ON teach_assets (module_id, created_at)`,
+    );
+  },
+};
+
 export const MIGRATIONS: Migration[] = [
   migration001InitialSchema,
   migration002QueryIndexes,
   migration003IdentityAndAuth,
   migration004AssessmentAttempts,
+  migration005AuthoringStudio,
 ];
 
 export async function ensureColumn(

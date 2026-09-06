@@ -9,9 +9,11 @@ import type { WhyPayload } from "./games/play-types";
 export function GameEditor({
   game,
   onSave,
+  onChange,
 }: {
   game: GameContent;
   onSave: (game: GameContent) => Promise<void>;
+  onChange?: (game: GameContent) => void;
 }) {
   const [draft, setDraft] = useState<GameContent>(game);
   const [tab, setTab] = useState<"build" | "play">("build");
@@ -22,6 +24,11 @@ export function GameEditor({
     stars: number;
   } | null>(null);
   const [playKey, setPlayKey] = useState(0);
+
+  function updateDraft(next: GameContent) {
+    setDraft(next);
+    onChange?.(next);
+  }
 
   return (
     <form
@@ -57,7 +64,7 @@ export function GameEditor({
         </button>
       </div>
       {tab === "build" ? (
-        <GameSwitch mode="build" game={draft} onChange={setDraft} />
+        <GameSwitch mode="build" game={draft} onChange={updateDraft} />
       ) : preview ? (
         <StarCelebration
           title="Playtest"

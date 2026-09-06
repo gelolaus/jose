@@ -34,6 +34,7 @@ export const modules = sqliteTable("modules", {
   }),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
+  revision: integer("revision").notNull().default(0),
 });
 
 /** Explicit per-module edit grants. Owning a module is never implied by role or domain. */
@@ -76,6 +77,7 @@ export const levels = sqliteTable("levels", {
   kind: text("kind").notNull(),
   gameType: text("game_type"),
   sortOrder: integer("sort_order").notNull(),
+  revision: integer("revision").notNull().default(0),
 });
 
 export const lessonContent = sqliteTable("lesson_content", {
@@ -84,6 +86,7 @@ export const lessonContent = sqliteTable("lesson_content", {
     .references(() => levels.id, { onDelete: "cascade" }),
   markdown: text("markdown").notNull(),
   youtubeVideoId: text("youtube_video_id"),
+  blocksJson: text("blocks_json"),
 });
 
 export const gameContent = sqliteTable("game_content", {
@@ -91,6 +94,20 @@ export const gameContent = sqliteTable("game_content", {
     .primaryKey()
     .references(() => levels.id, { onDelete: "cascade" }),
   json: text("json").notNull(),
+});
+
+export const teachAssets = sqliteTable("teach_assets", {
+  id: text("id").primaryKey(),
+  moduleId: text("module_id")
+    .notNull()
+    .references(() => modules.id, { onDelete: "cascade" }),
+  filename: text("filename").notNull(),
+  mime: text("mime").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  alt: text("alt").notNull(),
+  attribution: text("attribution"),
+  dataBase64: text("data_base64").notNull(),
+  createdAt: integer("created_at").notNull(),
 });
 
 export const learnerProgress = sqliteTable(
