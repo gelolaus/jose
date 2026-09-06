@@ -1,19 +1,29 @@
 import {
   evaluateEventResultSchema,
   finishAttemptResultSchema,
+  importQuestionsResultSchema,
   missBodySchema,
   missResponseSchema,
+  moduleTemplateMetaSchema,
   modulesResponseSchema,
   pathResponseSchema,
   playLevelResponseSchema,
+  publishReadinessSchema,
+  studentAssignmentSchema,
+  classSummarySchema,
+  teachAssetSchema,
   teachLevelDetailSchema,
   teachModuleDetailSchema,
   teachModuleSchema,
   type FinishAnswers,
   type FinishAttemptResult,
+  type GameContent,
   type ModulesResponse,
+  type ModuleTemplateId,
   type PathResponse,
   type PlayLevelResponse,
+  type PublishReadiness,
+  type TeachAsset,
   type TeachLevelDetail,
   type TeachModule,
   type TeachModuleDetail,
@@ -69,7 +79,13 @@ async function apiFetch(
   const json: unknown = await res.json().catch(() => null);
   if (!res.ok) {
     const message = extractApiMessage(json) ?? `API returned ${res.status}`;
-    throw new ApiError(message, res.status, extractApiCode(json));
+    throw new ApiError(
+      message,
+      res.status,
+      extractApiCode(json),
+      extractCurrentRevision(json),
+      json,
+    );
   }
   return json;
 }
@@ -79,10 +95,26 @@ export class ApiError extends Error {
     message: string,
     readonly status: number,
     readonly code?: string,
+    readonly currentRevision?: number,
+    readonly payload?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
   }
+}
+
+export function extractPublishReadiness(error: unknown): PublishReadiness | null {
+  if (!(error instanceof ApiError) || error.payload == null) return null;
+  const payload = error.payload;
+  if (typeof payload !== "object") return null;
+  const record = payload as { readiness?: unknown; message?: unknown };
+  const candidate =
+    record.readiness ??
+    (record.message && typeof record.message === "object"
+      ? (record.message as { readiness?: unknown }).readiness
+      : undefined);
+  const parsed = publishReadinessSchema.safeParse(candidate);
+  return parsed.success ? parsed.data : null;
 }
 
 export function isNotFoundError(error: unknown): boolean {
@@ -229,6 +261,25 @@ export async function createTeachModule(body: {
   return teachModuleDetailSchema.parse(json);
 }
 
+export async function createTeachModuleFromWizard(body: {
+  title: string;
+  intendedLearners: string;
+  objective: string;
+  coverColor?: string;
+  templateId?: ModuleTemplateId;
+}): Promise<TeachModuleDetail> {
+  const json = await apiFetch("/teach/modules/wizard", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return teachModuleDetailSchema.parse(json);
+}
+
+export async function fetchTeachTemplates() {
+  const json = await apiFetch("/teach/templates");
+  return moduleTemplateMetaSchema.array().parse(json);
+}
+
 export async function patchTeachModule(
   id: string,
   body: Record<string, unknown>,
@@ -242,6 +293,25 @@ export async function patchTeachModule(
 
 export async function deleteTeachModule(id: string) {
   await apiFetch(`/teach/modules/${id}`, { method: "DELETE" });
+}
+
+export async function duplicateTeachModule(id: string, title?: string) {
+  const json = await apiFetch(`/teach/modules/${id}/duplicate`, {
+    method: "POST",
+    body: JSON.stringify(title ? { title } : {}),
+  });
+  return teachModuleDetailSchema.parse(json);
+}
+
+export async function applyTeachTemplate(
+  moduleId: string,
+  body: { templateId: ModuleTemplateId; replaceEmptyStarter?: boolean },
+) {
+  const json = await apiFetch(`/teach/modules/${moduleId}/apply-template`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return teachModuleDetailSchema.parse(json);
 }
 
 export async function createTeachSection(
@@ -271,6 +341,14 @@ export async function deleteTeachSection(id: string) {
   return teachModuleDetailSchema.parse(json);
 }
 
+export async function duplicateTeachSection(id: string, title?: string) {
+  const json = await apiFetch(`/teach/sections/${id}/duplicate`, {
+    method: "POST",
+    body: JSON.stringify(title ? { title } : {}),
+  });
+  return teachModuleDetailSchema.parse(json);
+}
+
 export async function createTeachLevel(
   sectionId: string,
   body: { title: string; kind: "lesson" | "game"; gameType?: string },
@@ -290,7 +368,10 @@ export async function fetchTeachLevel(
   return teachLevelDetailSchema.parse(json);
 }
 
-export async function patchTeachLevel(id: string, body: { title?: string }) {
+export async function patchTeachLevel(
+  id: string,
+  body: { title?: string; expectedRevision?: number },
+) {
   const json = await apiFetch(`/teach/levels/${id}`, {
     method: "PATCH",
     body: JSON.stringify(body),
@@ -302,17 +383,81 @@ export async function deleteTeachLevel(id: string) {
   await apiFetch(`/teach/levels/${id}`, { method: "DELETE" });
 }
 
-export async function moveTeachLevel(id: string, direction: "up" | "down") {
+export async function duplicateTeachLevel(id: string, title?: string) {
+  const json = await apiFetch(`/teach/levels/${id}/duplicate`, {
+    method: "POST",
+    body: JSON.stringify(title ? { title } : {}),
+  });
+  return teachLevelDetailSchema.parse(json);
+}
+
+export async function moveTeachLevel(
+  id: string,
+  body: { direction?: "up" | "down"; targetSectionId?: string; index?: number } | "up" | "down",
+) {
+  const payload = typeof body === "string" ? { direction: body } : body;
   const json = await apiFetch(`/teach/levels/${id}/move`, {
     method: "POST",
-    body: JSON.stringify({ direction }),
+    body: JSON.stringify(payload),
   });
   return teachModuleDetailSchema.parse(json);
 }
 
+export async function moveTeachSection(
+  id: string,
+  body: { direction?: "up" | "down"; index?: number },
+) {
+  const json = await apiFetch(`/teach/sections/${id}/move`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return teachModuleDetailSchema.parse(json);
+}
+
+export async function fetchPublishReadiness(id: string): Promise<PublishReadiness> {
+  const json = await apiFetch(`/teach/modules/${id}/readiness`);
+  return publishReadinessSchema.parse(json);
+}
+
+export async function publishTeachModule(id: string) {
+  const json = await apiFetch(`/teach/modules/${id}/publish`, {
+    method: "POST",
+    body: JSON.stringify({ authorReviewed: true }),
+  });
+  return json as { module: TeachModuleDetail };
+}
+
+export async function unpublishTeachModule(id: string): Promise<TeachModuleDetail> {
+  const json = await apiFetch(`/teach/modules/${id}/unpublish`, {
+    method: "POST",
+    body: "{}",
+  });
+  return teachModuleDetailSchema.parse(json);
+}
+
+export async function restoreTeachModule(id: string): Promise<TeachModuleDetail> {
+  const json = await apiFetch(`/teach/modules/${id}/restore`, { method: "POST", body: "{}" });
+  return teachModuleDetailSchema.parse(json);
+}
+
+export async function fetchMyAssignments() {
+  const json = await apiFetch("/assignments/mine");
+  return studentAssignmentSchema.array().parse(json);
+}
+
+export async function fetchTeachClasses(options?: ApiCallOptions) {
+  const json = await apiFetch("/teach/classes", undefined, options);
+  return classSummarySchema.array().parse(json);
+}
+
 export async function putTeachLesson(
   id: string,
-  body: { markdown: string; youtubeUrl?: string },
+  body: {
+    markdown?: string;
+    youtubeUrl?: string;
+    blocks?: unknown;
+    expectedRevision?: number;
+  },
 ) {
   const json = await apiFetch(`/teach/levels/${id}/lesson`, {
     method: "PUT",
@@ -321,12 +466,55 @@ export async function putTeachLesson(
   return teachLevelDetailSchema.parse(json);
 }
 
-export async function putTeachGame(id: string, body: unknown) {
+export async function putTeachGame(
+  id: string,
+  body: GameContent & { expectedRevision?: number },
+) {
   const json = await apiFetch(`/teach/levels/${id}/game`, {
     method: "PUT",
     body: JSON.stringify(body),
   });
   return teachLevelDetailSchema.parse(json);
+}
+
+export async function importTeachQuestions(
+  levelId: string,
+  body: {
+    mode: "all-or-nothing" | "partial";
+    format: "json" | "csv";
+    raw?: string;
+    rows?: unknown[];
+    commit: boolean;
+  },
+) {
+  const json = await apiFetch(`/teach/levels/${levelId}/import-questions`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return importQuestionsResultSchema.parse(json);
+}
+
+export async function fetchTeachAssets(moduleId: string): Promise<TeachAsset[]> {
+  const json = await apiFetch(`/teach/modules/${moduleId}/assets`);
+  return teachAssetSchema.array().parse(json);
+}
+
+export async function createTeachAsset(
+  moduleId: string,
+  body: {
+    filename: string;
+    mime: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+    sizeBytes: number;
+    alt: string;
+    attribution?: string;
+    dataBase64: string;
+  },
+): Promise<TeachAsset> {
+  const json = await apiFetch(`/teach/modules/${moduleId}/assets`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return teachAssetSchema.parse(json);
 }
 
 export function findNode(path: PathResponse, nodeId: string) {
@@ -338,9 +526,27 @@ export function findNode(path: PathResponse, nodeId: string) {
 }
 
 function extractApiCode(json: unknown): string | undefined {
-  if (typeof json !== "object" || !json || !("code" in json)) return undefined;
-  const code = (json as { code: unknown }).code;
-  return typeof code === "string" ? code : undefined;
+  if (typeof json !== "object" || !json) return undefined;
+  if ("code" in json) {
+    const code = (json as { code: unknown }).code;
+    if (typeof code === "string") return code;
+  }
+  if ("message" in json && typeof (json as { message: unknown }).message === "object") {
+    const nested = (json as { message: { code?: unknown } }).message;
+    if (nested && typeof nested.code === "string") return nested.code;
+  }
+  return undefined;
+}
+
+function extractCurrentRevision(json: unknown): number | undefined {
+  if (typeof json !== "object" || !json) return undefined;
+  const direct = (json as { currentRevision?: unknown }).currentRevision;
+  if (typeof direct === "number") return direct;
+  const nested = (json as { message?: { currentRevision?: unknown } }).message;
+  if (nested && typeof nested.currentRevision === "number") {
+    return nested.currentRevision;
+  }
+  return undefined;
 }
 
 function extractApiMessage(json: unknown): string | null {
@@ -348,6 +554,10 @@ function extractApiMessage(json: unknown): string | null {
   const message = (json as { message: unknown }).message;
   if (typeof message === "string") return message;
   if (Array.isArray(message)) return message.map(String).join("; ");
+  if (message && typeof message === "object" && "message" in message) {
+    const nested = (message as { message: unknown }).message;
+    if (typeof nested === "string") return nested;
+  }
   return null;
 }
 

@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { ArrowLeft, Layers } from "lucide-react";
+import { ArrowLeft, Layers, Users } from "lucide-react";
 import { useJoseSession } from "@/lib/use-jose-session";
 
 export function TeachShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const modulesActive = pathname === "/teach" || pathname.startsWith("/teach/modules");
+  const classesActive = pathname.startsWith("/teach/classes");
   const { canTeach, loading } = useJoseSession();
 
   if (loading) {
@@ -72,6 +73,17 @@ export function TeachShell({ children }: { children: ReactNode }) {
           >
             <Layers className="size-6 shrink-0" strokeWidth={2.4} aria-hidden />
             Modules
+          </Link>
+          <Link
+            href="/teach/classes"
+            className={`flex items-center gap-3.5 rounded-3xl px-4 py-3.5 text-lg font-extrabold ${
+              classesActive
+                ? "bg-violet-100 text-violet-700 shadow-sm"
+                : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <Users className="size-6 shrink-0" strokeWidth={2.4} aria-hidden />
+            Classes
           </Link>
           <Link
             href="/learn"

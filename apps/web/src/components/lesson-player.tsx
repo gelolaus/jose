@@ -1,5 +1,6 @@
 "use client";
 
+import { LessonBlocksView } from "@/components/lesson-blocks-view";
 import { YoutubeEmbed } from "@/components/youtube-embed";
 import { completeLevel } from "@/lib/path-api";
 import type { LessonContent } from "@jose/shared";
@@ -37,19 +38,27 @@ export function LessonPlayer({
     }
   }
 
+  const useBlocks = Boolean(lesson.blocks && lesson.blocks.length > 0);
+
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
       <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-800 sm:text-4xl">
         {title}
       </h1>
-      <article className="jose-prose text-base font-semibold leading-relaxed text-slate-700 sm:text-lg">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
-          {lesson.markdown}
-        </ReactMarkdown>
-      </article>
-      {lesson.youtubeVideoId ? (
-        <YoutubeEmbed videoId={lesson.youtubeVideoId} />
-      ) : null}
+      {useBlocks ? (
+        <LessonBlocksView lesson={lesson} />
+      ) : (
+        <>
+          <article className="jose-prose text-base font-semibold leading-relaxed text-slate-700 sm:text-lg">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+              {lesson.markdown}
+            </ReactMarkdown>
+          </article>
+          {lesson.youtubeVideoId ? (
+            <YoutubeEmbed videoId={lesson.youtubeVideoId} />
+          ) : null}
+        </>
+      )}
       {error ? (
         <p className="text-sm font-bold text-rose-600">{error}</p>
       ) : null}

@@ -136,6 +136,8 @@ describe("migrations and backup/restore", () => {
     expect(applied).toContain("002_query_indexes");
     expect(applied).toContain("003_identity_and_auth");
     expect(applied).toContain("004_assessment_attempts");
+    expect(applied).toContain("005_authoring_studio");
+    expect(applied).toContain("006_content_classroom");
 
     const [attempt] = await db
       .select()

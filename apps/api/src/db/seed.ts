@@ -1,5 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { DEMO_LEARNER_ID, emptyGameContent, type GameContent } from "@jose/shared";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { JoseDb } from "./database.service";
 import {
   gameContent,
@@ -7,6 +8,7 @@ import {
   learnerProgress,
   lessonContent,
   levels,
+  moduleRevisions,
   modules,
   sections,
   seedHistory,
@@ -450,6 +452,7 @@ export async function applyPendingSeeds(
       await applySeedOnce(db, SEED_IDS.demoLearner, () => seedDemoLearnerV1(db)),
     );
   }
+  await ensurePublishedRevisions(db);
   return results;
 }
 
@@ -678,6 +681,13 @@ async function insertModuleIfMissing(
         ownerUserId: null,
         createdAt: now,
         updatedAt: now,
+        revision: 0,
+        objectives: "Understand key events, people, and writings from this chapter.",
+        authorReviewedAt: now,
+        publishedRevisionId: null,
+        archivedAt: null,
+        trashedAt: null,
+        status: input.published ? "published" : "draft",
       })
       .onConflictDoNothing();
 
@@ -727,4 +737,96 @@ async function insertModuleIfMissing(
       }
     }
   });
+}
+
+async function ensurePublishedRevisions(db: JoseDb) {
+  const rows = await db.select().from(modules);
+  for (const mod of rows) {
+    if (!mod.published || mod.publishedRevisionId) continue;
+    const sectionRows = await db
+      .select()
+      .from(sections)
+      .where(and(eq(sections.moduleId, mod.id), isNull(sections.archivedAt)));
+    sectionRows.sort((a, b) => a.sortOrder - b.sortOrder);
+    const sectionsSnap = [];
+    for (const section of sectionRows) {
+      const levelRows = await db
+        .select()
+        .from(levels)
+        .where(and(eq(levels.sectionId, section.id), isNull(levels.archivedAt)));
+      levelRows.sort((a, b) => a.sortOrder - b.sortOrder);
+      const levelsSnap = [];
+      for (const level of levelRows) {
+        let lesson = null;
+        let game = null;
+        if (level.kind === "lesson") {
+          const [content] = await db
+            .select()
+            .from(lessonContent)
+            .where(eq(lessonContent.levelId, level.id));
+          lesson = {
+            markdown: content?.markdown ?? "",
+            youtubeVideoId: content?.youtubeVideoId ?? null,
+          };
+        }
+        if (level.kind === "game") {
+          const [content] = await db
+            .select()
+            .from(gameContent)
+            .where(eq(gameContent.levelId, level.id));
+          game = JSON.parse(content?.json ?? "{}");
+        }
+        levelsSnap.push({
+          id: level.id,
+          title: level.title,
+          kind: level.kind,
+          gameType: level.gameType,
+          sortOrder: level.sortOrder,
+          lesson,
+          game,
+        });
+      }
+      sectionsSnap.push({
+        id: section.id,
+        title: section.title,
+        subtitle: section.subtitle,
+        themeColor: section.themeColor,
+        sortOrder: section.sortOrder,
+        levels: levelsSnap,
+      });
+    }
+    const revisionId = randomUUID();
+    await db.insert(moduleRevisions).values({
+      id: revisionId,
+      moduleId: mod.id,
+      revisionNumber: 1,
+      snapshotJson: JSON.stringify({
+        module: {
+          id: mod.id,
+          title: mod.title,
+          subtitle: mod.subtitle,
+          coverColor: mod.coverColor,
+          objectives:
+            mod.objectives ??
+            "Understand key events, people, and writings from this chapter.",
+        },
+        sections: sectionsSnap,
+      }),
+      createdAt: now,
+      createdBy: "seed",
+      publishedAt: now,
+      note: "Seeded revision",
+    });
+    await db
+      .update(modules)
+      .set({
+        publishedRevisionId: revisionId,
+        objectives:
+          mod.objectives ??
+          "Understand key events, people, and writings from this chapter.",
+        authorReviewedAt: mod.authorReviewedAt ?? now,
+        status: "published",
+      })
+      .where(eq(modules.id, mod.id));
+  }
 }
