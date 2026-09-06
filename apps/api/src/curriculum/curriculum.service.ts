@@ -432,6 +432,7 @@ export class CurriculumService {
           : `/learn/${ctx.module.id}`,
       };
     });
+  }
 
   async recordMiss(levelId: string, learnerId: string, body: unknown = {}) {
     const data = parseBody(missBodySchema, body);
