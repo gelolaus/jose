@@ -19,7 +19,10 @@ import {
   teachAssetSchema,
   teachLevelDetailSchema,
   teachModuleDetailSchema,
+  artifactsResponseSchema,
   teachModuleSchema,
+  type ArtifactsResponse,
+  type ChestContent,
   type FinishAnswers,
   type FinishAttemptResult,
   type GameContent,
@@ -207,6 +210,23 @@ export async function completeLevel(levelId: string) {
     body: "{}",
   });
   return attemptResultSchema.parse(json);
+}
+
+
+export async function fetchArtifacts(options?: ApiCallOptions): Promise<
+  | { ok: true; data: ArtifactsResponse }
+  | { ok: false; error: string; status?: number }
+> {
+  try {
+    const json = await apiFetch("/artifacts", undefined, options);
+    return { ok: true, data: artifactsResponseSchema.parse(json) };
+  } catch (error) {
+    return {
+      ok: false,
+      error: errorMessage(error),
+      status: error instanceof ApiError ? error.status : undefined,
+    };
+  }
 }
 
 export async function recordMiss(levelId: string, idempotencyKey: string) {
@@ -546,6 +566,14 @@ export async function putTeachGame(
   body: GameContent & { expectedRevision?: number },
 ) {
   const json = await apiFetch(`/teach/levels/${id}/game`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+  return teachLevelDetailSchema.parse(json);
+}
+
+export async function putTeachChest(id: string, body: ChestContent) {
+  const json = await apiFetch(`/teach/levels/${id}/chest`, {
     method: "PUT",
     body: JSON.stringify(body),
   });

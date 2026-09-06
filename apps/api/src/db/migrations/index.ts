@@ -405,6 +405,30 @@ export const migration007StudentExperience: Migration = {
   },
 };
 
+/** Journal artifacts awarded from path chests. */
+export const migration008LearnerArtifacts: Migration = {
+  id: "008_learner_artifacts",
+  async up(client) {
+    await client.execute("PRAGMA foreign_keys = ON");
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS learner_artifacts (
+        learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+        artifact_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        provenance TEXT NOT NULL,
+        body TEXT,
+        image_url TEXT,
+        journal_cover_id TEXT,
+        source_level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+        earned_at INTEGER NOT NULL,
+        PRIMARY KEY (learner_id, artifact_id)
+      )
+    `);
+  },
+};
+
 export const MIGRATIONS: Migration[] = [
   migration001InitialSchema,
   migration002QueryIndexes,
@@ -413,6 +437,7 @@ export const MIGRATIONS: Migration[] = [
   migration005AuthoringStudio,
   migration006ContentClassroom,
   migration007StudentExperience,
+  migration008LearnerArtifacts,
 ];
 
 export async function ensureColumn(

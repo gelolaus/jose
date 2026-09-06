@@ -12,6 +12,14 @@ export function hintFor(type: GameContent["type"]) {
       return "Answer the claim with the strongest evidence when asked.";
     case "blank":
       return "Restore the missing word in the sourced passage.";
+    case "case-files":
+      return "Inspect the documents, tag evidence, then defend a conclusion.";
+    case "dispatches":
+      return "Open each stop from the list (or map), then send a short dispatch.";
+    case "editorial":
+      return "Build a coherent editorial. More than one structure can work.";
+    case "dapitan":
+      return "Plan projects with limited resources. Undo anytime — no timers.";
   }
 }
 
@@ -27,5 +35,13 @@ export function labelFor(type: GameContent["type"]) {
       return "Evidence duel";
     case "blank":
       return "Restore the passage";
+    case "case-files":
+      return "Case Files";
+    case "dispatches":
+      return "Dispatches";
+    case "editorial":
+      return "Editorial";
+    case "dapitan":
+      return "Dapitan";
   }
 }

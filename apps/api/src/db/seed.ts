@@ -1,6 +1,17 @@
 import { randomUUID } from "node:crypto";
-import { DEMO_LEARNER_ID, emptyGameContent, parseGameContent, type GameContent } from "@jose/shared";
-import { and, eq, isNull } from "drizzle-orm";
+import {
+  DEMO_LEARNER_ID,
+  emptyCaseFilesGame,
+  emptyChestContent,
+  emptyDapitanGame,
+  emptyDispatchesGame,
+  emptyEditorialGame,
+  emptyGameContent,
+  parseGameContent,
+  type ChestContent,
+  type GameContent,
+} from "@jose/shared";
+import { and, eq, gte, isNull } from "drizzle-orm";
 import type { JoseDb } from "./database.service";
 import {
   gameContent,
@@ -17,6 +28,7 @@ import {
 export const SEED_IDS = {
   curriculum: "curriculum@1",
   demoLearner: "demo-learner@1",
+  gameRelease: "games-37-47@1",
 } as const;
 
 export type ApplySeedsOptions = {
@@ -34,9 +46,10 @@ type SeedLevel = {
   id: string;
   title: string;
   kind: "lesson" | "game" | "chest";
-  gameType?: "quiz" | "memory" | "timeline" | "blank" | "sort";
+  gameType?: GameContent["type"];
   markdown?: string;
   game?: GameContent;
+  chest?: ChestContent;
 };
 
 const RIZAL_LESSONS: Record<string, string> = {
@@ -556,6 +569,44 @@ function game(
   };
 }
 
+function chest(id: string, title: string, content: ChestContent): SeedLevel {
+  return {
+    id,
+    title,
+    kind: "chest",
+    chest: content,
+  };
+}
+
+function draftChest(
+  id: string,
+  title: string,
+  kind: ChestContent["artifact"]["kind"],
+  coverId: string | null,
+): ChestContent {
+  const base = emptyChestContent();
+  return {
+    ...base,
+    message: `You opened ${title}. Collect a revisitable journal artifact.`,
+    achievementCriteria: "Complete this chest stop once to earn the artifact.",
+    journalCoverId: coverId,
+    artifact: {
+      ...base.artifact,
+      id: `${id}-artifact`,
+      title: `${title} (draft artifact)`,
+      kind,
+      summary:
+        "Draft reward for the journal. Replace with an approved map, excerpt, cover, or illustration before classroom publish.",
+      provenance:
+        "Teacher must supply provenance (archive, edition, or public-domain citation).",
+      body: "[Paste an instructor-approved excerpt or description. Do not invent quotations.]",
+      approvalStatus: "draft",
+      teacherInstructions:
+        "Approve provenance and body text, set approvalStatus to approved, then publish.",
+    },
+  };
+}
+
 /**
  * Applies pending versioned seeds. Already-recorded seeds are skipped, so
  * editorial deletions survive restarts and re-runs of the seed command.
@@ -567,6 +618,9 @@ export async function applyPendingSeeds(
   const results: SeedApplyResult[] = [];
   results.push(
     await applySeedOnce(db, SEED_IDS.curriculum, () => seedCurriculumV1(db)),
+  );
+  results.push(
+    await applySeedOnce(db, SEED_IDS.gameRelease, () => seedGameReleaseV1(db)),
   );
   if (options.includeDemo) {
     results.push(
@@ -618,7 +672,11 @@ async function seedCurriculumV1(db: JoseDb) {
           lesson("childhood-family", "The Mercado family"),
           lesson("childhood-stories", "Stories from Teodora"),
           game("childhood-timeline", "Put the years in order", CHILDHOOD_TIMELINE),
-          { id: "childhood-chest", title: "Childhood treasure", kind: "chest" },
+          chest(
+            "childhood-chest",
+            "Childhood treasure",
+            draftChest("childhood-chest", "Childhood treasure", "illustration", "cover-calamba"),
+          ),
         ],
       },
       {
@@ -643,7 +701,12 @@ async function seedCurriculumV1(db: JoseDb) {
           lesson("travel-paris", "Paris days"),
           lesson("travel-germany", "Germany & science"),
           game("travel-memory", "Match the cities", TRAVELS_MEMORY),
-          { id: "travel-chest", title: "Traveler's chest", kind: "chest" },
+          chest(
+            "travel-chest",
+            "Traveler's chest",
+            draftChest("travel-chest", "Traveler's chest", "map", "cover-europe"),
+          ),
+          game("travel-dispatches", "Dispatches from Europe (draft)", emptyDispatchesGame()),
         ],
       },
       {
@@ -656,6 +719,8 @@ async function seedCurriculumV1(db: JoseDb) {
           lesson("fili", "El Filibusterismo"),
           lesson("reform", "La Liga Filipina"),
           game("novels-sort", "Which novel?", NOVELS_SORT),
+          game("novels-case-files", "Rizal Case Files (draft)", emptyCaseFilesGame()),
+          game("novels-editorial", "Editorial Room (draft)", emptyEditorialGame()),
         ],
       },
       {
@@ -668,7 +733,12 @@ async function seedCurriculumV1(db: JoseDb) {
           lesson("mi-ultimo", "Mi Último Adiós"),
           lesson("bagumbayan", "Bagumbayan"),
           game("martyrdom-blank", "Finish the farewell", MARTYRDOM_BLANK),
-          { id: "legacy-chest", title: "Legacy chest", kind: "chest" },
+          chest(
+            "legacy-chest",
+            "Legacy chest",
+            draftChest("legacy-chest", "Legacy chest", "excerpt", "cover-adios"),
+          ),
+          game("legacy-dapitan", "Dapitan Workshop (draft)", emptyDapitanGame()),
         ],
       },
     ],
@@ -714,6 +784,198 @@ He boarded in Manila, wrote poems for school programs, and finished as one of th
       },
     ],
   });
+}
+
+const GAME_RELEASE_EXTRAS: {
+  id: string;
+  sectionId: string;
+  afterId: string;
+  title: string;
+  game: GameContent;
+}[] = [
+  {
+    id: "novels-case-files",
+    sectionId: "novels",
+    afterId: "novels-sort",
+    title: "Rizal Case Files (draft)",
+    game: emptyCaseFilesGame(),
+  },
+  {
+    id: "travel-dispatches",
+    sectionId: "travels",
+    afterId: "travel-chest",
+    title: "Dispatches from Europe (draft)",
+    game: emptyDispatchesGame(),
+  },
+  {
+    id: "novels-editorial",
+    sectionId: "novels",
+    afterId: "novels-case-files",
+    title: "Editorial Room (draft)",
+    game: emptyEditorialGame(),
+  },
+  {
+    id: "legacy-dapitan",
+    sectionId: "martyrdom",
+    afterId: "legacy-chest",
+    title: "Dapitan Workshop (draft)",
+    game: emptyDapitanGame(),
+  },
+];
+
+const GAME_RELEASE_CHESTS = [
+  {
+    id: "childhood-chest",
+    title: "Childhood treasure",
+    kind: "illustration" as const,
+    coverId: "cover-calamba",
+  },
+  {
+    id: "travel-chest",
+    title: "Traveler's chest",
+    kind: "map" as const,
+    coverId: "cover-europe",
+  },
+  {
+    id: "legacy-chest",
+    title: "Legacy chest",
+    kind: "excerpt" as const,
+    coverId: "cover-adios",
+  },
+];
+
+async function seedGameReleaseV1(db: JoseDb) {
+  for (const chestLevel of GAME_RELEASE_CHESTS) {
+    const [level] = await db
+      .select({ id: levels.id })
+      .from(levels)
+      .where(eq(levels.id, chestLevel.id))
+      .limit(1);
+    if (!level) continue;
+    const [content] = await db
+      .select()
+      .from(gameContent)
+      .where(eq(gameContent.levelId, chestLevel.id))
+      .limit(1);
+    if (content) continue;
+    await db.insert(gameContent).values({
+      levelId: chestLevel.id,
+      json: JSON.stringify(
+        draftChest(chestLevel.id, chestLevel.title, chestLevel.kind, chestLevel.coverId),
+      ),
+    });
+  }
+
+  for (const extra of GAME_RELEASE_EXTRAS) {
+    const [exists] = await db
+      .select({ id: levels.id })
+      .from(levels)
+      .where(eq(levels.id, extra.id))
+      .limit(1);
+    if (exists) continue;
+    const [anchor] = await db
+      .select()
+      .from(levels)
+      .where(eq(levels.id, extra.afterId))
+      .limit(1);
+    if (!anchor) continue;
+    const insertAt = anchor.sortOrder + 1;
+    const later = await db
+      .select()
+      .from(levels)
+      .where(
+        and(eq(levels.sectionId, extra.sectionId), gte(levels.sortOrder, insertAt)),
+      );
+    for (const row of later) {
+      await db
+        .update(levels)
+        .set({ sortOrder: row.sortOrder + 1 })
+        .where(eq(levels.id, row.id));
+    }
+    await db.insert(levels).values({
+      id: extra.id,
+      sectionId: extra.sectionId,
+      title: extra.title,
+      kind: "game",
+      gameType: extra.game.type,
+      sortOrder: insertAt,
+    });
+    await db.insert(gameContent).values({
+      levelId: extra.id,
+      json: JSON.stringify(extra.game),
+    });
+  }
+
+  await spliceExtrasIntoPublishedSnapshots(db);
+}
+
+async function spliceExtrasIntoPublishedSnapshots(db: JoseDb) {
+  const published = await db.select().from(modules);
+  for (const mod of published) {
+    if (!mod.publishedRevisionId) continue;
+    const [revision] = await db
+      .select()
+      .from(moduleRevisions)
+      .where(eq(moduleRevisions.id, mod.publishedRevisionId))
+      .limit(1);
+    if (!revision) continue;
+    const snapshot = JSON.parse(revision.snapshotJson) as {
+      sections: Array<{
+        id: string;
+        levels: Array<{
+          id: string;
+          title: string;
+          kind: string;
+          gameType: string | null;
+          sortOrder: number;
+          lesson: unknown;
+          game: unknown;
+          chest?: unknown;
+        }>;
+      }>;
+    };
+    let changed = false;
+    for (const extra of GAME_RELEASE_EXTRAS) {
+      const section = snapshot.sections.find((row) => row.id === extra.sectionId);
+      if (!section) continue;
+      if (section.levels.some((level) => level.id === extra.id)) continue;
+      const afterIndex = section.levels.findIndex((level) => level.id === extra.afterId);
+      const insertAt = afterIndex >= 0 ? afterIndex + 1 : section.levels.length;
+      section.levels.splice(insertAt, 0, {
+        id: extra.id,
+        title: extra.title,
+        kind: "game",
+        gameType: extra.game.type,
+        sortOrder: insertAt,
+        lesson: null,
+        game: extra.game,
+      });
+      section.levels.forEach((level, index) => {
+        level.sortOrder = index;
+      });
+      changed = true;
+    }
+    for (const chestLevel of GAME_RELEASE_CHESTS) {
+      for (const section of snapshot.sections) {
+        const level = section.levels.find((row) => row.id === chestLevel.id);
+        if (!level) continue;
+        if (level.chest && typeof level.chest === "object") continue;
+        const [content] = await db
+          .select()
+          .from(gameContent)
+          .where(eq(gameContent.levelId, chestLevel.id))
+          .limit(1);
+        if (!content) continue;
+        level.chest = JSON.parse(content.json);
+        changed = true;
+      }
+    }
+    if (!changed) continue;
+    await db
+      .update(moduleRevisions)
+      .set({ snapshotJson: JSON.stringify(snapshot) })
+      .where(eq(moduleRevisions.id, revision.id));
+  }
 }
 
 async function seedDemoLearnerV1(db: JoseDb) {
@@ -868,6 +1130,15 @@ async function insertModuleIfMissing(
             .values({ levelId: level.id, json })
             .onConflictDoNothing();
         }
+        if (level.kind === "chest") {
+          const json = JSON.stringify(
+            level.chest ?? draftChest(level.id, level.title, "excerpt", null),
+          );
+          await tx
+            .insert(gameContent)
+            .values({ levelId: level.id, json })
+            .onConflictDoNothing();
+        }
       }
     }
   });
@@ -893,6 +1164,7 @@ async function ensurePublishedRevisions(db: JoseDb) {
       for (const level of levelRows) {
         let lesson = null;
         let game = null;
+        let chest = null;
         if (level.kind === "lesson") {
           const [content] = await db
             .select()
@@ -917,6 +1189,13 @@ async function ensurePublishedRevisions(db: JoseDb) {
             .where(eq(gameContent.levelId, level.id));
           game = JSON.parse(content?.json ?? "{}");
         }
+        if (level.kind === "chest") {
+          const [content] = await db
+            .select()
+            .from(gameContent)
+            .where(eq(gameContent.levelId, level.id));
+          chest = JSON.parse(content?.json ?? "{}");
+        }
         levelsSnap.push({
           id: level.id,
           title: level.title,
@@ -925,6 +1204,7 @@ async function ensurePublishedRevisions(db: JoseDb) {
           sortOrder: level.sortOrder,
           lesson,
           game,
+          chest,
         });
       }
       sectionsSnap.push({

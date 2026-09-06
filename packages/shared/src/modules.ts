@@ -3,6 +3,7 @@ import {
   assessmentGameSchema,
   attemptInfoSchema,
 } from "./assessment";
+import { chestContentSchema } from "./artifacts";
 import { MAX_ATTEMPT_PAYLOAD_BYTES, serializedJsonBytes } from "./limits";
 import { continueLearningSchema } from "./continue";
 import { lessonContentSchema } from "./games";
@@ -52,7 +53,7 @@ export const playLevelResponseSchema = z.object({
   /** Assessment delivery only — answer keys are stripped. */
   game: assessmentGameSchema.optional(),
   attempt: attemptInfoSchema.optional(),
-  chest: z.object({ message: z.string().min(1) }).optional(),
+  chest: chestContentSchema.optional(),
   contentRevisionId: z.string().min(1).nullable().optional(),
   nextLevelId: z.string().min(1).nullable().optional(),
   mapHref: z.string().min(1).optional(),
@@ -109,6 +110,7 @@ export const attemptResultSchema = z.object({
   nextLevelId: z.string().min(1).nullable().optional(),
   continueHref: z.string().min(1).optional(),
   contentRevisionId: z.string().min(1).nullable().optional(),
+  artifactAwarded: z.boolean().optional(),
 });
 
 export type ModuleCard = z.infer<typeof moduleCardSchema>;

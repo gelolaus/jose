@@ -737,4 +737,38 @@ describe("authoritative assessment", () => {
     const listed = await service.listAssets(mod.id);
     expect(listed.some((item) => item.id === asset.id)).toBe(true);
   });
+
+  it("awards a journal artifact once and does not duplicate on repeat", async () => {
+    const prior = [
+      "childhood-born",
+      "childhood-family",
+      "childhood-stories",
+      "childhood-timeline",
+    ];
+    await database.db.insert(learnerProgress).values(
+      prior.map((levelId) => ({
+        learnerId: student.learnerId,
+        levelId,
+        completedAt: Date.now(),
+      })),
+    ).onConflictDoNothing();
+    const play = await service.getPlayLevel("childhood-chest", student.learnerId);
+    expect(play.chest?.artifact.id).toBeTruthy();
+    expect(play.chest?.artifact.provenance.length).toBeGreaterThan(10);
+
+    const first = await service.completeLevel("childhood-chest", student.learnerId);
+    expect(first.artifactAwarded).toBe(true);
+    const listed = await service.listArtifacts(student.learnerId);
+    expect(listed.artifacts.some((a) => a.sourceLevelId === "childhood-chest")).toBe(
+      true,
+    );
+
+    const second = await service.completeLevel("childhood-chest", student.learnerId);
+    expect(second.artifactAwarded).toBe(false);
+    expect(
+      (await service.listArtifacts(student.learnerId)).artifacts.filter(
+        (a) => a.artifactId === play.chest!.artifact.id,
+      ),
+    ).toHaveLength(1);
+  });
 });

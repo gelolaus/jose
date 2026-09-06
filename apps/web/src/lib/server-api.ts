@@ -12,6 +12,7 @@ import {
   fetchPracticeReview as baseFetchPracticeReview,
   fetchPracticePlayLevel as baseFetchPracticePlayLevel,
   fetchProfileStats as baseFetchProfileStats,
+  fetchArtifacts as baseFetchArtifacts,
   fetchTeachLevel as baseFetchTeachLevel,
   fetchTeachModule as baseFetchTeachModule,
   fetchTeachModules as baseFetchTeachModules,
@@ -64,6 +65,10 @@ export async function fetchPracticePlayLevel(levelId: string) {
 
 export async function fetchProfileStats() {
   return baseFetchProfileStats(await options());
+}
+
+export async function fetchArtifacts() {
+  return baseFetchArtifacts(await options());
 }
 
 export async function fetchTeachModules() {

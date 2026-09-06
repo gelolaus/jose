@@ -13,7 +13,12 @@ import {
   shuffledCopy,
   normalizeBlankKey,
 } from "./games";
-import { firstTryScore } from "./hearts";
+import {
+  caseFilesGameSchema,
+  dapitanGameSchema,
+  dispatchesGameSchema,
+  editorialGameSchema,
+} from "./advanced-games";
 import { learnerSchema } from "./path";
 
 export const attemptModeSchema = z.enum(["assessment", "practice"]);
@@ -157,6 +162,10 @@ export const assessmentGameSchema = z.union([
   assessmentTimelineSchema,
   assessmentSortSchema,
   assessmentMemorySchema,
+  caseFilesGameSchema,
+  dispatchesGameSchema,
+  editorialGameSchema,
+  dapitanGameSchema,
 ]);
 
 export type AssessmentGame = z.infer<typeof assessmentGameSchema>;
@@ -233,16 +242,20 @@ export const finishAnswersSchema = z.discriminatedUnion("type", [
     placements: z.record(z.string().trim().min(1)),
   }),
   z.object({
-    type: z.literal("memory"),
-    /** Successful match pairs as [cardA, cardB] lists recorded by the client; verified server-side. */
-    matches: z
-      .array(
-        z.object({
-          cardA: z.string().trim().min(1),
-          cardB: z.string().trim().min(1),
-        }),
-      )
-      .min(1),
+    type: z.literal("case-files"),
+    completed: z.literal(true),
+  }),
+  z.object({
+    type: z.literal("dispatches"),
+    completed: z.literal(true),
+  }),
+  z.object({
+    type: z.literal("editorial"),
+    completed: z.literal(true),
+  }),
+  z.object({
+    type: z.literal("dapitan"),
+    completed: z.literal(true),
   }),
 ]);
 
@@ -413,11 +426,15 @@ export function sanitizeGameForAssessment(
         secret: secret ?? {},
       };
     case "memory":
-      // Prefer buildMemoryAssessment in the API so card ids are unguessable.
       return buildMemoryAssessment(game, () => {
         const n = Math.floor(Math.random() * 1e9).toString(36);
         return `card-${n}`;
       });
+    case "case-files":
+    case "dispatches":
+    case "editorial":
+    case "dapitan":
+      return { play: game, secret: secret ?? {} };
   }
 }
 
@@ -770,5 +787,11 @@ export function gradeAssessmentFinish(
       }
       return gradeFromMisses(game, priorMisses);
     }
+    case "case-files":
+    case "dispatches":
+    case "editorial":
+    case "dapitan":
+      if (game.type !== answers.type) throw new Error("Answer type mismatch");
+      return gradeFromMisses(game, priorMisses);
   }
 }

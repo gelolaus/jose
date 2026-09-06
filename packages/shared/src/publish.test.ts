@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessPublishReadiness, csvSafeCell, emptyLessonEditorial, toCsv } from "./index";
+import { assessPublishReadiness, csvSafeCell, emptyCaseFilesGame, emptyChestContent, emptyLessonEditorial, toCsv } from "./index";
 
 describe("assessPublishReadiness", () => {
   it("blocks unreviewed defaults and placeholder lessons", () => {
@@ -124,6 +124,42 @@ describe("assessPublishReadiness", () => {
     expect(result.blockers.some((issue) => issue.code === "blank.missing_slot")).toBe(true);
     expect(result.blockers.some((issue) => issue.code === "blank.ambiguous")).toBe(true);
     expect(result.blockers.some((issue) => issue.code === "game.type_mismatch")).toBe(true);
+  });
+
+  it("blocks draft investigation games and chests until sources are approved", () => {
+    const result = assessPublishReadiness({
+      id: "m1",
+      title: "Draft",
+      objectives: "Investigate sourced claims.",
+      authorReviewed: true,
+      sections: [
+        {
+          id: "s1",
+          title: "Section",
+          levels: [
+            {
+              id: "cf1",
+              title: "Case Files",
+              kind: "game",
+              gameType: "case-files",
+              sectionId: "s1",
+              game: emptyCaseFilesGame(),
+            },
+            {
+              id: "chest1",
+              title: "Chest",
+              kind: "chest",
+              gameType: null,
+              sectionId: "s1",
+              chest: emptyChestContent(),
+            },
+          ],
+        },
+      ],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.blockers.some((issue) => issue.code === "game.draft")).toBe(true);
+    expect(result.blockers.some((issue) => issue.code === "chest.draft")).toBe(true);
   });
 });
 

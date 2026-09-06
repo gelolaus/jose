@@ -355,6 +355,17 @@ export class TeachController {
     return this.curriculum.putGame(id, body);
   }
 
+  @Put("levels/:id/chest")
+  async putChest(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const moduleId = await this.curriculum.moduleIdForLevel(id);
+    await this.authorization.assertCanAccessModule(user, moduleId);
+    return this.curriculum.putChest(id, body);
+  }
+
   @Post("levels/:id/import-questions")
   async importQuestions(
     @CurrentUser() user: SessionUser,

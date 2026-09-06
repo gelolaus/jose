@@ -5,13 +5,19 @@ import { logoutJose } from "@/lib/auth-api";
 import { clearSensitiveClientState, isAvatarId } from "@/lib/explorer-identity";
 import { useExplorerIdentity } from "@/lib/use-explorer-identity";
 import { useJoseSession } from "@/lib/use-jose-session";
-import type { ProfileStatsResponse } from "@jose/shared";
-import { Flame, Heart, Lock, Trophy, Zap } from "lucide-react";
+import type { ArtifactsResponse, ProfileStatsResponse } from "@jose/shared";
+import { BookOpen, Flame, Heart, Lock, Trophy, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
+export function ProfileShowcase({
+  stats,
+  artifacts,
+}: {
+  stats: ProfileStatsResponse;
+  artifacts?: ArtifactsResponse;
+}) {
   const identity = useExplorerIdentity(stats.learner.displayName);
   const { authenticated, canTeach, loading } = useJoseSession();
   const router = useRouter();
@@ -149,6 +155,52 @@ export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--jose-ink)]">
+          Journal artifacts
+        </h2>
+        <p className="text-sm text-[var(--jose-ink-muted)]">
+          Revisitable finds from path chests — no loot boxes
+        </p>
+        {artifacts && artifacts.artifacts.length > 0 ? (
+          <ul className="flex flex-col gap-2.5">
+            {artifacts.artifacts.map((artifact) => (
+              <li
+                key={artifact.artifactId}
+                className="rounded-2xl bg-white/80 px-4 py-4 ring-1 ring-black/5"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+                    <BookOpen className="size-5" strokeWidth={2.4} aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-stone-800">
+                      {artifact.title}
+                    </p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                      {artifact.kind}
+                    </p>
+                    <p className="mt-1 text-sm text-stone-600">{artifact.summary}</p>
+                    <p className="mt-1 text-xs font-semibold text-stone-500">
+                      {artifact.provenance}
+                    </p>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="rounded-2xl bg-white/70 px-4 py-4 text-sm text-[var(--jose-ink-muted)] ring-1 ring-black/5">
+            Open a path chest to collect your first journal artifact.
+          </p>
+        )}
+        {artifacts && artifacts.journalCovers.length > 0 ? (
+          <p className="text-xs font-semibold text-violet-800">
+            Cosmetic covers unlocked: {artifacts.journalCovers.join(", ")}
+          </p>
+        ) : null}
       </section>
 
       <section className="space-y-3 pb-4">
