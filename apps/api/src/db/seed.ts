@@ -663,58 +663,68 @@ async function insertModuleIfMissing(
     }[];
   },
 ) {
-  const [exists] = await db
-    .select({ id: modules.id })
-    .from(modules)
-    .where(eq(modules.id, input.id))
-    .limit(1);
-  if (exists) return;
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(modules)
+      .values({
+        id: input.id,
+        title: input.title,
+        subtitle: input.subtitle,
+        coverColor: input.coverColor,
+        sortOrder: input.sortOrder,
+        published: input.published,
+        featured: input.featured,
+        // Seeded curriculum has no owner; only admins can edit it.
+        ownerUserId: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoNothing();
 
-  await db.insert(modules).values({
-    id: input.id,
-    title: input.title,
-    subtitle: input.subtitle,
-    coverColor: input.coverColor,
-    sortOrder: input.sortOrder,
-    published: input.published,
-    featured: input.featured,
-    // Seeded curriculum has no owner; only admins can edit it.
-    ownerUserId: null,
-    createdAt: now,
-    updatedAt: now,
-  });
-
-  for (const [sIndex, section] of input.sections.entries()) {
-    await db.insert(sections).values({
-      id: section.id,
-      moduleId: input.id,
-      title: section.title,
-      subtitle: section.subtitle,
-      themeColor: section.themeColor,
-      sortOrder: sIndex,
-    });
-    for (const [lIndex, level] of section.levels.entries()) {
-      await db.insert(levels).values({
-        id: level.id,
-        sectionId: section.id,
-        title: level.title,
-        kind: level.kind,
-        gameType: level.gameType ?? null,
-        sortOrder: lIndex,
-      });
-      if (level.kind === "lesson") {
-        await db.insert(lessonContent).values({
-          levelId: level.id,
-          markdown: level.markdown ?? `## ${level.title}`,
-          youtubeVideoId: null,
-        });
-      }
-      if (level.kind === "game") {
-        const json = JSON.stringify(
-          level.game ?? emptyGameContent(level.gameType ?? "quiz"),
-        );
-        await db.insert(gameContent).values({ levelId: level.id, json });
+    for (const [sIndex, section] of input.sections.entries()) {
+      await tx
+        .insert(sections)
+        .values({
+          id: section.id,
+          moduleId: input.id,
+          title: section.title,
+          subtitle: section.subtitle,
+          themeColor: section.themeColor,
+          sortOrder: sIndex,
+        })
+        .onConflictDoNothing();
+      for (const [lIndex, level] of section.levels.entries()) {
+        await tx
+          .insert(levels)
+          .values({
+            id: level.id,
+            sectionId: section.id,
+            title: level.title,
+            kind: level.kind,
+            gameType: level.gameType ?? null,
+            sortOrder: lIndex,
+          })
+          .onConflictDoNothing();
+        if (level.kind === "lesson") {
+          await tx
+            .insert(lessonContent)
+            .values({
+              levelId: level.id,
+              markdown: level.markdown ?? `## ${level.title}`,
+              youtubeVideoId: null,
+            })
+            .onConflictDoNothing();
+        }
+        if (level.kind === "game") {
+          const json = JSON.stringify(
+            level.game ?? emptyGameContent(level.gameType ?? "quiz"),
+          );
+          await tx
+            .insert(gameContent)
+            .values({ levelId: level.id, json })
+            .onConflictDoNothing();
+        }
       }
     }
-  }
+  });
 }

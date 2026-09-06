@@ -346,15 +346,32 @@ export class CurriculumService {
 
     const secret = this.parseSecret(attempt.secretJson);
     const result = this.gradeEvent(game, secret, event);
-    const events = this.parseEvents(attempt.eventsJson);
-    events.push({ ...event, result, at: Date.now() });
-    await this.db
-      .update(attempts)
-      .set({ eventsJson: JSON.stringify(events) })
-      .where(eq(attempts.id, attemptId));
+    const misses = await this.runTx(async (tx) => {
+      const [freshAttempt] = await tx
+        .select()
+        .from(attempts)
+        .where(
+          and(
+            eq(attempts.id, attemptId),
+            eq(attempts.learnerId, learnerId),
+            eq(attempts.status, "open"),
+          ),
+        )
+        .limit(1);
+      if (!freshAttempt) {
+        throw new BadRequestException("Attempt is already finished");
+      }
+      const events = this.parseEvents(freshAttempt.eventsJson);
+      events.push({ ...event, result, at: Date.now() });
+      await tx
+        .update(attempts)
+        .set({ eventsJson: JSON.stringify(events) })
+        .where(eq(attempts.id, attemptId));
+      return events.reduce((sum, row) => sum + Math.max(0, row.result.misses), 0);
+    });
     return {
       ...result,
-      misses: events.reduce((sum, row) => sum + Math.max(0, row.result.misses), 0),
+      misses,
     };
   }
 
@@ -1216,65 +1233,67 @@ export class CurriculumService {
     learnerId: string,
     game: GameContent,
   ) {
-    const revision = contentRevisionOf(game);
-    const [existing] = await this.db
-      .select()
-      .from(attempts)
-      .where(
-        and(
-          eq(attempts.learnerId, learnerId),
-          eq(attempts.levelId, levelId),
-          eq(attempts.status, "open"),
-          eq(attempts.mode, "assessment"),
-          eq(attempts.contentRevision, revision),
-        ),
-      )
-      .limit(1);
+    return this.runTx(async (tx) => {
+      const revision = contentRevisionOf(game);
+      const [existing] = await tx
+        .select()
+        .from(attempts)
+        .where(
+          and(
+            eq(attempts.learnerId, learnerId),
+            eq(attempts.levelId, levelId),
+            eq(attempts.status, "open"),
+            eq(attempts.mode, "assessment"),
+            eq(attempts.contentRevision, revision),
+          ),
+        )
+        .limit(1);
 
-    if (existing) {
-      const secret = this.parseSecret(existing.secretJson);
-      const play = this.playPayloadFromSecret(game, secret);
-      return { attemptId: existing.id, contentRevision: revision, play };
-    }
+      if (existing) {
+        const secret = this.parseSecret(existing.secretJson);
+        const play = this.playPayloadFromSecret(game, secret);
+        return { attemptId: existing.id, contentRevision: revision, play };
+      }
 
-    await this.db
-      .update(attempts)
-      .set({
-        status: "finished",
-        finishedAt: Date.now(),
-        payload: JSON.stringify({ abandoned: true }),
-      })
-      .where(
-        and(
-          eq(attempts.learnerId, learnerId),
-          eq(attempts.levelId, levelId),
-          eq(attempts.status, "open"),
-        ),
-      );
+      await tx
+        .update(attempts)
+        .set({
+          status: "finished",
+          finishedAt: Date.now(),
+          payload: JSON.stringify({ abandoned: true }),
+        })
+        .where(
+          and(
+            eq(attempts.learnerId, learnerId),
+            eq(attempts.levelId, levelId),
+            eq(attempts.status, "open"),
+          ),
+        );
 
-    const built =
-      game.type === "memory"
-        ? buildMemoryAssessment(game, () => randomUUID())
-        : sanitizeGameForAssessment(game);
-    const attemptId = randomUUID();
-    await this.db.insert(attempts).values({
-      id: attemptId,
-      learnerId,
-      levelId,
-      contentRevision: revision,
-      mode: "assessment",
-      status: "open",
-      clientAttemptId: null,
-      score: 0,
-      maxScore: 0,
-      stars: null,
-      payload: null,
-      secretJson: JSON.stringify(built.secret),
-      eventsJson: "[]",
-      createdAt: Date.now(),
-      finishedAt: null,
+      const built =
+        game.type === "memory"
+          ? buildMemoryAssessment(game, () => randomUUID())
+          : sanitizeGameForAssessment(game);
+      const attemptId = randomUUID();
+      await tx.insert(attempts).values({
+        id: attemptId,
+        learnerId,
+        levelId,
+        contentRevision: revision,
+        mode: "assessment",
+        status: "open",
+        clientAttemptId: null,
+        score: 0,
+        maxScore: 0,
+        stars: null,
+        payload: null,
+        secretJson: JSON.stringify(built.secret),
+        eventsJson: "[]",
+        createdAt: Date.now(),
+        finishedAt: null,
+      });
+      return { attemptId, contentRevision: revision, play: built.play };
     });
-    return { attemptId, contentRevision: revision, play: built.play };
   }
 
   private playPayloadFromSecret(game: GameContent, secret: AssessmentSecret) {

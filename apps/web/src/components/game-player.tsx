@@ -124,6 +124,8 @@ export function GamePlayer({
       : null,
   );
   const [attemptId, setAttemptId] = useState(attempt.id);
+  const pendingMissKey = useRef<string | null>(null);
+  const pendingMissPayload = useRef<string | null>(null);
 
   function persistDraft(scored: ScoredResult, status: AttemptDraft["status"]): void {
     writeAttemptDraft({
@@ -182,8 +184,17 @@ export function GamePlayer({
   ): Promise<"ok" | "empty" | "unsynced"> {
     setBusy(true);
     setError(null);
+    const payloadKey = JSON.stringify(payload ?? null);
+    const idempotencyKey =
+      pendingMissKey.current && pendingMissPayload.current === payloadKey
+        ? pendingMissKey.current
+        : newClientAttemptId();
+    pendingMissKey.current = idempotencyKey;
+    pendingMissPayload.current = payloadKey;
     try {
-      const parsed = await recordMiss(levelId, newClientAttemptId());
+      const parsed = await recordMiss(levelId, idempotencyKey);
+      pendingMissKey.current = null;
+      pendingMissPayload.current = null;
       setHearts(parsed.learner.hearts);
       if (payload) setWhy(payload);
       if (parsed.learner.hearts <= 0) {
@@ -194,6 +205,8 @@ export function GamePlayer({
       return "ok";
     } catch (err) {
       if (err instanceof ApiError && err.code === HEARTS_EMPTY_CODE) {
+        pendingMissKey.current = null;
+        pendingMissPayload.current = null;
         setHearts(0);
         if (payload) {
           setWhy(payload);
@@ -421,4 +434,3 @@ export function localPracticeFinish(
 ): { score: number; maxScore: number; stars: 1 | 2 | 3 } {
   return firstTryScore(pieceCount(game), misses);
 }
-
