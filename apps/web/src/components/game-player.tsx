@@ -32,7 +32,6 @@ import { useRef, useState } from "react";
 import { BlankGame } from "./games/blank-game";
 import {
   GameFrame,
-  HeartsBreak,
   StarCelebration,
   WhySheet,
 } from "./games/game-stage";
@@ -49,6 +48,7 @@ type ScoredResult = {
   misses: number;
   clientAttemptId: string;
   answers: FinishAnswers;
+  continueHref?: string;
 };
 
 function statusLabelFor(phase: SavePhase): string | null {
@@ -85,6 +85,7 @@ export function GamePlayer({
   attempt,
   accountId,
   hearts: startHearts,
+  nextLevelId,
 }: {
   levelId: string;
   moduleId: string;
@@ -93,6 +94,7 @@ export function GamePlayer({
   attempt: AttemptInfo;
   accountId: string;
   hearts: number;
+  nextLevelId?: string | null;
 }) {
   const router = useRouter();
   const revision = attempt.contentRevision || gameContentRevision(game as unknown as GameContent);
@@ -160,6 +162,7 @@ export function GamePlayer({
         score: finished.score,
         maxScore: finished.maxScore,
         stars: finished.stars,
+        continueHref: finished.continueHref,
       };
       setResult(next);
       setSavePhase("saved");
@@ -197,11 +200,6 @@ export function GamePlayer({
       pendingMissPayload.current = null;
       setHearts(parsed.learner.hearts);
       if (payload) setWhy(payload);
-      if (parsed.learner.hearts <= 0) {
-        if (payload) pendingEmpty.current = true;
-        else if (!opts?.hold) setEmpty(true);
-        return "empty";
-      }
       return "ok";
     } catch (err) {
       if (err instanceof ApiError && err.code === HEARTS_EMPTY_CODE) {
@@ -256,10 +254,6 @@ export function GamePlayer({
     await reconcileSave(scored);
   }
 
-  if (empty) {
-    return <HeartsBreak moduleId={moduleId} />;
-  }
-
   if (result && savePhase !== "playing") {
     const unsaved = isUnsavedSavePhase(savePhase);
     return (
@@ -287,7 +281,12 @@ export function GamePlayer({
           setAttemptId(attempt.id);
         }}
         onContinue={() => {
-          router.push(`/learn/${moduleId}`);
+          router.push(
+            result.continueHref ??
+              (nextLevelId
+                ? `/learn/${moduleId}/${nextLevelId}`
+                : `/learn/${moduleId}`),
+          );
           router.refresh();
         }}
       />
@@ -300,7 +299,7 @@ export function GamePlayer({
         title={title}
         hint={hintFor(game.type)}
         hearts={hearts}
-        showHearts
+        showHearts={false}
         progress={labelFor(game.type)}
         wide={game.type === "timeline"}
       >

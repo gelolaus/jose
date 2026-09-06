@@ -1,7 +1,8 @@
 # Jose
 
-Kids-first adventure path for the Filipino college course **Work and Life of Rizal**.
-Module grid + Duolingo-style levels (Next.js) and NestJS API with local SQLite (Turso-ready).
+Historical investigation adventure for the Filipino college course **Work and Life of Rizal** (APC RIZLIFE), also approachable for younger learners.
+
+Module grid + adventure path (Next.js) and NestJS API with local SQLite (Turso-ready). Presentation modes: **Adventure** and **Focus**.
 
 ## Stack
 
@@ -113,8 +114,13 @@ Full setup steps, including the Entra app registration, are in
 npm test
 ```
 
+## Content ownership
+
+Seed lessons are structural placeholders. See `docs/CONTENT_GAPS.md` for syllabus, objectives, citations, and review work instructors must supply.
+
 ## Docs
 
+- Application review / handoff: `docs/reviews/2026-09-05-application-review.md`
 - Modules / lessons / games: `docs/superpowers/specs/2026-08-15-rizal-modules-lessons-games-design.md`
 - Game stage (playable boards): `docs/superpowers/specs/2026-08-23-game-stage-design.md`
 - Future work (accounts, Turso, monitoring): `docs/superpowers/specs/2026-08-15-jose-future-work.md`

@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { MAX_LESSON_MARKDOWN_CHARS } from "./limits";
 import { lessonBlocksSchema } from "./lesson-blocks";
+import {
+  emptyLessonEditorial,
+  lessonEditorialSchema,
+} from "./editorial";
 
 const nonEmpty = z.string().trim().min(1);
 const optionalWhy = z.string().trim().max(280).optional();
@@ -104,6 +108,7 @@ export const lessonContentSchema = z.object({
   markdown: z.string().max(MAX_LESSON_MARKDOWN_CHARS),
   youtubeVideoId: z.string().regex(/^[A-Za-z0-9_-]{11}$/).nullable(),
   blocks: lessonBlocksSchema.optional(),
+  editorial: lessonEditorialSchema.default(emptyLessonEditorial()),
 });
 
 export type LessonContent = z.infer<typeof lessonContentSchema>;

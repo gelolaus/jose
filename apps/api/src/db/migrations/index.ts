@@ -346,6 +346,65 @@ export const migration006ContentClassroom: Migration = {
   },
 };
 
+/** Student experience: editorial metadata, practice, streaks, achievements. */
+export const migration007StudentExperience: Migration = {
+  id: "007_student_experience",
+  async up(client) {
+    await client.execute("PRAGMA foreign_keys = ON");
+    await ensureColumn(client, "learners", "last_activity_day", "TEXT");
+    await ensureColumn(client, "sections", "objectives_json", "TEXT NOT NULL DEFAULT '[]'");
+    await ensureColumn(
+      client,
+      "sections",
+      "instructor_review_status",
+      "TEXT NOT NULL DEFAULT 'unreviewed'",
+    );
+    await ensureColumn(
+      client,
+      "sections",
+      "scaffolding_default",
+      "TEXT NOT NULL DEFAULT 'standard'",
+    );
+    await ensureColumn(client, "sections", "key_vocabulary_json", "TEXT NOT NULL DEFAULT '[]'");
+    await ensureColumn(client, "levels", "instructor_tags_json", "TEXT NOT NULL DEFAULT '[]'");
+    await ensureColumn(client, "lesson_content", "editorial_json", "TEXT NOT NULL DEFAULT '{}'");
+    const statements = [
+      `CREATE TABLE IF NOT EXISTS learning_misses (
+        id TEXT PRIMARY KEY,
+        learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+        level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS practice_attempts (
+        id TEXT PRIMARY KEY,
+        learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+        level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+        score INTEGER NOT NULL,
+        max_score INTEGER NOT NULL,
+        payload TEXT,
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS practice_reviews (
+        learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+        level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+        review_count INTEGER NOT NULL DEFAULT 0,
+        next_due_at INTEGER,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (learner_id, level_id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS learner_achievements (
+        learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+        achievement_id TEXT NOT NULL,
+        earned_at INTEGER NOT NULL,
+        PRIMARY KEY (learner_id, achievement_id)
+      )`,
+    ];
+    for (const sql of statements) {
+      await client.execute(sql);
+    }
+  },
+};
+
 export const MIGRATIONS: Migration[] = [
   migration001InitialSchema,
   migration002QueryIndexes,
@@ -353,6 +412,7 @@ export const MIGRATIONS: Migration[] = [
   migration004AssessmentAttempts,
   migration005AuthoringStudio,
   migration006ContentClassroom,
+  migration007StudentExperience,
 ];
 
 export async function ensureColumn(

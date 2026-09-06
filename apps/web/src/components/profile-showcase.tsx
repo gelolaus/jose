@@ -3,41 +3,26 @@
 import { ExplorerAvatar } from "@/components/explorer-avatar";
 import { logoutJose } from "@/lib/auth-api";
 import { clearSensitiveClientState, isAvatarId } from "@/lib/explorer-identity";
-import {
-  useExplorerIdentity,
-} from "@/lib/use-explorer-identity";
+import { useExplorerIdentity } from "@/lib/use-explorer-identity";
 import { useJoseSession } from "@/lib/use-jose-session";
-import {
-  deriveTrophies,
-  highlightSectionId,
-  sectionProgress,
-} from "@/lib/profile-derived";
-import type { PathResponse } from "@jose/shared";
+import type { ProfileStatsResponse } from "@jose/shared";
 import { Flame, Heart, Lock, Trophy, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-type ProfileShowcaseProps = {
-  path: PathResponse;
-};
-
-export function ProfileShowcase({ path }: ProfileShowcaseProps) {
-  const identity = useExplorerIdentity(path.learner.displayName);
+export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
+  const identity = useExplorerIdentity(stats.learner.displayName);
   const { authenticated, canTeach, loading } = useJoseSession();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
 
-  // Server truth wins over the locally cached explorer look.
   const avatarId =
-    path.learner.avatarId && isAvatarId(path.learner.avatarId)
-      ? path.learner.avatarId
+    stats.learner.avatarId && isAvatarId(stats.learner.avatarId)
+      ? stats.learner.avatarId
       : identity.avatarId;
-  const displayName = path.learner.displayName || identity.displayName;
-
-  const trophies = deriveTrophies(path);
-  const activeSectionId = highlightSectionId(path);
-  const { streak, hearts, xp } = path.learner;
+  const displayName = stats.learner.displayName || identity.displayName;
+  const { streak, hearts, xp } = stats.learner;
 
   async function onSignOut() {
     setSigningOut(true);
@@ -51,15 +36,15 @@ export function ProfileShowcase({ path }: ProfileShowcaseProps) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-5 py-8 sm:px-8 sm:py-10">
+    <div className="jose-surface mx-auto flex w-full max-w-3xl flex-col gap-8 px-5 py-8 sm:px-8 sm:py-10">
       <section className="flex flex-col items-center gap-4 text-center">
         <ExplorerAvatar avatarId={avatarId} floating />
         <div className="space-y-1.5">
-          <h1 className="font-display text-4xl font-semibold tracking-tight text-slate-800 md:text-5xl">
+          <h1 className="font-display text-4xl font-semibold tracking-tight text-[var(--jose-ink)] md:text-5xl">
             {displayName}
           </h1>
-          <p className="text-base font-semibold text-slate-500 md:text-lg">
-            Rizal path explorer
+          <p className="text-base text-[var(--jose-ink-muted)] md:text-lg">
+            Jose field journal
           </p>
         </div>
         <div className="flex flex-col items-center gap-2 sm:flex-row">
@@ -73,7 +58,7 @@ export function ProfileShowcase({ path }: ProfileShowcaseProps) {
           ) : null}
           <Link
             href="/profile/edit"
-            className="rounded-full bg-rose-500 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
+            className="rounded-xl bg-rose-800 px-6 py-3 text-base font-semibold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm"
           >
             Edit explorer
           </Link>
@@ -101,86 +86,93 @@ export function ProfileShowcase({ path }: ProfileShowcaseProps) {
       <section aria-label="Stats" className="flex flex-wrap items-center justify-center gap-3">
         <StatChip tone="sky" icon={Zap} label={`${xp} XP`} />
         <StatChip tone="coral" icon={Flame} label={`${streak} day streak`} />
-        <StatChip tone="rose" icon={Heart} label={`${hearts} hearts`} />
+        <StatChip tone="rose" icon={Heart} label={`${hearts} arcade lives`} />
+      </section>
+
+      <section className="rounded-2xl border border-[var(--jose-rule)] bg-white/80 px-4 py-4 text-sm text-[var(--jose-ink-muted)]">
+        <p>
+          <span className="font-semibold text-[var(--jose-ink)]">Course total:</span>{" "}
+          {stats.totals.completedLevels}/{stats.totals.totalLevels} levels ·{" "}
+          {stats.totals.chestsOpened} chests
+        </p>
+        <details className="mt-2">
+          <summary className="cursor-pointer font-semibold text-[var(--jose-ink)]">
+            How XP, streak, and hearts work
+          </summary>
+          <ul className="mt-2 list-disc space-y-2 pl-5">
+            <li>{stats.rules.xp}</li>
+            <li>{stats.rules.streak}</li>
+            <li>{stats.rules.hearts}</li>
+          </ul>
+        </details>
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-display text-2xl font-semibold tracking-tight text-slate-800">
-          Journey
+        <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--jose-ink)]">
+          Journey across modules
         </h2>
-        <p className="text-sm font-semibold text-slate-500">
-          Where you are on the Rizal path
+        <p className="text-sm text-[var(--jose-ink-muted)]">
+          Aggregated from every published module on your account
         </p>
         <ul className="flex flex-col gap-2.5">
-          {path.sections.map((section) => {
-            const { completed, total } = sectionProgress(section);
-            const active = section.id === activeSectionId;
-            return (
-              <li
-                key={section.id}
-                className={`flex items-center justify-between gap-3 rounded-3xl px-4 py-3.5 transition ${
-                  active ? "bg-white shadow-md ring-2" : "bg-white/70 ring-1 ring-black/5"
-                }`}
-                style={
-                  active
-                    ? { boxShadow: `0 0 0 2px ${section.themeColor}` }
-                    : undefined
-                }
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span
-                    className="size-3.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: section.themeColor }}
-                    aria-hidden
-                  />
-                  <span className="truncate text-base font-extrabold text-slate-700">
-                    {section.title}
-                  </span>
-                </div>
-                <span className="shrink-0 text-sm font-extrabold tabular-nums text-slate-500">
-                  {completed}/{total}
+          {stats.modules.map((mod) => (
+            <li
+              key={mod.moduleId}
+              className="flex items-center justify-between gap-3 rounded-2xl bg-white/80 px-4 py-3.5 ring-1 ring-black/5"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <span
+                  className="size-3.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: mod.coverColor }}
+                  aria-hidden
+                />
+                <span className="truncate text-base font-semibold text-stone-700">
+                  {mod.title}
+                  {mod.featured ? " · featured" : ""}
                 </span>
-              </li>
-            );
-          })}
+              </div>
+              <span className="shrink-0 text-sm font-semibold tabular-nums text-stone-500">
+                {mod.completedCount}/{mod.totalCount}
+              </span>
+            </li>
+          ))}
         </ul>
       </section>
 
       <section className="space-y-3 pb-4">
-        <h2 className="font-display text-2xl font-semibold tracking-tight text-slate-800">
-          Trophies
+        <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--jose-ink)]">
+          Achievements
         </h2>
-        <p className="text-sm font-semibold text-slate-500">
-          Little wins along the way
+        <p className="text-sm text-[var(--jose-ink-muted)]">
+          Earned badges stay unlocked even after you finish the course
         </p>
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {trophies.map((trophy) => (
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {stats.achievements.map((trophy) => (
             <li
               key={trophy.id}
-              className={`flex items-center gap-3 rounded-3xl px-4 py-4 ring-1 sm:flex-col sm:text-center ${
+              className={`flex items-center gap-3 rounded-2xl px-4 py-4 ring-1 ${
                 trophy.unlocked
-                  ? "bg-[var(--jose-gold)]/20 ring-amber-300/80"
+                  ? "bg-amber-50 ring-amber-300/80"
                   : "bg-white/60 ring-black/5 opacity-70"
               }`}
             >
               <span
-                className={`flex size-12 shrink-0 items-center justify-center rounded-2xl ${
+                className={`flex size-12 shrink-0 items-center justify-center rounded-xl ${
                   trophy.unlocked
-                    ? "bg-[var(--jose-gold)] text-amber-900"
-                    : "bg-slate-100 text-slate-400"
+                    ? "bg-amber-200 text-amber-950"
+                    : "bg-stone-100 text-stone-400"
                 }`}
               >
                 {trophy.unlocked ? (
-                  <Trophy className="size-6" strokeWidth={2.4} aria-hidden />
+                  <Trophy className="size-6" strokeWidth={2.25} aria-hidden />
                 ) : (
-                  <Lock className="size-6" strokeWidth={2.4} aria-hidden />
+                  <Lock className="size-6" strokeWidth={2.25} aria-hidden />
                 )}
               </span>
-              <div className="min-w-0 sm:space-y-0.5">
-                <p className="text-sm font-extrabold text-slate-800">
-                  {trophy.title}
-                </p>
-                <p className="text-xs font-bold text-slate-500">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-stone-800">{trophy.title}</p>
+                <p className="text-xs text-stone-500">{trophy.description}</p>
+                <p className="text-xs font-semibold text-stone-500">
                   {trophy.unlocked ? "Unlocked" : "Locked"}
                 </p>
               </div>
@@ -202,16 +194,16 @@ function StatChip({
   icon: typeof Zap;
 }) {
   const tones = {
-    sky: "bg-sky-100 text-sky-700",
-    coral: "bg-orange-100 text-orange-700",
-    rose: "bg-rose-100 text-rose-700",
+    sky: "bg-cyan-100 text-cyan-900",
+    coral: "bg-orange-100 text-orange-900",
+    rose: "bg-rose-100 text-rose-900",
   };
 
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-extrabold tabular-nums shadow-sm transition active:translate-y-0.5 active:shadow-none sm:text-base ${tones[tone]}`}
+      className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold tabular-nums shadow-sm transition active:translate-y-0.5 active:shadow-none sm:text-base ${tones[tone]}`}
     >
-      <Icon className="size-5" strokeWidth={2.5} aria-hidden />
+      <Icon className="size-5" strokeWidth={2.25} aria-hidden />
       {label}
     </span>
   );

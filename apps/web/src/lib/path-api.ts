@@ -2,12 +2,17 @@ import {
   evaluateEventResultSchema,
   finishAttemptResultSchema,
   importQuestionsResultSchema,
+  attemptResultSchema,
   missBodySchema,
   missResponseSchema,
   moduleTemplateMetaSchema,
   modulesResponseSchema,
   pathResponseSchema,
   playLevelResponseSchema,
+  practiceAttemptResultSchema,
+  practicePlayResponseSchema,
+  practiceReviewResponseSchema,
+  profileStatsResponseSchema,
   publishReadinessSchema,
   studentAssignmentSchema,
   classSummarySchema,
@@ -22,6 +27,9 @@ import {
   type ModuleTemplateId,
   type PathResponse,
   type PlayLevelResponse,
+  type PracticePlayResponse,
+  type PracticeReviewResponse,
+  type ProfileStatsResponse,
   type PublishReadiness,
   type TeachAsset,
   type TeachLevelDetail,
@@ -194,7 +202,11 @@ export async function fetchPlayLevel(
 }
 
 export async function completeLevel(levelId: string) {
-  return apiFetch(`/levels/${levelId}/complete`, { method: "POST", body: "{}" });
+  const json = await apiFetch(`/levels/${levelId}/complete`, {
+    method: "POST",
+    body: "{}",
+  });
+  return attemptResultSchema.parse(json);
 }
 
 export async function recordMiss(levelId: string, idempotencyKey: string) {
@@ -203,6 +215,69 @@ export async function recordMiss(levelId: string, idempotencyKey: string) {
     body: JSON.stringify(missBodySchema.parse({ idempotencyKey })),
   });
   return missResponseSchema.parse(json);
+}
+
+export async function fetchPracticeReview(options?: ApiCallOptions): Promise<
+  { ok: true; data: PracticeReviewResponse } | { ok: false; error: string; status?: number }
+> {
+  try {
+    const json = await apiFetch("/practice/review", undefined, options);
+    return { ok: true, data: practiceReviewResponseSchema.parse(json) };
+  } catch (error) {
+    return {
+      ok: false,
+      error: errorMessage(error),
+      status: error instanceof ApiError ? error.status : undefined,
+    };
+  }
+}
+
+export async function fetchPracticePlayLevel(
+  levelId: string,
+  options?: ApiCallOptions,
+): Promise<
+  | { ok: true; data: PracticePlayResponse }
+  | { ok: false; error: string; status?: number }
+> {
+  try {
+    const json = await apiFetch(`/practice/levels/${levelId}`, undefined, options);
+    return { ok: true, data: practicePlayResponseSchema.parse(json) };
+  } catch (error) {
+    return {
+      ok: false,
+      error: errorMessage(error),
+      status: error instanceof ApiError ? error.status : undefined,
+    };
+  }
+}
+
+export async function submitPracticeAttempt(body: {
+  levelId: string;
+  score: number;
+  maxScore: number;
+  payload?: unknown;
+}) {
+  const json = await apiFetch("/practice/attempts", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return practiceAttemptResultSchema.parse(json);
+}
+
+export async function fetchProfileStats(options?: ApiCallOptions): Promise<
+  | { ok: true; data: ProfileStatsResponse }
+  | { ok: false; error: string; status?: number }
+> {
+  try {
+    const json = await apiFetch("/profile/stats", undefined, options);
+    return { ok: true, data: profileStatsResponseSchema.parse(json) };
+  } catch (error) {
+    return {
+      ok: false,
+      error: errorMessage(error),
+      status: error instanceof ApiError ? error.status : undefined,
+    };
+  }
 }
 
 export async function evaluateAttempt(

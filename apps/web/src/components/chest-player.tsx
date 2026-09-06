@@ -10,11 +10,13 @@ export function ChestPlayer({
   moduleId,
   title,
   message,
+  nextLevelId,
 }: {
   levelId: string;
   moduleId: string;
   title: string;
   message: string;
+  nextLevelId?: string | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -22,8 +24,13 @@ export function ChestPlayer({
   async function onContinue() {
     setBusy(true);
     try {
-      await completeLevel(levelId);
-      router.push(`/learn/${moduleId}`);
+      const result = await completeLevel(levelId);
+      router.push(
+        result.continueHref ??
+          (nextLevelId
+            ? `/learn/${moduleId}/${nextLevelId}`
+            : `/learn/${moduleId}`),
+      );
       router.refresh();
     } catch {
       setBusy(false);
@@ -32,20 +39,20 @@ export function ChestPlayer({
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center gap-5 px-6 py-16 text-center">
-      <div className="flex size-28 items-center justify-center rounded-[2rem] bg-amber-100 text-amber-700 shadow-md">
-        <Gift className="size-14" strokeWidth={2.3} aria-hidden />
+      <div className="flex size-28 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 shadow-md">
+        <Gift className="size-14" strokeWidth={2.2} aria-hidden />
       </div>
-      <h1 className="font-display text-4xl font-semibold tracking-tight text-slate-800">
+      <h1 className="font-display text-4xl font-semibold tracking-tight text-[var(--jose-ink)]">
         {title}
       </h1>
-      <p className="text-lg font-semibold text-slate-600">{message}</p>
+      <p className="text-lg text-[var(--jose-ink-muted)]">{message}</p>
       <button
         type="button"
         onClick={onContinue}
         disabled={busy}
-        className="rounded-full bg-violet-600 px-7 py-3.5 text-base font-extrabold text-white shadow-md disabled:opacity-60"
+        className="rounded-xl bg-[var(--jose-ink)] px-7 py-3.5 text-base font-semibold text-[var(--jose-paper)] shadow-md disabled:opacity-60"
       >
-        {busy ? "Saving…" : "Continue"}
+        {busy ? "Saving…" : nextLevelId ? "Continue to next" : "Continue"}
       </button>
     </div>
   );

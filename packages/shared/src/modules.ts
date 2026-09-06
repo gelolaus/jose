@@ -4,6 +4,7 @@ import {
   attemptInfoSchema,
 } from "./assessment";
 import { MAX_ATTEMPT_PAYLOAD_BYTES, serializedJsonBytes } from "./limits";
+import { continueLearningSchema } from "./continue";
 import { lessonContentSchema } from "./games";
 import {
   gameTypeSchema,
@@ -22,11 +23,15 @@ export const moduleCardSchema = z.object({
   published: z.boolean(),
   completedCount: z.number().int().nonnegative(),
   totalCount: z.number().int().nonnegative(),
+  nextLevelId: z.string().min(1).nullable().optional(),
+  nextLevelTitle: z.string().min(1).nullable().optional(),
+  nextSectionTitle: z.string().min(1).nullable().optional(),
 });
 
 export const modulesResponseSchema = z.object({
   learner: learnerSchema,
   modules: z.array(moduleCardSchema),
+  continueLearning: continueLearningSchema.nullable(),
 });
 
 export const playLevelMetaSchema = z.object({
@@ -49,6 +54,8 @@ export const playLevelResponseSchema = z.object({
   attempt: attemptInfoSchema.optional(),
   chest: z.object({ message: z.string().min(1) }).optional(),
   contentRevisionId: z.string().min(1).nullable().optional(),
+  nextLevelId: z.string().min(1).nullable().optional(),
+  mapHref: z.string().min(1).optional(),
 });
 
 /** Legacy client-scored posts are rejected. */
@@ -99,6 +106,9 @@ export const attemptResultSchema = z.object({
   completed: z.boolean(),
   firstTime: z.boolean(),
   learner: learnerSchema,
+  nextLevelId: z.string().min(1).nullable().optional(),
+  continueHref: z.string().min(1).optional(),
+  contentRevisionId: z.string().min(1).nullable().optional(),
 });
 
 export type ModuleCard = z.infer<typeof moduleCardSchema>;

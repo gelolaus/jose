@@ -15,3 +15,8 @@ export * from "./limits";
 export * from "./publish";
 export * from "./classroom";
 export * from "./revisions";
+export * from "./streak";
+export * from "./continue";
+export * from "./editorial";
+export * from "./practice";
+export * from "./profile-stats";

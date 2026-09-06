@@ -1,5 +1,7 @@
 "use client";
 
+import { PresentationToggle } from "@/components/presentation-toggle";
+import { PresentationDocumentSync } from "@/lib/presentation-mode";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -30,7 +32,8 @@ export function AppShell({
   topBar?: ReactNode;
 }) {
   return (
-    <div className="flex h-dvh overflow-hidden bg-[var(--jose-cream)] lg:grid lg:grid-cols-[18rem_minmax(0,1fr)]">
+    <div className="flex h-dvh overflow-hidden bg-transparent lg:grid lg:grid-cols-[18rem_minmax(0,1fr)]">
+      <PresentationDocumentSync />
       <SideNav />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {topBar ? <div className="shrink-0">{topBar}</div> : null}
@@ -47,16 +50,16 @@ function SideNav() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden h-dvh flex-col border-r border-black/8 bg-white/95 px-5 py-7 backdrop-blur-md lg:flex">
-      <div className="mb-10 px-2">
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-violet-500">
+    <aside className="hidden h-dvh flex-col border-r border-[var(--jose-rule)] bg-[var(--jose-paper)]/95 px-5 py-7 backdrop-blur-md lg:flex">
+      <div className="mb-8 px-2">
+        <p className="font-display text-3xl font-semibold tracking-tight text-[var(--jose-ink)]">
           Jose
         </p>
-        <p className="font-display text-3xl font-semibold tracking-tight text-slate-800">
-          Adventure
+        <p className="mt-1 text-sm text-[var(--jose-ink-muted)]">
+          Historical investigation
         </p>
       </div>
-      <nav className="flex flex-1 flex-col gap-2.5" aria-label="Main">
+      <nav className="flex flex-1 flex-col gap-2" aria-label="Main">
         {tabs.map((tab) => {
           const active = isActive(pathname, tab.href);
           const Icon = tab.icon;
@@ -64,21 +67,24 @@ function SideNav() {
             <Link
               key={tab.href}
               href={tab.href}
-              className={`flex items-center gap-3.5 rounded-3xl px-4 py-3.5 text-lg font-extrabold transition ${
+              className={`flex items-center gap-3.5 rounded-xl px-4 py-3 text-base font-semibold transition ${
                 active
-                  ? "bg-violet-100 text-violet-700 shadow-sm"
-                  : "text-slate-600 hover:bg-slate-50"
+                  ? "bg-teal-100 text-teal-900 shadow-sm"
+                  : "text-stone-600 hover:bg-stone-50"
               }`}
             >
-              <Icon className="size-6 shrink-0" strokeWidth={2.4} aria-hidden />
+              <Icon className="size-5 shrink-0" strokeWidth={2.25} aria-hidden />
               {tab.label}
             </Link>
           );
         })}
       </nav>
-      <p className="px-2 text-sm font-bold text-slate-400">
-        Kids-first Rizal path
-      </p>
+      <div className="space-y-3 px-2">
+        <PresentationToggle compact />
+        <p className="text-sm text-stone-500">
+          Field journal for APC RIZLIFE
+        </p>
+      </div>
     </aside>
   );
 }
@@ -88,7 +94,7 @@ export function BottomTabs() {
 
   return (
     <nav
-      className="shrink-0 border-t border-black/10 bg-white/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] backdrop-blur-md lg:hidden"
+      className="shrink-0 border-t border-[var(--jose-rule)] bg-[var(--jose-paper)]/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] backdrop-blur-md lg:hidden"
       aria-label="Main"
     >
       <div className="mx-auto flex w-full max-w-3xl items-stretch justify-around px-2 pt-2.5">
@@ -99,13 +105,13 @@ export function BottomTabs() {
             <Link
               key={tab.href}
               href={tab.href}
-              className={`flex min-w-[5rem] flex-col items-center gap-1 rounded-3xl px-3 py-2.5 text-xs font-extrabold transition sm:text-sm ${
+              className={`flex min-w-[5rem] flex-col items-center gap-1 rounded-xl px-3 py-2.5 text-xs font-semibold transition sm:text-sm ${
                 active
-                  ? "bg-violet-100 text-violet-700"
-                  : "text-slate-500 hover:bg-slate-50"
+                  ? "bg-teal-100 text-teal-900"
+                  : "text-stone-500 hover:bg-stone-50"
               }`}
             >
-              <Icon className="size-6" strokeWidth={2.4} aria-hidden />
+              <Icon className="size-5" strokeWidth={2.25} aria-hidden />
               {tab.label}
             </Link>
           );

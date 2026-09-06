@@ -722,6 +722,19 @@ async function insertModuleIfMissing(
               levelId: level.id,
               markdown: level.markdown ?? `## ${level.title}`,
               youtubeVideoId: null,
+              editorialJson: JSON.stringify({
+                objectives: [],
+                keyVocabulary: [],
+                citations: [],
+                interpretationNotes: [],
+                deeperAnalysisMarkdown: null,
+                scaffoldingLevel: "standard",
+                contentGaps: [
+                  "Map this lesson to APC RIZLIFE syllabus codes.",
+                  "Add measurable objectives, vocabulary, and citations.",
+                  "Record instructor historical-accuracy review.",
+                ],
+              }),
             })
             .onConflictDoNothing();
         }
@@ -767,6 +780,13 @@ async function ensurePublishedRevisions(db: JoseDb) {
           lesson = {
             markdown: content?.markdown ?? "",
             youtubeVideoId: content?.youtubeVideoId ?? null,
+            editorial: (() => {
+              try {
+                return JSON.parse(content?.editorialJson || "{}");
+              } catch {
+                return {};
+              }
+            })(),
           };
         }
         if (level.kind === "game") {

@@ -27,6 +27,8 @@ const fixture: PathResponse = {
       title: "Childhood",
       subtitle: "Calamba beginnings",
       themeColor: "#A855F7",
+      objectives: [],
+      instructorReviewStatus: "unreviewed",
       nodes: [
         {
           id: "c1",
@@ -51,6 +53,8 @@ const fixture: PathResponse = {
       title: "Education",
       subtitle: "School days",
       themeColor: "#22C55E",
+      objectives: [],
+      instructorReviewStatus: "unreviewed",
       nodes: [
         {
           id: "e1",
@@ -87,12 +91,33 @@ describe("sectionProgress", () => {
 });
 
 describe("deriveTrophies", () => {
-  it("unlocks the three teaser trophies for the fixture", () => {
-    expect(deriveTrophies(fixture)).toEqual([
-      { id: "childhood-clear", title: "Childhood cleared", unlocked: true },
-      { id: "first-treasure", title: "First treasure", unlocked: true },
-      { id: "on-the-path", title: "On the path", unlocked: true },
-    ]);
+  it("unlocks path trophies for the fixture", () => {
+    const trophies = deriveTrophies(fixture);
+    expect(trophies.find((t) => t.id === "on-the-path")?.unlocked).toBe(true);
+    expect(trophies.find((t) => t.id === "first-treasure")?.unlocked).toBe(true);
+    expect(trophies.find((t) => t.id === "first-chapter-clear")?.unlocked).toBe(
+      true,
+    );
+  });
+
+  it("keeps on-the-path after the course is fully complete", () => {
+    const complete: PathResponse = {
+      ...fixture,
+      sections: fixture.sections.map((section) => ({
+        ...section,
+        nodes: section.nodes.map((node) => ({
+          ...node,
+          status: "completed" as const,
+          icon: "check" as const,
+        })),
+      })),
+    };
+    expect(deriveTrophies(complete).find((t) => t.id === "on-the-path")?.unlocked).toBe(
+      true,
+    );
+    expect(
+      deriveTrophies(complete).find((t) => t.id === "course-complete")?.unlocked,
+    ).toBe(true);
   });
 
   it("keeps trophies locked when progress is empty", () => {
@@ -114,11 +139,7 @@ describe("deriveTrophies", () => {
         },
       ],
     };
-    expect(deriveTrophies(empty).map((t) => t.unlocked)).toEqual([
-      false,
-      false,
-      false,
-    ]);
+    expect(deriveTrophies(empty).every((t) => !t.unlocked)).toBe(true);
   });
 });
 

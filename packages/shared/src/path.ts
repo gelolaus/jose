@@ -31,6 +31,10 @@ export const sectionSchema = z.object({
   subtitle: z.string().min(1),
   themeColor: hexColorSchema,
   nodes: z.array(levelNodeSchema).min(1),
+  objectives: z.array(z.string()).default([]),
+  instructorReviewStatus: z
+    .enum(["unreviewed", "needs_revision", "reviewed"])
+    .default("unreviewed"),
 });
 
 export const pathModuleSchema = z.object({

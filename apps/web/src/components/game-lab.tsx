@@ -24,42 +24,50 @@ const ICONS: Record<LabGame["type"], LucideIcon> = {
   blank: PenLine,
 };
 
-export function GameLabHub() {
+export function GameLabHub({ embedded = false }: { embedded?: boolean }) {
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-      <div className="mb-6 max-w-2xl">
-        <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-violet-500">
-          Game lab
-        </p>
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-800 sm:text-4xl">
-          Try every board
-        </h1>
-        <p className="mt-2 text-base font-semibold text-slate-500">
-          Sample games, no hearts, nothing saved. Drag timeline events and sort chips
-          onto their spots — or tap, then tap, on a phone.
-        </p>
-      </div>
+    <div
+      className={
+        embedded
+          ? "w-full"
+          : "mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8"
+      }
+    >
+      {!embedded ? (
+        <div className="mb-6 max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--jose-accent)]">
+            Try games
+          </p>
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-[var(--jose-ink)] sm:text-4xl">
+            Sample boards
+          </h1>
+          <p className="mt-2 text-base text-[var(--jose-ink-muted)]">
+            Demo boards for exploring mechanics. These do not save path progress
+            or complete assignments.
+          </p>
+        </div>
+      ) : null}
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {LAB_GAMES.map((entry) => {
           const Icon = ICONS[entry.type];
           return (
             <li key={entry.type}>
               <Link
-                href={`/practice/${entry.type}`}
-                className="block overflow-hidden rounded-[2rem] text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0.5"
+                href={`/practice/lab/${entry.type}`}
+                className="block overflow-hidden rounded-2xl text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0.5"
               >
                 <div
                   className="flex min-h-[11.5rem] flex-col justify-between p-5 sm:min-h-[13rem] sm:p-6"
                   style={{ backgroundColor: entry.color }}
                 >
-                  <span className="flex size-12 items-center justify-center rounded-2xl bg-white/95 text-slate-800 shadow-sm">
-                    <Icon className="size-6" strokeWidth={2.4} aria-hidden />
+                  <span className="flex size-12 items-center justify-center rounded-xl bg-white/95 text-stone-800 shadow-sm">
+                    <Icon className="size-6" strokeWidth={2.25} aria-hidden />
                   </span>
                   <div>
                     <p className="font-display text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
                       {entry.title}
                     </p>
-                    <p className="mt-1 text-sm font-semibold text-white/90 sm:text-base">
+                    <p className="mt-1 text-sm text-white/90 sm:text-base">
                       {entry.blurb}
                     </p>
                   </div>
@@ -115,11 +123,11 @@ export function GameLabPlay({ entry }: { entry: LabGame }) {
           {LAB_GAMES.map((item) => (
             <Link
               key={item.type}
-              href={`/practice/${item.type}`}
-              className={`flex min-h-11 shrink-0 items-center rounded-full px-3 py-2 text-xs font-extrabold ${
+              href={`/practice/lab/${item.type}`}
+              className={`flex min-h-11 shrink-0 items-center rounded-full px-3 py-2 text-xs font-semibold ${
                 item.type === entry.type
-                  ? "bg-violet-600 text-white"
-                  : "bg-white text-slate-600 ring-1 ring-black/10"
+                  ? "bg-teal-800 text-white"
+                  : "bg-white text-stone-600 ring-1 ring-black/10"
               }`}
             >
               {item.title}
