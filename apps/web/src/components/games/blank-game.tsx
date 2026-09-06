@@ -18,6 +18,15 @@ function isAuthorBlank(game: BlankPlayContent): game is BlankContent {
   return "answer" in (game.items[0] ?? {});
 }
 
+function blankBank(
+  item: BlankPlayContent["items"][number],
+  author: boolean,
+): string[] {
+  if (author && "answer" in item) return [item.answer, ...item.decoys];
+  if ("options" in item) return item.options;
+  return [];
+}
+
 export function BlankGame({
   game,
   mode = "play",
@@ -56,17 +65,11 @@ function BlankPlay({
 }: { game: BlankPlayContent } & PlayBoardProps) {
   const author = isAuthorBlank(game);
   const [banks, setBanks] = useState(() =>
-    game.items.map((item) =>
-      author ? [item.answer, ...item.decoys] : item.options,
-    ),
+    game.items.map((item) => blankBank(item, author)),
   );
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setBanks(
-        game.items.map((item) =>
-          shuffledCopy(author ? [item.answer, ...item.decoys] : item.options),
-        ),
-      );
+      setBanks(game.items.map((item) => shuffledCopy(blankBank(item, author))));
     }, 0);
     return () => window.clearTimeout(timer);
   }, [author, game.items]);

@@ -2,25 +2,27 @@ import type { SortGame, SortItem } from "@jose/shared";
 import type { WhyPayload } from "./play-types";
 
 type Placed = Record<string, string>;
+type SortChip = Pick<SortItem, "id" | "label"> &
+  Partial<Pick<SortItem, "bucketId" | "scoring" | "why" | "source">>;
 
-export function scoredSortItems(items: SortItem[]): SortItem[] {
+export function scoredSortItems(items: SortChip[]): SortChip[] {
   return items.filter((item) => item.scoring !== "discussion");
 }
 
-export function discussionSortItems(items: SortItem[]): SortItem[] {
+export function discussionSortItems(items: SortChip[]): SortChip[] {
   return items.filter((item) => item.scoring === "discussion");
 }
 
-export function allChipsPlaced(items: SortItem[], placed: Placed): boolean {
+export function allChipsPlaced(items: SortChip[], placed: Placed): boolean {
   return items.every((item) => Boolean(placed[item.id]));
 }
 
 export function gradeSortCheck(
-  items: SortItem[],
+  items: SortChip[],
   placed: Placed,
-): { correctIds: string[]; wrongItems: SortItem[]; perfect: boolean; discussionIds: string[] } {
+): { correctIds: string[]; wrongItems: SortChip[]; perfect: boolean; discussionIds: string[] } {
   const correctIds: string[] = [];
-  const wrongItems: SortItem[] = [];
+  const wrongItems: SortChip[] = [];
   const discussionIds: string[] = [];
 
   for (const item of items) {
@@ -41,7 +43,7 @@ export function gradeSortCheck(
   };
 }
 
-export function formatSortWhy(wrongItems: SortItem[]): WhyPayload | null {
+export function formatSortWhy(wrongItems: SortChip[]): WhyPayload | null {
   const withWhy = wrongItems.filter((item) => item.why?.trim());
   if (withWhy.length === 0) return null;
   if (withWhy.length === 1) {

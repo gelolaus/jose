@@ -33,6 +33,10 @@ function useWideScreen() {
 
 type SortPlayContent = SortContent | AssessmentSort;
 
+function chipSource(item: SortPlayContent["items"][number]) {
+  return "source" in item ? item.source : undefined;
+}
+
 function isAuthorSort(game: SortPlayContent): game is SortContent {
   return game.items.some((item) => "bucketId" in item && item.bucketId);
 }
@@ -142,7 +146,7 @@ function SortPlay({
       await onMiss(result.feedback ?? null);
       return;
     }
-    const result = gradeSortCheck(isAuthorSort(game) ? game.items : [], placed);
+    const result = gradeSortCheck(game.items, placed);
     if (result.perfect) {
       const all: Record<string, true> = {};
       for (const item of game.items) all[item.id] = true;
@@ -240,9 +244,9 @@ function SortPlay({
                           <span className="block rounded-full bg-emerald-50 px-3 py-1.5 text-left text-xs font-extrabold text-emerald-900 ring-2 ring-emerald-300 sm:text-sm">
                             {item.label}
                           </span>
-                          {"source" in item && (item.source?.citation || item.source?.label) ? (
+                          {chipSource(item)?.citation || chipSource(item)?.label ? (
                             <p className="mt-1 px-2 text-[10px] font-bold text-emerald-800/80">
-                              Source: {item.source.citation || item.source.label}
+                              Source: {chipSource(item)?.citation || chipSource(item)?.label}
                             </p>
                           ) : null}
                         </li>
@@ -355,7 +359,7 @@ function DiscussionReview({
   onChoose,
   onFinish,
 }: {
-  items: SortItem[];
+  items: SortPlayContent["items"];
   selectedJustifications: Record<string, string>;
   curatorNotes: ReturnType<typeof formatSortExplanations>;
   disabled: boolean;
@@ -372,17 +376,20 @@ function DiscussionReview({
           Consider the evidence
         </h2>
       </div>
-      {items.map((item) => (
+      {items.map((item) => {
+        const choices = "justificationChoices" in item ? item.justificationChoices : undefined;
+        const why = "why" in item ? item.why : undefined;
+        return (
         <article key={item.id} className="rounded-2xl bg-white p-4 ring-1 ring-amber-200">
           <p className="text-sm font-extrabold text-slate-800">{item.label}</p>
-          {item.source?.citation || item.source?.label ? (
+          {chipSource(item)?.citation || chipSource(item)?.label ? (
             <p className="mt-1 text-xs font-bold text-slate-500">
-              Source: {item.source.citation || item.source.label}
+              Source: {chipSource(item)?.citation || chipSource(item)?.label}
             </p>
           ) : null}
-          {item.justificationChoices?.length ? (
+          {choices?.length ? (
             <div className="mt-3 grid gap-2">
-              {item.justificationChoices.map((choice) => (
+              {choices.map((choice) => (
                 <button
                   key={choice.id}
                   type="button"
@@ -399,13 +406,14 @@ function DiscussionReview({
               ))}
             </div>
           ) : null}
-          {(selectedJustifications[item.id] || !item.justificationChoices?.length) && item.why ? (
+          {(selectedJustifications[item.id] || !choices?.length) && why ? (
             <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm font-semibold leading-relaxed text-emerald-900">
-              {item.why}
+              {why}
             </p>
           ) : null}
         </article>
-      ))}
+        );
+      })}
       <CuratorNotes notes={curatorNotes} />
       <button
         type="button"
@@ -555,6 +563,7 @@ function SortBuild({
                         id: `i${Date.now()}`,
                         label: "New item",
                         bucketId: bucket.id,
+                        scoring: "auto",
                       },
                     ],
                   })
@@ -573,7 +582,7 @@ function SortBuild({
           onClick={() =>
             onChange({
               ...game,
-              buckets: [...game.buckets, { id: `b${Date.now()}`, label: "New chest" }],
+              buckets: [...game.buckets, { id: `b${Date.now()}`, label: "New chest", role: "category" }],
             })
           }
         >

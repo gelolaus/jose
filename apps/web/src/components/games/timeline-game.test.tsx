@@ -1,17 +1,19 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TimelineGame as TimelineContent } from "@jose/shared";
+import { parseGameContent, type TimelineGame as TimelineContent } from "@jose/shared";
 import { TimelineGame } from "./timeline-game";
 
-const game: TimelineContent = {
+const parsedTimeline = parseGameContent({
   type: "timeline",
   items: [
     { id: "a", label: "Born in Calamba", year: "June 19, 1861", why: "Calamba is the start." },
     { id: "b", label: "Teodora teaches", year: "1860s", why: "Home was the first classroom." },
     { id: "c", label: "Leaves for Biñan", year: "1870" },
   ],
-};
+});
+if (parsedTimeline.type !== "timeline") throw new Error("expected timeline");
+const game: TimelineContent = parsedTimeline;
 
 const gameWithCausalLink: TimelineContent = {
   ...game,

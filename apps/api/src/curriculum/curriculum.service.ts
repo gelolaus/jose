@@ -1868,7 +1868,7 @@ export class CurriculumService {
       typeof raw.expectedRevision === "number" ? raw.expectedRevision : undefined;
     delete raw.expectedRevision;
     this.assertRevision(ctx.level.revision ?? 0, expectedRevision);
-    const data = parseBody(putGameBodySchema, raw);
+    const data = parseBody(putGameBodySchema, coerceGameContent(raw));
     await this.db
       .insert(gameContent)
       .values({ levelId, json: JSON.stringify(data) })
