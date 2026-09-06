@@ -222,6 +222,18 @@ export class CurriculumService {
     const orderedByModule = await this.orderedLevelIdsByModules(rows.map((row) => row.id));
     const completed = await this.completedSet(learnerId);
     const continueCandidates: ContinueCandidate[] = [];
+    const currentIds = rows
+      .map((row) => {
+        const ordered = orderedByModule.get(row.id) ?? [];
+        const statuses = deriveLevelStatuses(ordered, completed);
+        return (
+          ordered.find((id) => statuses[id] === "current") ??
+          ordered[ordered.length - 1] ??
+          null
+        );
+      })
+      .filter((id): id is string => Boolean(id));
+    const headlines = await this.levelHeadlines(currentIds);
     const cards = [];
     for (const row of rows) {
       const ordered = orderedByModule.get(row.id) ?? [];
@@ -231,21 +243,18 @@ export class CurriculumService {
         ordered.find((id) => statuses[id] === "current") ??
         ordered[ordered.length - 1] ??
         null;
-      let nextLevelTitle: string | null = null;
-      let nextSectionTitle: string | null = null;
-      let nextKind: NodeKind = "lesson";
-      if (currentId) {
-        const ctx = await this.levelContext(currentId);
-        nextLevelTitle = ctx.level.title;
-        nextSectionTitle = ctx.section.title;
-        nextKind = ctx.level.kind as NodeKind;
+      const headline = currentId ? headlines.get(currentId) : undefined;
+      const nextLevelTitle = headline?.title ?? null;
+      const nextSectionTitle = headline?.sectionTitle ?? null;
+      const nextKind = headline?.kind ?? "lesson";
+      if (currentId && headline) {
         continueCandidates.push({
           moduleId: row.id,
           moduleTitle: row.title,
           featured: row.featured,
-          sectionTitle: ctx.section.title,
+          sectionTitle: headline.sectionTitle,
           levelId: currentId,
-          levelTitle: ctx.level.title,
+          levelTitle: headline.title,
           levelKind: nextKind,
           completedCount,
           totalCount: ordered.length,
@@ -396,32 +405,33 @@ export class CurriculumService {
       throw new BadRequestException("Finish the game to complete this level");
     }
     await this.ensureUnlocked(ctx.module.id, levelId, learnerId);
-    const first = await this.runTx(async (tx) => {
-      return this.markComplete(
-        levelId,
-        learnerId,
-        tx,
-        publishedRevision?.id ?? null,
-      );
+    return this.enqueueWrite(async () => {
+      const first = await this.db.transaction(async (tx) => {
+        return this.markComplete(
+          levelId,
+          learnerId,
+          tx as unknown as JoseDb,
+          publishedRevision?.id ?? null,
+        );
+      });
+      await this.touchQualifyingActivity(learnerId);
+      await this.syncAchievements(learnerId);
+      const learner = await this.getLearner(learnerId);
+      const ordered = snapshot
+        ? snapshot.sections.flatMap((section) => section.levels.map((level) => level.id))
+        : await this.orderedLevelIds(ctx.module.id);
+      const nextId = nextLevelAfter(ordered, levelId);
+      return {
+        completed: true,
+        firstTime: first,
+        learner,
+        contentRevisionId: publishedRevision?.id ?? null,
+        nextLevelId: nextId,
+        continueHref: nextId
+          ? `/learn/${ctx.module.id}/${nextId}`
+          : `/learn/${ctx.module.id}`,
+      };
     });
-    await this.touchQualifyingActivity(learnerId);
-    await this.syncAchievements(learnerId);
-    const learner = await this.getLearner(learnerId);
-    const ordered = snapshot
-      ? snapshot.sections.flatMap((section) => section.levels.map((level) => level.id))
-      : await this.orderedLevelIds(ctx.module.id);
-    const nextId = nextLevelAfter(ordered, levelId);
-    return {
-      completed: true,
-      firstTime: first,
-      learner,
-      contentRevisionId: publishedRevision?.id ?? null,
-      nextLevelId: nextId,
-      continueHref: nextId
-        ? `/learn/${ctx.module.id}/${nextId}`
-        : `/learn/${ctx.module.id}`,
-    };
-  }
 
   async recordMiss(levelId: string, learnerId: string, body: unknown = {}) {
     const data = parseBody(missBodySchema, body);
@@ -596,47 +606,54 @@ export class CurriculumService {
     }
 
     const finishedAt = Date.now();
-    const first = await this.runTx(async (tx) => {
-      const updated = await tx
-        .update(attempts)
-        .set({
-          status: "finished",
-          score: graded.score,
-          maxScore: graded.maxScore,
-          stars: graded.stars,
-          finishedAt,
-          clientAttemptId: data.clientAttemptId ?? attempt.clientAttemptId,
-          payload: JSON.stringify({
-            misses: graded.misses,
+    return this.enqueueWrite(async () => {
+      const first = await this.db.transaction(async (tx) => {
+        const updated = await tx
+          .update(attempts)
+          .set({
+            status: "finished",
+            score: graded.score,
+            maxScore: graded.maxScore,
             stars: graded.stars,
-            events: events.length,
-            answers: data.answers,
-            source: "server",
-          }),
-        })
-        .where(and(eq(attempts.id, attemptId), eq(attempts.status, "open")))
-        .returning({ id: attempts.id });
-      if (updated.length === 0) {
-        return false;
+            finishedAt,
+            clientAttemptId: data.clientAttemptId ?? attempt.clientAttemptId,
+            payload: JSON.stringify({
+              misses: graded.misses,
+              stars: graded.stars,
+              events: events.length,
+              answers: data.answers,
+              source: "server",
+            }),
+          })
+          .where(and(eq(attempts.id, attemptId), eq(attempts.status, "open")))
+          .returning({ id: attempts.id });
+        if (updated.length === 0) {
+          return false;
+        }
+        return this.markComplete(
+          attempt.levelId,
+          learnerId,
+          tx as unknown as JoseDb,
+          attempt.publishedRevisionId ?? ctx.module.publishedRevisionId ?? null,
+        );
+      });
+
+      const [fresh] = await this.db
+        .select()
+        .from(attempts)
+        .where(eq(attempts.id, attemptId));
+      if (!fresh || fresh.status !== "finished") {
+        throw new BadRequestException("Could not finish attempt");
       }
-      return this.markComplete(
-        attempt.levelId,
+      await this.touchQualifyingActivity(learnerId);
+      await this.syncAchievements(learnerId);
+      return this.finishedAttemptResult(
+        fresh,
         learnerId,
-        tx,
-        attempt.publishedRevisionId ?? ctx.module.publishedRevisionId ?? null,
+        fresh.finishedAt !== finishedAt,
+        first,
       );
     });
-
-    const [fresh] = await this.db
-      .select()
-      .from(attempts)
-      .where(eq(attempts.id, attemptId));
-    if (!fresh || fresh.status !== "finished") {
-      throw new BadRequestException("Could not finish attempt");
-    }
-    await this.touchQualifyingActivity(learnerId);
-    await this.syncAchievements(learnerId);
-    return this.finishedAttemptResult(fresh, learnerId, fresh.finishedAt !== finishedAt, first);
   }
 
   async getContinueLearning(
@@ -2659,6 +2676,34 @@ export class CurriculumService {
       .where(eq(sections.id, sectionId));
     if (!row) throw new NotFoundException("Section not found");
     return row;
+  }
+
+  private async levelHeadlines(
+    levelIds: string[],
+  ): Promise<Map<string, { title: string; sectionTitle: string; kind: NodeKind }>> {
+    const result = new Map<
+      string,
+      { title: string; sectionTitle: string; kind: NodeKind }
+    >();
+    if (levelIds.length === 0) return result;
+    const rows = await this.db
+      .select({
+        id: levels.id,
+        title: levels.title,
+        kind: levels.kind,
+        sectionTitle: sections.title,
+      })
+      .from(levels)
+      .innerJoin(sections, eq(levels.sectionId, sections.id))
+      .where(inArray(levels.id, levelIds));
+    for (const row of rows) {
+      result.set(row.id, {
+        title: row.title,
+        sectionTitle: row.sectionTitle,
+        kind: row.kind as NodeKind,
+      });
+    }
+    return result;
   }
 
   private async levelContext(levelId: string) {
