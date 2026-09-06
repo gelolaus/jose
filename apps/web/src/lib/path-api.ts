@@ -15,6 +15,10 @@ import {
   profileStatsResponseSchema,
   publishReadinessSchema,
   studentAssignmentSchema,
+  studentChallengeListItemSchema,
+  studentChallengeViewSchema,
+  teacherChallengeSummarySchema,
+  teacherChallengeViewSchema,
   classSummarySchema,
   teachAssetSchema,
   teachLevelDetailSchema,
@@ -543,6 +547,136 @@ export async function fetchMyAssignments() {
 export async function fetchTeachClasses(options?: ApiCallOptions) {
   const json = await apiFetch("/teach/classes", undefined, options);
   return classSummarySchema.array().parse(json);
+}
+
+export async function fetchMyChallenges(options?: ApiCallOptions) {
+  const json = await apiFetch("/challenges/mine", undefined, options);
+  return studentChallengeListItemSchema.array().parse(json);
+}
+
+export async function fetchStudentChallenge(id: string, options?: ApiCallOptions) {
+  const json = await apiFetch(`/challenges/${id}`, undefined, options);
+  return studentChallengeViewSchema.parse(json);
+}
+
+export async function joinClassWithInvite(inviteCode: string) {
+  const json = await apiFetch("/classes/join", {
+    method: "POST",
+    body: JSON.stringify({ inviteCode }),
+  });
+  return json as { ok: boolean; classId: string; name: string };
+}
+
+export async function optInToChallenge(
+  id: string,
+  displayMode: "alias" | "opt_in_name" = "alias",
+) {
+  const json = await apiFetch(`/challenges/${id}/opt-in`, {
+    method: "POST",
+    body: JSON.stringify({ displayMode }),
+  });
+  return studentChallengeViewSchema.parse(json);
+}
+
+export async function patchChallengeParticipation(
+  id: string,
+  displayMode: "alias" | "opt_in_name",
+) {
+  const json = await apiFetch(`/challenges/${id}/participation`, {
+    method: "PATCH",
+    body: JSON.stringify({ displayMode }),
+  });
+  return studentChallengeViewSchema.parse(json);
+}
+
+export async function contributeToChallenge(
+  id: string,
+  body: { evidenceKey: string; title: string; note?: string },
+) {
+  const json = await apiFetch(`/challenges/${id}/contributions`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return studentChallengeViewSchema.parse(json);
+}
+
+export async function patchClassChallengeSettings(
+  classId: string,
+  body: { challengesEnabled: boolean },
+) {
+  const json = await apiFetch(`/teach/classes/${classId}/settings`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+  return json as { ok: boolean; challengesEnabled: boolean };
+}
+
+export async function fetchTeachChallenges(classId: string) {
+  const json = await apiFetch(`/teach/classes/${classId}/challenges`);
+  return teacherChallengeSummarySchema.array().parse(json);
+}
+
+export async function fetchTeachChallenge(classId: string, challengeId: string) {
+  const json = await apiFetch(`/teach/classes/${classId}/challenges/${challengeId}`);
+  return teacherChallengeViewSchema.parse(json);
+}
+
+export async function createTeachChallenge(
+  classId: string,
+  body: {
+    kind: "evidence_collection" | "team_case";
+    title: string;
+    prompt: string;
+    goalCount: number;
+  },
+) {
+  const json = await apiFetch(`/teach/classes/${classId}/challenges`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return teacherChallengeViewSchema.parse(json);
+}
+
+export async function createTeachChallengeTeam(
+  classId: string,
+  challengeId: string,
+  name: string,
+) {
+  return apiFetch(`/teach/classes/${classId}/challenges/${challengeId}/teams`, {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  }) as Promise<{ id: string; name: string; memberIds: string[] }>;
+}
+
+export async function assignTeachChallengeTeamMember(
+  classId: string,
+  challengeId: string,
+  teamId: string,
+  learnerId: string,
+) {
+  return apiFetch(
+    `/teach/classes/${classId}/challenges/${challengeId}/teams/${teamId}/members`,
+    {
+      method: "POST",
+      body: JSON.stringify({ learnerId }),
+    },
+  );
+}
+
+export async function moderateTeachContribution(
+  classId: string,
+  challengeId: string,
+  contributionId: string,
+  status: "accepted" | "returned",
+) {
+  const json = await apiFetch(
+    `/teach/classes/${classId}/challenges/${challengeId}/contributions/${contributionId}/moderation`,
+    {
+      method: "POST",
+      body: JSON.stringify({ status }),
+    },
+  );
+  return teacherChallengeViewSchema.parse(json);
 }
 
 export async function putTeachLesson(

@@ -429,6 +429,75 @@ export const migration008LearnerArtifacts: Migration = {
   },
 };
 
+/** Optional cooperative class challenges with aliases and async progress. */
+export const migration009ClassChallenges: Migration = {
+  id: "009_class_challenges",
+  async up(client) {
+    await client.execute("PRAGMA foreign_keys = ON");
+    await ensureColumn(
+      client,
+      "classes",
+      "challenges_enabled",
+      "INTEGER NOT NULL DEFAULT 0",
+    );
+    const statements = [
+      `CREATE TABLE IF NOT EXISTS class_challenges (
+        id TEXT PRIMARY KEY,
+        class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        title TEXT NOT NULL,
+        prompt TEXT NOT NULL,
+        goal_count INTEGER NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        archived_at INTEGER,
+        created_at INTEGER NOT NULL,
+        closed_at INTEGER
+      )`,
+      `CREATE TABLE IF NOT EXISTS class_challenge_teams (
+        id TEXT PRIMARY KEY,
+        challenge_id TEXT NOT NULL REFERENCES class_challenges(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS class_challenge_team_members (
+        team_id TEXT NOT NULL REFERENCES class_challenge_teams(id) ON DELETE CASCADE,
+        learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+        assigned_at INTEGER NOT NULL,
+        PRIMARY KEY (team_id, learner_id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS class_challenge_participants (
+        challenge_id TEXT NOT NULL REFERENCES class_challenges(id) ON DELETE CASCADE,
+        learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+        alias TEXT NOT NULL,
+        display_mode TEXT NOT NULL DEFAULT 'alias',
+        opted_in_at INTEGER NOT NULL,
+        withdrawn_at INTEGER,
+        PRIMARY KEY (challenge_id, learner_id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS class_challenge_contributions (
+        id TEXT PRIMARY KEY,
+        challenge_id TEXT NOT NULL REFERENCES class_challenges(id) ON DELETE CASCADE,
+        learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+        team_id TEXT REFERENCES class_challenge_teams(id) ON DELETE SET NULL,
+        evidence_key TEXT NOT NULL,
+        title TEXT NOT NULL,
+        note TEXT,
+        status TEXT NOT NULL DEFAULT 'accepted',
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_challenge_contribution_unique
+        ON class_challenge_contributions (challenge_id, learner_id, evidence_key)`,
+      `CREATE INDEX IF NOT EXISTS idx_class_challenges_class
+        ON class_challenges (class_id, created_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_challenge_contributions_challenge
+        ON class_challenge_contributions (challenge_id, created_at)`,
+    ];
+    for (const sql of statements) {
+      await client.execute(sql);
+    }
+  },
+};
+
 export const MIGRATIONS: Migration[] = [
   migration001InitialSchema,
   migration002QueryIndexes,
@@ -438,6 +507,7 @@ export const MIGRATIONS: Migration[] = [
   migration006ContentClassroom,
   migration007StudentExperience,
   migration008LearnerArtifacts,
+  migration009ClassChallenges,
 ];
 
 export async function ensureColumn(

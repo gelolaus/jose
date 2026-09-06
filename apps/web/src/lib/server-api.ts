@@ -17,6 +17,7 @@ import {
   fetchTeachModule as baseFetchTeachModule,
   fetchTeachModules as baseFetchTeachModules,
   fetchTeachClasses as baseFetchTeachClasses,
+  fetchMyChallenges as baseFetchMyChallenges,
 } from "./path-api";
 
 /**
@@ -77,6 +78,10 @@ export async function fetchTeachModules() {
 
 export async function fetchTeachClasses() {
   return baseFetchTeachClasses(await options());
+}
+
+export async function fetchMyChallenges() {
+  return baseFetchMyChallenges(await options());
 }
 
 export async function fetchTeachModule(id: string) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { TeachTitle } from "@/components/teach-shell";
+import { TeachClassChallenges } from "@/components/teach-class-challenges";
 import { ApiError } from "@/lib/path-api";
 import {
   classReportSchema,
@@ -170,6 +171,19 @@ export function TeachClassesClient({
                 Assign + report
               </button>
             </form>
+            <TeachClassChallenges
+              classId={klass.id}
+              className={klass.name}
+              challengesEnabled={klass.challengesEnabled}
+              onEnabledChange={(enabled) => {
+                setClasses((current) =>
+                  current.map((row) =>
+                    row.id === klass.id ? { ...row, challengesEnabled: enabled } : row,
+                  ),
+                );
+              }}
+              onError={(message) => setError(message)}
+            />
           </li>
         ))}
       </ul>
