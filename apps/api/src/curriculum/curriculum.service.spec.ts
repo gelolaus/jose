@@ -747,26 +747,26 @@ describe("authoritative assessment", () => {
     ];
     await database.db.insert(learnerProgress).values(
       prior.map((levelId) => ({
-        learnerId: student.learnerId,
+        learnerId: alice.learnerId,
         levelId,
         completedAt: Date.now(),
       })),
     ).onConflictDoNothing();
-    const play = await service.getPlayLevel("childhood-chest", student.learnerId);
+    const play = await service.getPlayLevel("childhood-chest", alice.learnerId);
     expect(play.chest?.artifact.id).toBeTruthy();
     expect(play.chest?.artifact.provenance.length).toBeGreaterThan(10);
 
-    const first = await service.completeLevel("childhood-chest", student.learnerId);
+    const first = await service.completeLevel("childhood-chest", alice.learnerId);
     expect(first.artifactAwarded).toBe(true);
-    const listed = await service.listArtifacts(student.learnerId);
+    const listed = await service.listArtifacts(alice.learnerId);
     expect(listed.artifacts.some((a) => a.sourceLevelId === "childhood-chest")).toBe(
       true,
     );
 
-    const second = await service.completeLevel("childhood-chest", student.learnerId);
+    const second = await service.completeLevel("childhood-chest", alice.learnerId);
     expect(second.artifactAwarded).toBe(false);
     expect(
-      (await service.listArtifacts(student.learnerId)).artifacts.filter(
+      (await service.listArtifacts(alice.learnerId)).artifacts.filter(
         (a) => a.artifactId === play.chest!.artifact.id,
       ),
     ).toHaveLength(1);

@@ -156,6 +156,7 @@ function TimelinePlay({
   const [hintsRevealed, setHintsRevealed] = useState(false);
   const missesRef = useRef(0);
   const causalChoiceRef = useRef<string | undefined>(undefined);
+  const maxPieces = game.items.length + (game.causalLink ? 1 : 0);
   const { feedbackHoldMs, playCue } = useMotionSound();
   const wide = useWideScreen();
   const drag = usePlaceDrag({

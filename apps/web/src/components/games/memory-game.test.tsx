@@ -100,6 +100,11 @@ describe("MemoryGame play", () => {
     tap("pair-2-a");
     tap("pair-2-b");
     expect(onMiss).not.toHaveBeenCalled();
-    expect(onFinish).toHaveBeenCalledWith(1, 2, 1);
+    expect(onFinish).toHaveBeenCalledWith(
+      1,
+      2,
+      1,
+      expect.objectContaining({ type: "memory" }),
+    );
   });
 });
