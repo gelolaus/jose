@@ -43,7 +43,7 @@ export const journalStoreSchema = z.object({
 });
 export type JournalStore = z.infer<typeof journalStoreSchema>;
 
-export const glossaryTermSchema = z.object({
+export const journalGlossaryTermSchema = z.object({
   id: z.string().min(1).max(64),
   term: z.string().min(1).max(120),
   definition: z.string().min(1).max(2000),
@@ -51,21 +51,21 @@ export const glossaryTermSchema = z.object({
   incomplete: z.boolean().default(false),
   relatedHref: z.string().max(500).optional(),
 });
-export type GlossaryTerm = z.infer<typeof glossaryTermSchema>;
+export type JournalGlossaryTerm = z.infer<typeof journalGlossaryTermSchema>;
 
-export const catalogEntityKindSchema = z.enum(["book", "character", "place"]);
-export type CatalogEntityKind = z.infer<typeof catalogEntityKindSchema>;
+export const journalCatalogEntityKindSchema = z.enum(["book", "character", "place"]);
+export type JournalCatalogEntityKind = z.infer<typeof journalCatalogEntityKindSchema>;
 
-export const catalogEntitySchema = z.object({
+export const journalCatalogEntitySchema = z.object({
   id: z.string().min(1).max(64),
-  kind: catalogEntityKindSchema,
+  kind: journalCatalogEntityKindSchema,
   name: z.string().min(1).max(160),
   summary: z.string().max(1000),
   /** Curated browsing stubs; full encyclopedia content is owner-supplied. */
   incomplete: z.boolean().default(true),
   href: z.string().max(500).optional(),
 });
-export type CatalogEntity = z.infer<typeof catalogEntitySchema>;
+export type JournalCatalogEntity = z.infer<typeof journalCatalogEntitySchema>;
 
 export const journalExportSchema = z.object({
   exportedAt: z.string(),

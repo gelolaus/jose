@@ -3,9 +3,9 @@
  * Do not invent production historical copy beyond these clearly incomplete placeholders.
  */
 
-import type { CatalogEntity, GlossaryTerm } from "@jose/shared";
+import type { JournalCatalogEntity, JournalGlossaryTerm } from "@jose/shared";
 
-export const SEED_GLOSSARY: GlossaryTerm[] = [
+export const SEED_GLOSSARY: JournalGlossaryTerm[] = [
   {
     id: "ilustrado",
     term: "Ilustrado",
@@ -30,7 +30,7 @@ export const SEED_GLOSSARY: GlossaryTerm[] = [
   },
 ];
 
-export const SEED_CATALOG: CatalogEntity[] = [
+export const SEED_CATALOG: JournalCatalogEntity[] = [
   {
     id: "noli-me-tangere",
     kind: "book",

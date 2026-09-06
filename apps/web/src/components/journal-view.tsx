@@ -11,7 +11,7 @@ import { SEED_CATALOG, SEED_GLOSSARY } from "@/lib/journal-catalog";
 import { t } from "@/lib/reading-preferences";
 import { useJournalStore } from "@/lib/use-journal-store";
 import { useReadingPreferences } from "@/lib/use-reading-preferences";
-import type { CatalogEntityKind, JournalEntry } from "@jose/shared";
+import type { JournalCatalogEntityKind, JournalEntry } from "@jose/shared";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Breadcrumbs } from "@/components/breadcrumbs";
@@ -248,7 +248,7 @@ function GlossaryPanel() {
   );
 }
 
-function CatalogPanel({ kind }: { kind: CatalogEntityKind }) {
+function CatalogPanel({ kind }: { kind: JournalCatalogEntityKind }) {
   const items = SEED_CATALOG.filter((e) => e.kind === kind);
   return (
     <ul className="mt-6 space-y-3">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessPublishReadiness, csvSafeCell, toCsv } from "./index";
+import { assessPublishReadiness, csvSafeCell, emptyLessonEditorial, toCsv } from "./index";
 
 describe("assessPublishReadiness", () => {
   it("blocks unreviewed defaults and placeholder lessons", () => {
@@ -19,7 +19,11 @@ describe("assessPublishReadiness", () => {
               kind: "lesson",
               gameType: null,
               sectionId: "s1",
-              lesson: { markdown: "## Title\n\nWrite the lesson here.", youtubeVideoId: null },
+              lesson: {
+                markdown: "## Title\n\nWrite the lesson here.",
+                youtubeVideoId: null,
+                editorial: emptyLessonEditorial(),
+              },
             },
             {
               id: "l2",
