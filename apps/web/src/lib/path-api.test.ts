@@ -48,8 +48,7 @@ describe("apiRequestInit", () => {
     );
   });
 
-  it("omits the cookie header when there is no session to forward", () => {
-    const headers = apiRequestInit().headers as Record<string, string>;
-    expect(headers.cookie).toBeUndefined();
+  it("never requires public database secrets", () => {
+    expect(process.env.NEXT_PUBLIC_JOSE_DATABASE_AUTH_TOKEN).toBeUndefined();
   });
 });

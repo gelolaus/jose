@@ -29,6 +29,7 @@ sign-in, and without `JOSE_AUTH_MODE` there is no way to sign in at all.
 - Web: http://localhost:3000/learn  
 - Sign-in (mock or Microsoft): http://localhost:3000/login  
 - API: http://localhost:3001/health  
+- Readiness: http://localhost:3001/ready  
 - Teacher studio: Profile → Teacher studio, or http://localhost:3000/teach  
 
 The API creates `apps/api/data/jose.sqlite` on first boot but does **not** insert curriculum or demo progress automatically. After a fresh database (or deploy), seed explicitly:
@@ -39,6 +40,16 @@ npm run db:seed -- --demo       # also apply demo-learner@1 (local shared Explor
 ```
 
 Re-running the seed command skips already-applied versions, so deleting a seeded extra or the Ateneo module survives restart. `JOSE_DEMO_MODE` never invents XP for a signed-in student; production refuses to boot with it enabled.
+
+Versioned schema changes live in `apps/api/src/db/migrations`. Development applies them on API boot; production must run `npm run db:migrate` first. Backup and restore:
+
+```bash
+npm run db:migrate
+npm run db:backup -- --json --out=./apps/api/data/backups/pre-change.json
+# npm run db:restore -- --from=./apps/api/data/backups/pre-change.json
+```
+
+Point `JOSE_DATABASE_URL` at a persistent volume or hosted libSQL — never an ephemeral container disk. See `docs/ops/staging-smoke-and-rollback.md`.
 
 ## Accounts and sign-in
 
@@ -89,6 +100,8 @@ test-only login path is still enabled, so remove these:
 - `JOSE_AUTH_MODE=mock`
 - `JOSE_DEMO_MODE=true`
 - `JOSE_AUTH_DEV_LOGIN=1`
+- `JOSE_AUTH_STUB=1`
+- `JOSE_AUTH_MODE=disabled`
 - `JOSE_MAIL_TRANSPORT=memory` while `JOSE_AUTH_MODE=microsoft`
 
 Full setup steps, including the Entra app registration, are in
