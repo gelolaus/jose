@@ -10,7 +10,7 @@ import type { WhyPayload } from "@/components/games/play-types";
 import { hintFor, labelFor } from "@/lib/game-copy";
 import { LAB_GAMES, type LabGame } from "@/lib/lab-games";
 import { firstTryScore, pieceCount } from "@jose/shared";
-import { ArrowLeft, Boxes, FileSearch, HelpCircle, Layers, ListOrdered, Map, PenLine, Wrench } from "lucide-react";
+import { ArrowLeft, Boxes, FileSearch, HelpCircle, Layers, ListOrdered, Map, PenLine, Shuffle, Sparkles, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
@@ -29,6 +29,10 @@ const ICONS: Record<LabGame["type"], LucideIcon> = {
 };
 
 export function GameLabHub({ embedded = false }: { embedded?: boolean }) {
+  const [filter, setFilter] = useState<"all" | "quick" | "deep">("all");
+  const quickTypes: LabGame["type"][] = ["quiz", "memory", "blank", "timeline"];
+  const visibleGames = LAB_GAMES.filter((entry) => filter === "all" || (filter === "quick" ? quickTypes.includes(entry.type) : !quickTypes.includes(entry.type)));
+
   return (
     <div
       className={
@@ -37,34 +41,42 @@ export function GameLabHub({ embedded = false }: { embedded?: boolean }) {
           : "mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8"
       }
     >
-      {!embedded ? (
-        <div className="mb-6 max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--jose-accent)]">
-            Try games
-          </p>
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-[var(--jose-ink)] sm:text-4xl">
-            Sample boards
-          </h1>
-          <p className="mt-2 text-base text-[var(--jose-ink-muted)]">
-            Demo boards for exploring mechanics. These do not save path progress
-            or complete assignments.
-          </p>
+      <section className="relative mb-6 overflow-hidden rounded-[1.75rem] bg-[linear-gradient(135deg,#7c3aed_0%,#c2410c_100%)] px-5 py-6 text-white shadow-[0_16px_34px_rgba(124,58,237,0.2)] sm:px-7 sm:py-7">
+        <div className="relative z-10 max-w-2xl">
+          <p className="inline-flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.16em] text-white/80"><Sparkles className="size-4" aria-hidden /> Arcade corner</p>
+          <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">Make a little history.</h1>
+          <p className="mt-2 max-w-xl text-base leading-relaxed text-white/85">Quick rounds, curious clues, and no wrong turn that doesn&apos;t teach you something.</p>
         </div>
-      ) : null}
+        <div className="pointer-events-none absolute -right-7 -top-8 size-40 rounded-full border-[18px] border-white/15" />
+        <Shuffle className="pointer-events-none absolute bottom-4 right-8 size-20 rotate-12 text-white/20" aria-hidden />
+      </section>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-[var(--jose-ink)]">Pick your kind of fun</p>
+          <p className="text-sm text-[var(--jose-ink-muted)]">Everything here is optional practice.</p>
+        </div>
+        <div className="flex rounded-full bg-white p-1 shadow-sm ring-1 ring-black/5" role="group" aria-label="Filter games">
+          {(["all", "quick", "deep"] as const).map((kind) => (
+            <button key={kind} type="button" onClick={() => setFilter(kind)} className={`rounded-full px-3 py-2 text-xs font-extrabold capitalize transition sm:px-4 ${filter === kind ? "bg-[var(--jose-ink)] text-white" : "text-stone-500 hover:bg-stone-100"}`}>
+              {kind === "all" ? "All games" : kind === "quick" ? "Quick play" : "Take your time"}
+            </button>
+          ))}
+        </div>
+      </div>
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {LAB_GAMES.map((entry) => {
+        {visibleGames.map((entry) => {
           const Icon = ICONS[entry.type];
           return (
             <li key={entry.type}>
               <Link
                 href={`/practice/lab/${entry.type}`}
-                className="block overflow-hidden rounded-2xl text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0.5"
+                className="group block overflow-hidden rounded-[1.5rem] text-white shadow-md transition hover:-translate-y-1 hover:shadow-xl active:translate-y-0.5"
               >
                 <div
-                  className="flex min-h-[11.5rem] flex-col justify-between p-5 sm:min-h-[13rem] sm:p-6"
+                  className="relative flex min-h-[12rem] flex-col justify-between overflow-hidden p-5 sm:min-h-[13rem] sm:p-6"
                   style={{ backgroundColor: entry.color }}
                 >
-                  <span className="flex size-12 items-center justify-center rounded-xl bg-white/95 text-stone-800 shadow-sm">
+                  <span className="flex size-12 items-center justify-center rounded-2xl bg-white/95 text-stone-800 shadow-sm transition group-hover:rotate-6 group-hover:scale-105">
                     <Icon className="size-6" strokeWidth={2.25} aria-hidden />
                   </span>
                   <div>
@@ -73,6 +85,9 @@ export function GameLabHub({ embedded = false }: { embedded?: boolean }) {
                     </p>
                     <p className="mt-1 text-sm text-white/90 sm:text-base">
                       {entry.blurb}
+                    </p>
+                    <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-white/70">
+                      {quickTypes.includes(entry.type) ? "2–5 min · quick play" : "5–10 min · deep dive"}
                     </p>
                   </div>
                 </div>

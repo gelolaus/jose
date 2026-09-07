@@ -16,8 +16,8 @@
   --jose-ink: #1c1917;
   --jose-ink-soft: #292524;
   --jose-ink-muted: #57534e;
-  --jose-paper: #f3f1ea;
-  --jose-wash: #e7efe9;
+  --jose-paper: #fffdf7;
+  --jose-wash: #eff8f2;
   --jose-rule: #d6d3d1;
   --jose-accent: #0f766e;
   --jose-accent-soft: #99f6e4;
@@ -26,7 +26,7 @@
   --jose-gold-deep: #92400e;
   --jose-sky: #0e7490;
   --jose-coral: #9f1239;
-  --background: #eef2ef;
+  --background: #f5f7f2;
   --foreground: #1c1917;
   /* Motion system: control 120–180ms, screen 180–280ms, short milestones */
   --jose-motion-control: 150ms;
@@ -56,8 +56,8 @@ html[data-presentation="focus"] {
     margin: 0;
     color: var(--foreground);
     background:
-      radial-gradient(ellipse at top, #dbe7e1 0%, transparent 55%),
-      linear-gradient(180deg, #eef2ef 0%, #e7e5e4 100%);
+      radial-gradient(ellipse at top, #dff4e8 0%, transparent 52%),
+      linear-gradient(180deg, #f5f7f2 0%, #edf2ee 100%);
     font-family: var(--font-sans);
     font-weight: 400;
   }
@@ -142,7 +142,7 @@ html[data-presentation="focus"] {
   .node-3d {
     box-shadow:
       0 8px 0 var(--jose-gold-deep),
-      0 14px 24px rgb(0 0 0 / 18%);
+      0 14px 24px rgb(0 0 0 / 14%);
   }
 
   .node-3d:active:not(:disabled) {
@@ -567,4 +567,3 @@ html[data-text-size="lg"] {
 html[data-text-size="xl"] {
   font-size: 125%;
 }
-
