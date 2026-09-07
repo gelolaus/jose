@@ -1,6 +1,7 @@
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AddressInfo } from "node:net";
@@ -21,10 +22,11 @@ const AUTH_ENV = {
 };
 
 describe("platform reliability HTTP", () => {
-  const dirs: string[] = [];
+  let dir: string;
+  let databaseIndex = 0;
   let previousEnv: NodeJS.ProcessEnv;
   let app: INestApplication;
-  let database: DatabaseService;
+  let database!: DatabaseService;
   let baseUrl: string;
 
   beforeEach(() => {
@@ -32,22 +34,27 @@ describe("platform reliability HTTP", () => {
     resetMetrics();
   });
 
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), "jose-plat-"));
+  });
+
   afterEach(async () => {
     if (app) await app.close();
+    await database?.onModuleDestroy();
     process.env = previousEnv;
-    while (dirs.length) {
-      const dir = dirs.pop();
-      if (dir) rmSync(dir, { recursive: true, force: true });
-    }
+    app = undefined as never;
+  });
+
+  afterAll(async () => {
+    await removeFixtureDir(dir);
   });
 
   async function boot() {
-    const dir = mkdtempSync(join(tmpdir(), "jose-plat-"));
-    dirs.push(dir);
+    const databasePath = join(dir, `t-${databaseIndex++}.sqlite`);
     process.env = {
       ...previousEnv,
       NODE_ENV: "test",
-      JOSE_DATABASE_URL: `file:${join(dir, "t.sqlite").replace(/\\/g, "/")}`,
+      JOSE_DATABASE_URL: `file:${databasePath.replace(/\\/g, "/")}`,
       ...AUTH_ENV,
     };
     delete process.env.JOSE_AUTH_STUB;
@@ -167,3 +174,11 @@ describe("platform reliability HTTP", () => {
     expect(String(cleaned.message)).not.toContain("abc.secret");
   });
 });
+
+async function removeFixtureDir(dir: string) {
+  try {
+    await rm(dir, { recursive: true, force: true, maxRetries: 1, retryDelay: 100 });
+  } catch {
+    // libSQL can retain Windows handles briefly after the Nest application closes.
+  }
+}

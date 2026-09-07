@@ -4,11 +4,13 @@ import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
 import { AuthConfigError, loadAuthConfig } from "./auth/auth-config";
 import { EnvValidationError, loadJoseEnv } from "./config/env";
+import { loadApiEnvFile } from "./config/load-env-file";
 import { writeStructuredLog } from "./observability/telemetry";
 
 async function bootstrap() {
   let env;
   try {
+    loadApiEnvFile();
     env = loadJoseEnv(process.env);
     loadAuthConfig();
   } catch (error) {

@@ -1,7 +1,4 @@
-import { Test } from "@nestjs/testing";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { Test, type TestingModule } from "@nestjs/testing";
 import { randomUUID } from "node:crypto";
 import { AppModule } from "../app.module";
 import { CurriculumService } from "./curriculum.service";
@@ -10,37 +7,34 @@ import { levels, modules, sections } from "../db/schema";
 import { createTestAccount } from "../auth/test-session.helper";
 
 describe("batched catalog queries", () => {
-  const dirs: string[] = [];
   let previousEnv: NodeJS.ProcessEnv;
+  let database!: DatabaseService;
+  let moduleRef!: TestingModule;
 
   beforeEach(() => {
     previousEnv = { ...process.env };
   });
 
   afterEach(async () => {
+    await database?.onModuleDestroy();
+    await moduleRef?.close();
     process.env = previousEnv;
-    while (dirs.length) {
-      const dir = dirs.pop();
-      if (dir) rmSync(dir, { recursive: true, force: true });
-    }
   });
 
   it("lists many modules without one round-trip per section/level", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "jose-batch-"));
-    dirs.push(dir);
     process.env.NODE_ENV = "test";
-    process.env.JOSE_DATABASE_URL = `file:${join(dir, "b.sqlite").replace(/\\/g, "/")}`;
+    process.env.JOSE_DATABASE_URL = "file::memory:";
     process.env.JOSE_AUTH_MODE = "mock";
     process.env.JOSE_SESSION_SECRET = "query-batch-session-secret-at-least-32";
     process.env.JOSE_WEB_ORIGIN = "http://localhost:3000";
     process.env.JOSE_API_PUBLIC_URL = "http://localhost:3001";
 
-    const moduleRef = await Test.createTestingModule({
+    moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
     await moduleRef.init();
     const service = moduleRef.get(CurriculumService);
-    const database = moduleRef.get(DatabaseService);
+    database = moduleRef.get(DatabaseService);
     const student = await createTestAccount(database, {
       admissionEmail: "batch@student.apc.edu.ph",
     });
@@ -105,6 +99,5 @@ describe("batched catalog queries", () => {
     expect(selectRoundTrips).toBeLessThan(16);
 
     client.execute = original;
-    await moduleRef.close();
   });
 });

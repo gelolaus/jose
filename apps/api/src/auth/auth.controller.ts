@@ -24,6 +24,7 @@ import {
 import { evaluateChosenMailbox } from "./admission";
 import { AuthorizationService } from "./authorization.service";
 import { AuthService, type AdmissionOutcome } from "./auth.service";
+import { buildMicrosoftCallbackUrl } from "./microsoft-callback-url";
 import { CurrentUser, SessionAuthGuard, readSessionToken } from "./session.guard";
 import { SessionService } from "./session.service";
 import { UsersService } from "./users.service";
@@ -132,9 +133,12 @@ export class AuthController {
   @Get("microsoft/callback")
   async callback(@Req() req: Request, @Res() res: Response) {
     const config = this.auth.getRuntimeConfig();
-    const host = req.get("host") ?? "localhost";
-    const proto = (req.get("x-forwarded-proto") ?? req.protocol ?? "http").split(",")[0];
-    const callbackUrl = new URL(`${proto}://${host}${req.originalUrl}`);
+    const callbackUrl =
+      config.mode === "microsoft"
+        ? buildMicrosoftCallbackUrl(config.microsoft!.redirectUri, req.originalUrl)
+        : new URL(
+            `${(req.get("x-forwarded-proto") ?? req.protocol ?? "http").split(",")[0]}://${req.get("host") ?? "localhost"}${req.originalUrl}`,
+          );
     const outcome = await this.auth.handleMicrosoftCallback(callbackUrl);
     return this.writeOutcome(res, outcome, config.webOrigin, config.cookieSecure, config.sessionTtlSeconds, config.pendingTtlSeconds);
   }

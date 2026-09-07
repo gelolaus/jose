@@ -2,7 +2,8 @@ import type { Client } from "@libsql/client";
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import { eq } from "drizzle-orm";
-import { copyFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runMigrations, listAppliedMigrations } from "./migrate";
@@ -87,18 +88,18 @@ async function createLegacyDatabase(client: Client) {
 }
 
 describe("migrations and backup/restore", () => {
-  const dirs: string[] = [];
+  let rootDir: string;
 
-  afterEach(() => {
-    while (dirs.length) {
-      const dir = dirs.pop();
-      if (dir) rmSync(dir, { recursive: true, force: true });
-    }
+  beforeAll(() => {
+    rootDir = mkdtempSync(join(tmpdir(), "jose-migrations-"));
+  });
+
+  afterAll(async () => {
+    await removeFixtureDir(rootDir);
   });
 
   it("upgrades an older representative database without losing attempts", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "jose-migrate-"));
-    dirs.push(dir);
+    const dir = mkdtempSync(join(rootDir, "migrate-"));
     const path = join(dir, "legacy.sqlite");
     const { client, db } = open(path);
 
@@ -155,8 +156,7 @@ describe("migrations and backup/restore", () => {
   });
 
   it("restores a logical backup into a fresh environment with integrity", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "jose-backup-"));
-    dirs.push(dir);
+    const dir = mkdtempSync(join(rootDir, "backup-"));
     const sourcePath = join(dir, "source.sqlite");
     const restorePath = join(dir, "restore.sqlite");
     const backupJson = join(dir, "backup.json");
@@ -225,8 +225,7 @@ describe("migrations and backup/restore", () => {
   });
 
   it("file backup copies sqlite onto durable path (survives ephemeral restart simulation)", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "jose-filebak-"));
-    dirs.push(dir);
+    const dir = mkdtempSync(join(rootDir, "filebak-"));
     const livePath = join(dir, "live.sqlite");
     const durablePath = join(dir, "volume", "jose.sqlite");
     const live = open(livePath);
@@ -253,3 +252,11 @@ describe("migrations and backup/restore", () => {
     recovered.client.close();
   });
 });
+
+async function removeFixtureDir(dir: string) {
+  try {
+    await rm(dir, { recursive: true, force: true, maxRetries: 1, retryDelay: 100 });
+  } catch {
+    // libSQL can retain Windows handles briefly after the Nest application closes.
+  }
+}

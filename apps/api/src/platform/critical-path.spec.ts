@@ -1,8 +1,9 @@
 import { Test } from "@nestjs/testing";
-import { INestApplication } from "@nestjs/common";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { INestApplication } from "@nestjs/common";
 import { AddressInfo } from "node:net";
 import { AppModule } from "../app.module";
 import { DatabaseService } from "../db/database.service";
@@ -18,33 +19,39 @@ import { createTestAccount, type TestAccount } from "../auth/test-session.helper
  * - interrupted-save style attempt validation (oversized / invalid)
  */
 describe("critical path release gate", () => {
-  const dirs: string[] = [];
+  let dir: string;
+  let databaseIndex = 0;
   let previousEnv: NodeJS.ProcessEnv;
   let app: INestApplication;
   let baseUrl: string;
   let service: CurriculumService;
-  let database: DatabaseService;
+  let database!: DatabaseService;
 
   beforeEach(() => {
     previousEnv = { ...process.env };
   });
 
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), "jose-e2e-"));
+  });
+
   afterEach(async () => {
     if (app) await app.close();
+    await database?.onModuleDestroy();
     process.env = previousEnv;
-    while (dirs.length) {
-      const dir = dirs.pop();
-      if (dir) rmSync(dir, { recursive: true, force: true });
-    }
+    app = undefined as never;
+  });
+
+  afterAll(async () => {
+    await removeFixtureDir(dir);
   });
 
   async function boot() {
-    const dir = mkdtempSync(join(tmpdir(), "jose-e2e-"));
-    dirs.push(dir);
+    const databasePath = join(dir, `e-${databaseIndex++}.sqlite`);
     process.env = {
       ...previousEnv,
       NODE_ENV: "test",
-      JOSE_DATABASE_URL: `file:${join(dir, "e.sqlite").replace(/\\/g, "/")}`,
+      JOSE_DATABASE_URL: `file:${databasePath.replace(/\\/g, "/")}`,
       JOSE_AUTH_MODE: "mock",
       JOSE_SESSION_SECRET: "critical-path-session-secret-32chars!",
       JOSE_WEB_ORIGIN: "http://localhost:3000",
@@ -176,3 +183,11 @@ describe("critical path release gate", () => {
     expect(res.status).not.toBe(200);
   });
 });
+
+async function removeFixtureDir(dir: string) {
+  try {
+    await rm(dir, { recursive: true, force: true, maxRetries: 1, retryDelay: 100 });
+  } catch {
+    // libSQL can retain Windows handles briefly after the Nest application closes.
+  }
+}

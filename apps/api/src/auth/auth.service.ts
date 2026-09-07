@@ -350,7 +350,7 @@ export class AuthService {
           ? AUTH_DENIAL_MESSAGES.missing_email
           : AUTH_DENIAL_MESSAGES.mailbox_required,
     };
-    if (this.config.mode === "mock" && pending.candidateEmail) {
+    if (this.memoryMail && pending.candidateEmail) {
       status.devCode = this.lastMockMailboxCode(pending.candidateEmail) ?? undefined;
     }
     return status;
@@ -405,7 +405,7 @@ export class AuthService {
     await this.issueMailboxCode(pending.id, email!);
     const status = await this.getPendingStatus(pending.id);
     const result: PendingAdmissionStatus & { devCode?: string } = status;
-    if (this.config.mode === "mock") {
+    if (this.memoryMail) {
       result.devCode = this.lastMockMailboxCode(email!);
     }
     return result;

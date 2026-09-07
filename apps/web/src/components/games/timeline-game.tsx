@@ -7,7 +7,7 @@ import type {
 } from "@jose/shared";
 import { shuffledCopy } from "@jose/shared";
 import { Plus, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useMotionSound } from "@/lib/motion-sound";
 import type { PlayBoardProps } from "./play-types";
 import {
@@ -172,7 +172,7 @@ function TimelinePlay({
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setBank(dealTimelineItems(playItems(game)));
+      setBank(dealTimelineItems(game.items as TimelineItem[]));
       setPlaced({});
       setLocked({});
       setPhase("timeline");
@@ -182,17 +182,18 @@ function TimelinePlay({
     return () => window.clearTimeout(timer);
   }, [game.items, game.causalLink, game.dateHints]);
 
-  function currentOrder() {
-    return game.items.map((_, index) => placed[index]!).filter(Boolean);
-  }
+  const currentOrder = useCallback(
+    () => game.items.map((_, index) => placed[index]!).filter(Boolean),
+    [game.items, placed],
+  );
 
-  function finishTimeline() {
+  const finishTimeline = useCallback(() => {
     onFinish(maxPieces - missesRef.current, maxPieces, missesRef.current, {
       type: "timeline",
       order: currentOrder(),
       causalChoiceId: causalChoiceRef.current,
     });
-  }
+  }, [currentOrder, maxPieces, onFinish]);
 
   useEffect(() => {
     if (phase !== "causal-explanation") return;
@@ -200,7 +201,7 @@ function TimelinePlay({
       finishTimeline();
     }, feedbackHoldMs);
     return () => window.clearTimeout(timer);
-  }, [feedbackHoldMs, maxPieces, onFinish, phase]);
+  }, [feedbackHoldMs, finishTimeline, phase]);
 
   function putOn(slot: number, itemId = drag.selectedRef.current) {
     if (!itemId || disabled || locked[itemId]) return;

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseGameContent, type SortGame as SortContent } from "@jose/shared";
+import { parseGameContent } from "@jose/shared";
 import { SortGame } from "./sort-game";
 
 const game = parseGameContent({

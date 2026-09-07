@@ -42,8 +42,8 @@ jobs:
         env:
           JOSE_INTERNAL_API_URL: http://127.0.0.1:3001
 
-      - name: Dependency advisories (informational)
-        run: npm run audit:deps || true
+      - name: Block high and critical production dependency advisories
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Migration dry-run on fresh DB
         run: |

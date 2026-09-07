@@ -20,7 +20,7 @@ type Tab = "notes" | "glossary" | "books" | "characters" | "places";
 
 export function JournalView() {
   const prefs = useReadingPreferences();
-  const { ownerKey, store, ready } = useJournalStore();
+  const { ownerKey, store } = useJournalStore();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<Tab>("notes");
   const [draft, setDraft] = useState("");

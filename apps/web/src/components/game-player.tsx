@@ -104,7 +104,7 @@ export function GamePlayer({
   const revision = attempt.contentRevision || gameContentRevision(game as unknown as GameContent);
   const [hearts, setHearts] = useState(startHearts);
   const [why, setWhy] = useState<WhyPayload | null>(null);
-  const [empty, setEmpty] = useState(startHearts <= 0);
+  const [, setEmpty] = useState(startHearts <= 0);
   const pendingEmpty = useRef(false);
   const [resume] = useState(() => readResumeDraft(accountId, levelId, revision));
   const [result, setResult] = useState<ScoredResult | null>(() => {

@@ -120,6 +120,7 @@ export type StructuredLog = {
 
 export function writeStructuredLog(entry: StructuredLog) {
   const safe = sanitizeForLogs(entry) as StructuredLog;
+  if (process.env.NODE_ENV === "test") return;
   const line = JSON.stringify(safe);
   if (entry.level === "error") {
     console.error(line);
