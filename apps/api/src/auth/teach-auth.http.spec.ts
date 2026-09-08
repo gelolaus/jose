@@ -32,6 +32,7 @@ describe("Teacher studio authorization over HTTP (issues #3 and #4)", () => {
   let dir: string;
 
   let student: TestAccount;
+  let staffStudent: TestAccount;
   let teacherA: TestAccount;
   let teacherB: TestAccount;
   let admin: TestAccount;
@@ -56,6 +57,10 @@ describe("Teacher studio authorization over HTTP (issues #3 and #4)", () => {
     student = await createTestAccount(database, {
       admissionEmail: "student@student.apc.edu.ph",
       displayName: "Student",
+    });
+    staffStudent = await createTestAccount(database, {
+      admissionEmail: "faculty.staff@apc.edu.ph",
+      displayName: "Staff Student",
     });
     teacherA = await createTestAccount(database, {
       admissionEmail: "teacher-a@apc.edu.ph",
@@ -307,34 +312,68 @@ describe("Teacher studio authorization over HTTP (issues #3 and #4)", () => {
   it("lets only admins grant roles, and never grants admin", async () => {
     await request(app.getHttpServer())
       .post("/admin/users/role")
-      .send({ email: student.admissionEmail, role: "teacher" })
+      .send({ email: staffStudent.admissionEmail, role: "teacher" })
       .expect(401);
 
     await request(app.getHttpServer())
       .post("/admin/users/role")
       .set("Cookie", teacherA.cookie)
-      .send({ email: student.admissionEmail, role: "teacher" })
+      .send({ email: staffStudent.admissionEmail, role: "teacher" })
       .expect(403);
 
     await request(app.getHttpServer())
       .post("/admin/users/role")
       .set("Cookie", admin.cookie)
-      .send({ email: student.admissionEmail, role: "admin" })
+      .send({ email: staffStudent.admissionEmail, role: "admin" })
       .expect(400);
+
+    await request(app.getHttpServer())
+      .post("/admin/users/role")
+      .set("Cookie", admin.cookie)
+      .send({ email: student.admissionEmail, role: "teacher" })
+      .expect(403);
+
+    const pluralDomain = await createTestAccount(database, {
+      admissionEmail: "kid@students.apc.edu.ph",
+      displayName: "Plural Domain",
+    });
+    await request(app.getHttpServer())
+      .post("/admin/users/role")
+      .set("Cookie", admin.cookie)
+      .send({ email: pluralDomain.admissionEmail, role: "teacher" })
+      .expect(403);
 
     const granted = await request(app.getHttpServer())
       .post("/admin/users/role")
       .set("Cookie", admin.cookie)
-      .send({ email: student.admissionEmail, role: "teacher" })
+      .send({ email: staffStudent.admissionEmail, role: "teacher" })
       .expect(201);
     expect(granted.body.user.role).toBe("teacher");
+
+    const meAfterGrant = await request(app.getHttpServer())
+      .get("/auth/me")
+      .set("Cookie", staffStudent.cookie)
+      .expect(200);
+    expect(meAfterGrant.body.user.role).toBe("teacher");
 
     const [row] = await database.db
       .select()
       .from(users)
-      .where(eq(users.id, student.userId))
+      .where(eq(users.id, staffStudent.userId))
       .limit(1);
     expect(row.role).toBe("teacher");
+
+    const revoked = await request(app.getHttpServer())
+      .post("/admin/users/role")
+      .set("Cookie", admin.cookie)
+      .send({ email: staffStudent.admissionEmail, role: "student" })
+      .expect(201);
+    expect(revoked.body.user.role).toBe("student");
+
+    await request(app.getHttpServer())
+      .get("/teach/modules")
+      .set("Cookie", staffStudent.cookie)
+      .expect(403);
   });
 
   it("blocks admin bootstrap once an admin exists", async () => {

@@ -7,18 +7,21 @@ import {
 } from "@nestjs/common";
 import {
   DEFAULT_AVATAR_ID,
+  isExactStaffTeacherDomain,
   isLocalDevTestEmail,
   MAX_HEARTS,
+  paginateInMemory,
   roleFromAdmissionEmail,
   userRoleSchema,
+  type AdminUserQuery,
   type LocalDevRole,
   type SessionUser,
   type UserRole,
 } from "@jose/shared";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { DatabaseService } from "../db/database.service";
-import { learners, users } from "../db/schema";
+import { learners, roleAudit, users } from "../db/schema";
 
 export type UserRow = typeof users.$inferSelect;
 
@@ -143,10 +146,12 @@ export class UsersService {
   /**
    * Grants student or teacher by APC mailbox. Admin is deliberately unreachable here:
    * the only path to admin is the one-time operator bootstrap.
+   * Teacher grants require the verified admission mailbox's exact apc.edu.ph domain.
    */
   async setRoleByEmail(input: {
     email: string;
     role: Exclude<UserRole, "admin">;
+    actorId: string;
   }): Promise<SessionUser> {
     if ((input.role as UserRole) === "admin") {
       throw new BadRequestException("Admin role can only be set through bootstrap");
@@ -161,11 +166,51 @@ export class UsersService {
     if (existing.role === "admin") {
       throw new BadRequestException("Admin accounts cannot be demoted through this route");
     }
+    if (input.role === "teacher" && !isExactStaffTeacherDomain(admissionEmail)) {
+      throw new ForbiddenException(
+        "Teacher access can only be granted to verified apc.edu.ph staff mailboxes.",
+      );
+    }
+    const priorRole = existing.role;
     await this.db
       .update(users)
       .set({ role: input.role, updatedAt: Date.now() })
       .where(eq(users.id, existing.id));
+    await this.db.insert(roleAudit).values({
+      id: randomUUID(),
+      actorId: input.actorId,
+      targetUserId: existing.id,
+      priorRole,
+      newRole: input.role,
+      createdAt: Date.now(),
+    });
     return this.requireById(existing.id);
+  }
+
+  async listAccounts(query: AdminUserQuery) {
+    const rows = await this.db.select().from(users).orderBy(asc(users.admissionEmail));
+    const needle = query.q?.trim().toLowerCase();
+    const filtered = rows.filter((row) => {
+      const role = userRoleSchema.catch("student").parse(row.role);
+      if (query.role && role !== query.role) return false;
+      if (!needle) return true;
+      return (
+        row.admissionEmail.toLowerCase().includes(needle) ||
+        row.displayName.toLowerCase().includes(needle)
+      );
+    });
+    const mapped = filtered.map((row) => {
+      const role = userRoleSchema.catch("student").parse(row.role);
+      return {
+        id: row.id,
+        admissionEmail: row.admissionEmail,
+        displayName: row.displayName,
+        role,
+        staffEligible: isExactStaffTeacherDomain(row.admissionEmail),
+      };
+    });
+    const page = paginateInMemory(mapped, query, (item) => item.id);
+    return { users: page.items, nextCursor: page.nextCursor };
   }
 
   /**

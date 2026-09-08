@@ -56,6 +56,9 @@ export const learnerSchema = z.object({
   streak: z.number().int().nonnegative(),
   hearts: z.number().int().nonnegative(),
   xp: z.number().int().nonnegative(),
+  heartsUpdatedAt: z.number().int().nonnegative().optional(),
+  nextHeartAt: z.number().int().nonnegative().nullable().optional(),
+  serverNow: z.number().int().nonnegative().optional(),
 });
 
 export const pathResponseSchema = z.object({

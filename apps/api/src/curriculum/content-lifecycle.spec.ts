@@ -446,6 +446,14 @@ describe("content lifecycle + classroom", () => {
     const mine = await classroom.listStudentAssignments(student);
     expect(mine.some((row) => row.id === assignment.id)).toBe(true);
 
+    const classes = await classroom.listStudentClasses(student);
+    expect(classes.some((row) => row.classId === klass.id && row.name === "RIZLIFE-1")).toBe(
+      true,
+    );
+
+    const teacherAssignments = await classroom.listClassAssignments(teacher, klass.id);
+    expect(teacherAssignments.some((row) => row.id === assignment.id)).toBe(true);
+
     const exported = await classroom.exportClassReportCsv(teacher, klass.id, assignment.id);
     expect(csvSafeCell("=cmd|' /C calc'!A0")).toBe("'=cmd|' /C calc'!A0");
     expect(exported.csv.split("\n")[0]).toContain("displayName");

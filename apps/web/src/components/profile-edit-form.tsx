@@ -24,7 +24,7 @@ export function ProfileEditForm() {
   if (loading) {
     return (
       <p className="mx-auto max-w-lg px-5 py-10 font-semibold text-slate-600">
-        Loading your explorer…
+        Loading your profile…
       </p>
     );
   }
@@ -92,7 +92,7 @@ function ProfileEditFields({
         <ExplorerAvatar avatarId={avatarId} floating />
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-800 md:text-4xl">
-            Edit explorer
+            Edit profile
           </h1>
           <p className="mt-1 text-sm font-semibold text-slate-500 md:text-base">
             {authenticated

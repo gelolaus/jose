@@ -2,7 +2,7 @@ import { AppShell } from "@/components/learning-shell";
 import { ProfileShowcase } from "@/components/profile-showcase";
 import { RecoveryState } from "@/components/recovery-state";
 import { SignInRequired } from "@/components/sign-in-required";
-import { fetchArtifacts, fetchProfileStats } from "@/lib/server-api";
+import { fetchProfileStats } from "@/lib/server-api";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,6 @@ export const metadata: Metadata = {
 
 export default async function ProfilePage() {
   const result = await fetchProfileStats();
-  const artifactsResult = await fetchArtifacts();
 
   if (!result.ok) {
     if (result.status === 401) {
@@ -37,14 +36,7 @@ export default async function ProfilePage() {
 
   return (
     <AppShell>
-      <ProfileShowcase
-        stats={result.data}
-        artifacts={
-          artifactsResult.ok
-            ? artifactsResult.data
-            : { artifacts: [], journalCovers: [] }
-        }
-      />
+      <ProfileShowcase stats={result.data} />
     </AppShell>
   );
 }

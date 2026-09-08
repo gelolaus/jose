@@ -69,9 +69,7 @@ function findCurrentNode(path: PathResponse) {
 function initialCollapsed(path: PathResponse): Record<string, boolean> {
   const next: Record<string, boolean> = {};
   for (const section of path.sections) {
-    const done = section.nodes.every((n) => n.status === "completed");
-    const hasCurrent = section.nodes.some((n) => n.status === "current");
-    next[section.id] = done && !hasCurrent;
+    next[section.id] = false;
   }
   return next;
 }
@@ -237,7 +235,7 @@ export function PathView({ path }: { path: PathResponse }) {
           </div>
           {active ? (
             <p className="mt-2 truncate text-sm font-semibold text-[var(--jose-ink-muted)]">
-              Now exploring · {active.title}
+              Current · {active.title}
             </p>
           ) : null}
         </div>
@@ -356,7 +354,11 @@ function PathList({
               {node.title}
             </span>
             <span className="text-sm text-[var(--jose-ink-muted)]">
-              {node.kind}
+              {node.status === "completed"
+                ? node.kind === "lesson"
+                  ? "Read again"
+                  : "Review"
+                : node.kind}
               {prereq ? ` · ${prereq}` : ""}
             </span>
           </span>
@@ -474,7 +476,7 @@ function PathAside({
         <div className="mb-4 flex items-center justify-between gap-2">
           <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-stone-400">
             <Compass className="size-4" strokeWidth={2.25} aria-hidden />
-            Journey map
+            Path
           </p>
           <button
             type="button"

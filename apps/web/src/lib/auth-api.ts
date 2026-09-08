@@ -134,7 +134,8 @@ export async function updateProfile(patch: {
 }
 
 export function microsoftStartUrl() {
-  return `${getApiBaseUrl()}/auth/microsoft/start`;
+  // Same-origin rewrite so SSR and the browser emit the same href.
+  return "/api/auth/microsoft/start";
 }
 
 export function denialMessage(reason: string | null | undefined): string | null {

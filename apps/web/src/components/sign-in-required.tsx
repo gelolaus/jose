@@ -5,8 +5,8 @@ import Link from "next/link";
  * anonymous visitor is asked to sign in rather than handed someone else's path.
  */
 export function SignInRequired({
-  title = "Sign in to keep exploring",
-  message = "Your streak, hearts, and XP live with your APC school account. Sign in with Microsoft to pick up where you left off.",
+  title = "Sign in to continue",
+  message = "Your streak, Lives, and XP live with your APC school account. Sign in with Microsoft to pick up where you left off.",
 }: {
   title?: string;
   message?: string;

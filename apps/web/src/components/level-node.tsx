@@ -34,7 +34,15 @@ export function LevelNode({
     <button
       type="button"
       onClick={onActivate}
-      aria-label={`${node.title}${locked ? " (locked)" : ""}`}
+      aria-label={`${node.title}${
+        locked
+          ? " (locked)"
+          : node.status === "completed"
+            ? node.kind === "lesson"
+              ? " (completed, read again)"
+              : " (completed, review)"
+            : ""
+      }`}
       className={`relative ${shake ? "node-shake" : ""} ${current && node.kind !== "chest" ? "node-pulse" : ""}`}
     >
       {node.kind === "chest" ? (

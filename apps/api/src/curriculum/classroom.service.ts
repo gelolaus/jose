@@ -203,6 +203,33 @@ export class ClassroomService {
     return { ok: true, classId: klass.id, name: klass.name };
   }
 
+  async listStudentClasses(user: SessionUser) {
+    if (!user) throw new UnauthorizedException("Sign in required");
+    const memberships = await this.db
+      .select()
+      .from(classMembers)
+      .where(and(eq(classMembers.learnerId, user.id), isNull(classMembers.archivedAt)));
+    const result = [];
+    for (const membership of memberships) {
+      const [klass] = await this.db
+        .select()
+        .from(classes)
+        .where(and(eq(classes.id, membership.classId), isNull(classes.archivedAt)));
+      if (!klass) continue;
+      const assignmentRows = await this.db
+        .select()
+        .from(assignments)
+        .where(and(eq(assignments.classId, klass.id), isNull(assignments.archivedAt)));
+      result.push({
+        classId: klass.id,
+        name: klass.name,
+        joinedAt: membership.joinedAt,
+        assignmentCount: assignmentRows.length,
+      });
+    }
+    return result;
+  }
+
   async createAssignment(user: SessionUser, classId: string, body: unknown) {
     const klass = await this.requireOwnedClass(user, classId);
     const data = parseBody(createAssignmentBodySchema, body);
@@ -232,6 +259,20 @@ export class ClassroomService {
       archivedAt: null,
     });
     return this.getAssignment(user, id);
+  }
+
+  async listClassAssignments(user: SessionUser, classId: string) {
+    await this.requireOwnedClass(user, classId);
+    const rows = await this.db
+      .select()
+      .from(assignments)
+      .where(and(eq(assignments.classId, classId), isNull(assignments.archivedAt)))
+      .orderBy(asc(assignments.assignedAt));
+    const result = [];
+    for (const row of rows) {
+      result.push(await this.getAssignment(user, row.id));
+    }
+    return result;
   }
 
   async getAssignment(user: SessionUser, assignmentId: string) {
@@ -505,6 +546,7 @@ export class ClassroomService {
       id: row.id,
       name: row.name,
       inviteCode: includeCode ? null : null,
+      inviteCodeHint: row.inviteCodeHint,
       memberCount: members.length,
       challengesEnabled: Boolean(row.challengesEnabled),
       archivedAt: row.archivedAt,

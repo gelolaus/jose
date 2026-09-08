@@ -13,11 +13,10 @@ const sans = Nunito({
 
 export const metadata: Metadata = {
   title: {
-    default: "Jose — Work and Life of Rizal",
-    template: "%s — Jose",
+    default: "Jose",
+    template: "%s | Jose",
   },
-  description:
-    "A historical investigation adventure through the life and works of José Rizal for APC RIZLIFE and curious younger learners.",
+  description: "Short lessons and games for learning with Jose.",
 };
 
 export const viewport: Viewport = {

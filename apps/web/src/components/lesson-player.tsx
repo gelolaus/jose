@@ -2,7 +2,7 @@
 
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { LessonBlocksView } from "@/components/lesson-blocks-view";
-import { LessonJournalActions } from "@/components/lesson-journal-actions";
+import { LessonBookmarkButton } from "@/components/lesson-bookmark-button";
 import { ExplanationNote, SourceQuote } from "@/components/source-quote";
 import { YoutubeEmbed } from "@/components/youtube-embed";
 import { completeLevel } from "@/lib/path-api";
@@ -32,8 +32,6 @@ export function LessonPlayer({
   const [showDeeper, setShowDeeper] = useState(false);
   const editorial = lesson.editorial ?? emptyLessonEditorial();
   const useBlocks = Boolean(lesson.blocks && lesson.blocks.length > 0);
-  const excerptPreview = lesson.markdown.replace(/[#>*_`\[\]]/g, "").slice(0, 180);
-
   async function onContinue() {
     setBusy(true);
     setError(null);
@@ -64,12 +62,7 @@ export function LessonPlayer({
       <h1 className="font-display text-3xl font-semibold tracking-tight text-[var(--jose-ink)] sm:text-4xl">
         {title}
       </h1>
-      <LessonJournalActions
-        moduleId={moduleId}
-        levelId={levelId}
-        title={title}
-        excerpt={excerptPreview}
-      />
+      <LessonBookmarkButton levelId={levelId} />
       <ExplanationNote>
         Explanations and paraphrases appear in this style. Original historical quotations use the
         amber source block so source wording stays distinguishable from teaching text.

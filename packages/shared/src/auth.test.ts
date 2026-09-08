@@ -11,6 +11,7 @@ import {
   canAccessTeacherStudio,
   grantCollaboratorBodySchema,
   grantRoleBodySchema,
+  isExactStaffTeacherDomain,
   isLocalDevTestEmail,
   localDevRoleBodySchema,
   profilePatchBodySchema,
@@ -88,6 +89,21 @@ describe("roleFromAdmissionEmail", () => {
     expect(roleFromAdmissionEmail("dean@apc.edu.ph")).toBe("student");
     expect(roleFromAdmissionEmail("kid@student.apc.edu.ph")).toBe("student");
     expect(roleFromAdmissionEmail("faculty@apc.edu.ph")).not.toBe("teacher");
+  });
+});
+
+describe("isExactStaffTeacherDomain", () => {
+  it("accepts only the exact apc.edu.ph mailbox domain", () => {
+    expect(isExactStaffTeacherDomain("dean@apc.edu.ph")).toBe(true);
+    expect(isExactStaffTeacherDomain("  Faculty@APC.edu.ph ")).toBe(true);
+  });
+
+  it("rejects student domains, lookalikes, and suffix matches", () => {
+    expect(isExactStaffTeacherDomain("kid@student.apc.edu.ph")).toBe(false);
+    expect(isExactStaffTeacherDomain("kid@students.apc.edu.ph")).toBe(false);
+    expect(isExactStaffTeacherDomain("person@apc.edu.ph.example.com")).toBe(false);
+    expect(isExactStaffTeacherDomain("not-mail")).toBe(false);
+    expect(isExactStaffTeacherDomain("user@mail.apc.edu.ph")).toBe(false);
   });
 });
 

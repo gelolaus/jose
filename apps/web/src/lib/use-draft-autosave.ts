@@ -194,6 +194,29 @@ export function useDraftAutosave<T>({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [status]);
 
+  const saveRef = useRef(save);
+  const statusRef = useRef(status);
+
+  useEffect(() => {
+    saveRef.current = save;
+  }, [save]);
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
+  useEffect(() => {
+    return () => {
+      const st = statusRef.current;
+      if (st === "idle" || st === "saved") return;
+      persistLocal(valueRef.current, revisionRef.current);
+      if (!onlineRef.current) return;
+      void saveRef.current(valueRef.current, revisionRef.current).catch(() => {
+        persistLocal(valueRef.current, revisionRef.current);
+      });
+    };
+  }, [persistLocal]);
+
   const acceptRecovery = useCallback(() => {
     if (!recovered) return null;
     const next = recovered;

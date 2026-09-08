@@ -32,8 +32,8 @@ export function TopBar({ courseTitle, streak, hearts, xp }: TopBarProps) {
             tone="rose"
             icon={Heart}
             label={`${hearts}`}
-            accessibleName={`${hearts} optional arcade challenge lives`}
-            title="Arcade challenge lives (optional)"
+            accessibleName={`${hearts} lives`}
+            title="Lives"
           />
         </div>
       </div>

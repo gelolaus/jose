@@ -110,6 +110,9 @@ export const authLearnerProfileSchema = z.object({
   streak: z.number().int().nonnegative(),
   hearts: z.number().int().nonnegative(),
   xp: z.number().int().nonnegative(),
+  heartsUpdatedAt: z.number().int().nonnegative().optional(),
+  nextHeartAt: z.number().int().nonnegative().nullable().optional(),
+  serverNow: z.number().int().nonnegative().optional(),
 });
 export type AuthLearnerProfile = z.infer<typeof authLearnerProfileSchema>;
 
@@ -161,6 +164,29 @@ export const grantRoleBodySchema = z.object({
 });
 export type GrantRoleBody = z.infer<typeof grantRoleBodySchema>;
 
+export const adminUserQuerySchema = z.object({
+  q: z.string().trim().max(120).optional(),
+  role: z.enum(["student", "teacher"]).optional(),
+  cursor: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+export type AdminUserQuery = z.infer<typeof adminUserQuerySchema>;
+
+export const adminUserSummarySchema = z.object({
+  id: z.string().min(1),
+  admissionEmail: z.string().email(),
+  displayName: z.string().min(1),
+  role: userRoleSchema,
+  staffEligible: z.boolean(),
+});
+export type AdminUserSummary = z.infer<typeof adminUserSummarySchema>;
+
+export const adminUsersResponseSchema = z.object({
+  users: z.array(adminUserSummarySchema),
+  nextCursor: z.string().nullable(),
+});
+export type AdminUsersResponse = z.infer<typeof adminUsersResponseSchema>;
+
 /** Exact mailbox allowed to use the localhost-only development login. */
 export const LOCAL_DEV_TEST_EMAIL = "arlaus@student.apc.edu.ph";
 
@@ -175,11 +201,26 @@ export const localDevRoleBodySchema = z
   .strict();
 export type LocalDevRoleBody = z.infer<typeof localDevRoleBodySchema>;
 
+export const APC_STAFF_TEACHER_DOMAIN = "apc.edu.ph";
+
 export function normalizeAdmissionEmail(email: string): string {
   const trimmed = email.trim();
   const at = trimmed.lastIndexOf("@");
   if (at < 0) return trimmed.toLowerCase();
   return `${trimmed.slice(0, at).toLowerCase()}@${trimmed.slice(at + 1).toLowerCase()}`;
+}
+
+/** Exact mailbox domain after the last `@`. Never a suffix or includes match. */
+export function admissionMailboxDomain(email: string): string {
+  const normalized = normalizeAdmissionEmail(email);
+  const at = normalized.lastIndexOf("@");
+  if (at < 0 || at === normalized.length - 1) return "";
+  return normalized.slice(at + 1);
+}
+
+/** Staff teacher grants require the verified admission mailbox's exact domain. */
+export function isExactStaffTeacherDomain(email: string): boolean {
+  return admissionMailboxDomain(email) === APC_STAFF_TEACHER_DOMAIN;
 }
 
 export function isLocalDevTestEmail(email: string): boolean {

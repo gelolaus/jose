@@ -19,6 +19,7 @@ export type JoseSession = {
   authenticated: boolean;
   demoMode: boolean;
   canTeach: boolean;
+  canAdmin: boolean;
   localDevAccess: boolean;
   refresh: () => Promise<AuthMeResponse | void>;
 };
@@ -74,6 +75,7 @@ function useJoseSessionState(): JoseSession {
       authenticated: me.authenticated,
       demoMode: me.demoMode,
       canTeach: canAccessTeacherStudio(me.user?.role),
+      canAdmin: me.user?.role === "admin",
       localDevAccess,
       refresh,
     }),
@@ -101,6 +103,7 @@ export function useJoseSession(): JoseSession {
     authenticated: false,
     demoMode: false,
     canTeach: false,
+    canAdmin: false,
     localDevAccess: false,
     refresh: async () => {},
   };

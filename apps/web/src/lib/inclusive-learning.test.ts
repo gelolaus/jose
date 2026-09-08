@@ -130,8 +130,8 @@ describe("lesson packs", () => {
 });
 
 describe("ui dictionaries", () => {
-  it("provides Filipino chrome without inventing lesson translations", () => {
-    expect(t("fil", "nav.journal")).toBe("Talaarawan");
-    expect(t("en", "prefs.contentTranslationPending")).toMatch(/not loaded yet/i);
+  it("uses English chrome labels for bookmarks", () => {
+    expect(t("en", "nav.journal")).toBe("Bookmarks");
+    expect(t("en", "journal.empty")).toMatch(/save a lesson/i);
   });
 });

@@ -52,7 +52,7 @@ describe("pickContinueLearning", () => {
       },
     ]);
     expect(action?.kind).toBe("review");
-    expect(action?.href).toBe("/practice");
+    expect(action?.href).toBe("/learn/rizal");
   });
 });
 

@@ -151,7 +151,7 @@ export function JournalView() {
               onClick={onExportPrivate}
               className="min-h-11 rounded-full bg-violet-100 px-4 py-2 text-sm font-extrabold text-violet-800"
             >
-              {t(prefs.locale, "journal.exportPrivate")}
+              Export private notes
             </button>
           </div>
 
@@ -186,17 +186,14 @@ export function JournalView() {
 
 function JournalEntryCard({
   entry,
-  locale,
   onRemove,
 }: {
   entry: JournalEntry;
-  locale: "en" | "fil";
+  locale: "en";
   onRemove: () => void;
 }) {
   const badge =
-    entry.visibility === "teacher_submitted"
-      ? t(locale, "journal.teacherBadge")
-      : t(locale, "journal.privateBadge");
+    entry.visibility === "teacher_submitted" ? "Teacher" : "Private";
   return (
     <li className="rounded-[1.5rem] bg-white p-4 ring-1 ring-black/10">
       <div className="flex flex-wrap items-start justify-between gap-2">

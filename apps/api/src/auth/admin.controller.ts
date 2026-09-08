@@ -1,5 +1,9 @@
-import { BadRequestException, Body, Controller, Post, UseGuards } from "@nestjs/common";
-import { grantRoleBodySchema, type SessionUser } from "@jose/shared";
+import { BadRequestException, Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
+import {
+  adminUserQuerySchema,
+  grantRoleBodySchema,
+  type SessionUser,
+} from "@jose/shared";
 import { AuthorizationService } from "./authorization.service";
 import { CurrentUser, SessionAuthGuard } from "./session.guard";
 import { UsersService } from "./users.service";
@@ -11,6 +15,18 @@ export class AdminController {
     private readonly users: UsersService,
     private readonly authorization: AuthorizationService,
   ) {}
+
+  @Get("users")
+  async listUsers(@CurrentUser() admin: SessionUser, @Query() query: Record<string, string>) {
+    this.authorization.assertAdmin(admin);
+    const parsed = adminUserQuerySchema.safeParse(query);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        parsed.error.issues.map((issue) => issue.message).join("; ") || "Invalid query",
+      );
+    }
+    return this.users.listAccounts(parsed.data);
+  }
 
   /**
    * Explicit, admin-only role grant. Teacher rights never come from an email domain,
@@ -28,6 +44,7 @@ export class AdminController {
     const user = await this.users.setRoleByEmail({
       email: parsed.data.email,
       role: parsed.data.role,
+      actorId: admin.id,
     });
     return { user };
   }

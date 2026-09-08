@@ -18,7 +18,10 @@ import {
   PRACTICE_RULES,
   PROFILE_RULES,
   applyHeartDrip,
+  applyLessonCredit,
   applyQualifyingActivity,
+  learnerLivesFields,
+  LESSON_CREDIT_MS,
   applyTemplateBodySchema,
   assessPublishReadiness,
   attemptBodySchema,
@@ -132,6 +135,7 @@ import {
   learnerProgress,
   learningMisses,
   lessonContent,
+  lessonLifeCredits,
   levels,
   missReceipts,
   moduleCollaborators,
@@ -417,13 +421,18 @@ export class CurriculumService {
     }
     await this.ensureUnlocked(ctx.module.id, levelId, learnerId);
     return this.enqueueWrite(async () => {
-      const first = await this.db.transaction(async (tx) => {
-        return this.markComplete(
+      const { first, lessonCreditApplied } = await this.db.transaction(async (tx) => {
+        const first = await this.markComplete(
           levelId,
           learnerId,
           tx as unknown as JoseDb,
           publishedRevision?.id ?? null,
         );
+        const lessonCreditApplied =
+          kind === "lesson"
+            ? await this.applyLessonLifeCredit(levelId, learnerId, tx as unknown as JoseDb)
+            : false;
+        return { first, lessonCreditApplied };
       });
       let artifactAwarded = false;
       if (kind === "chest") {
@@ -441,6 +450,7 @@ export class CurriculumService {
         firstTime: first,
         learner,
         artifactAwarded,
+        lessonCreditApplied,
         contentRevisionId: publishedRevision?.id ?? null,
         nextLevelId: nextId,
         continueHref: nextId
@@ -2787,15 +2797,69 @@ export class CurriculumService {
     };
   }
 
-  private async syncedLearner(learnerId: string): Promise<Learner> {
-    const row = await this.requireLearner(learnerId);
-    const dripped = applyHeartDrip(row.hearts, row.heartsUpdatedAt, Date.now());
+  private async applyLessonLifeCredit(
+    levelId: string,
+    learnerId: string,
+    executor: JoseDb,
+  ): Promise<boolean> {
+    const now = Date.now();
+    const [row] = await executor
+      .select()
+      .from(learners)
+      .where(eq(learners.id, learnerId));
+    if (!row) throw new NotFoundException("Learner not found");
+    const dripped = applyHeartDrip(row.hearts, row.heartsUpdatedAt, now);
     if (dripped.changed) {
-      await this.db
+      await executor
         .update(learners)
         .set({
           hearts: dripped.hearts,
           heartsUpdatedAt: dripped.heartsUpdatedAt,
+        })
+        .where(eq(learners.id, learnerId));
+    }
+    const inserted = await executor
+      .insert(lessonLifeCredits)
+      .values({
+        learnerId,
+        levelId,
+        createdAt: now,
+        creditMs: 0,
+      })
+      .onConflictDoNothing()
+      .returning({ levelId: lessonLifeCredits.levelId });
+    if (inserted.length === 0) return false;
+    const credited = applyLessonCredit(dripped.hearts, dripped.heartsUpdatedAt, now);
+    if (!credited.creditApplied) return false;
+    await executor
+      .update(learners)
+      .set({
+        hearts: credited.hearts,
+        heartsUpdatedAt: credited.heartsUpdatedAt,
+      })
+      .where(eq(learners.id, learnerId));
+    await executor
+      .update(lessonLifeCredits)
+      .set({ creditMs: LESSON_CREDIT_MS })
+      .where(
+        and(
+          eq(lessonLifeCredits.learnerId, learnerId),
+          eq(lessonLifeCredits.levelId, levelId),
+        ),
+      );
+    return true;
+  }
+
+  private async syncedLearner(learnerId: string): Promise<Learner> {
+    const row = await this.requireLearner(learnerId);
+    const now = Date.now();
+    const lives = learnerLivesFields(row.hearts, row.heartsUpdatedAt, now);
+    if (lives.dripChanged) {
+      await this.db
+        .update(learners)
+        .set({
+          hearts: lives.hearts,
+          heartsUpdatedAt: lives.heartsUpdatedAt,
         })
         .where(eq(learners.id, learnerId));
     }
@@ -2807,8 +2871,11 @@ export class CurriculumService {
       displayName: row.displayName,
       avatarId,
       streak: row.streak,
-      hearts: dripped.hearts,
+      hearts: lives.hearts,
       xp: row.xp,
+      heartsUpdatedAt: lives.heartsUpdatedAt,
+      nextHeartAt: lives.nextHeartAt,
+      serverNow: lives.serverNow,
     };
   }
 
@@ -2842,7 +2909,7 @@ export class CurriculumService {
       {
         statusCode: HttpStatus.FORBIDDEN,
         code: HEARTS_EMPTY_CODE,
-        message: "You're out of hearts. Read a lesson or wait a bit.",
+        message: "You're out of Lives. Required lessons stay open.",
       },
       HttpStatus.FORBIDDEN,
     );

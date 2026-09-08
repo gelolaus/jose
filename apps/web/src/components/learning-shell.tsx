@@ -17,7 +17,7 @@ const tabDefs: {
 }[] = [
   { href: "/learn", labelKey: "nav.learn", icon: Map },
   { href: "/practice", labelKey: "nav.practice", icon: Sparkles },
-  { href: "/journal", labelKey: "nav.journal", icon: BookMarked },
+  { href: "/bookmarks", labelKey: "nav.journal", icon: BookMarked },
   { href: "/profile", labelKey: "nav.profile", icon: UserRound },
 ];
 
@@ -101,12 +101,12 @@ function SideNav() {
             }`}
           >
             <Wrench className="size-5 shrink-0" strokeWidth={2.25} aria-hidden />
-            Teacher tools
+            Teacher area
           </Link>
         ) : null}
       </nav>
       <div className="space-y-3 px-2">
-        <Link href="/profile/preferences" className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-[var(--jose-text-muted)]"><Settings className="size-5" aria-hidden /> Preferences</Link>
+        <Link href="/profile/preferences" className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-[var(--jose-text-muted)]"><Settings className="size-5" aria-hidden /> Settings</Link>
       </div>
     </aside>
   );
@@ -154,7 +154,7 @@ export function BottomTabs() {
             }`}
           >
             <Wrench className="size-5" strokeWidth={2.25} aria-hidden />
-            Teacher tools
+            Teacher area
           </Link>
         ) : null}
       </div>

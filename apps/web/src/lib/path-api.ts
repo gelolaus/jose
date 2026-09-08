@@ -19,7 +19,13 @@ import {
   studentChallengeViewSchema,
   teacherChallengeSummarySchema,
   teacherChallengeViewSchema,
+  assignmentSchema,
+  classReportSchema,
   classSummarySchema,
+  studentClassMembershipSchema,
+  bookmarksResponseSchema,
+  bookmarkMutationResponseSchema,
+  adminUsersResponseSchema,
   teachAssetSchema,
   teachLevelDetailSchema,
   teachModuleDetailSchema,
@@ -539,14 +545,92 @@ export async function restoreTeachModule(id: string): Promise<TeachModuleDetail>
   return teachModuleDetailSchema.parse(json);
 }
 
-export async function fetchMyAssignments() {
-  const json = await apiFetch("/assignments/mine");
+export async function fetchMyAssignments(options?: ApiCallOptions) {
+  const json = await apiFetch("/assignments/mine", undefined, options);
   return studentAssignmentSchema.array().parse(json);
+}
+
+export async function fetchMyClasses(options?: ApiCallOptions) {
+  const json = await apiFetch("/classes/mine", undefined, options);
+  return studentClassMembershipSchema.array().parse(json);
+}
+
+export async function fetchBookmarks(options?: ApiCallOptions) {
+  const json = await apiFetch("/bookmarks", undefined, options);
+  return bookmarksResponseSchema.parse(json);
+}
+
+export async function putBookmark(levelId: string, options?: ApiCallOptions) {
+  const json = await apiFetch(
+    `/bookmarks/${encodeURIComponent(levelId)}`,
+    { method: "PUT", body: "{}" },
+    options,
+  );
+  return bookmarkMutationResponseSchema.parse(json);
+}
+
+export async function deleteBookmark(levelId: string, options?: ApiCallOptions) {
+  const json = await apiFetch(
+    `/bookmarks/${encodeURIComponent(levelId)}`,
+    { method: "DELETE" },
+    options,
+  );
+  return bookmarkMutationResponseSchema.parse(json);
+}
+
+export async function fetchAdminUsers(
+  query?: { q?: string; role?: "student" | "teacher"; cursor?: string; limit?: number },
+  options?: ApiCallOptions,
+) {
+  const params = new URLSearchParams();
+  if (query?.q) params.set("q", query.q);
+  if (query?.role) params.set("role", query.role);
+  if (query?.cursor) params.set("cursor", query.cursor);
+  if (query?.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const json = await apiFetch(`/admin/users${qs ? `?${qs}` : ""}`, undefined, options);
+  return adminUsersResponseSchema.parse(json);
+}
+
+export async function grantAdminRole(
+  email: string,
+  role: "student" | "teacher",
+  options?: ApiCallOptions,
+) {
+  return apiFetch(
+    "/admin/users/role",
+    {
+      method: "POST",
+      body: JSON.stringify({ email, role }),
+    },
+    options,
+  );
 }
 
 export async function fetchTeachClasses(options?: ApiCallOptions) {
   const json = await apiFetch("/teach/classes", undefined, options);
   return classSummarySchema.array().parse(json);
+}
+
+export async function fetchTeachClassAssignments(
+  classId: string,
+  options?: ApiCallOptions,
+) {
+  const json = await apiFetch(`/teach/classes/${classId}/assignments`, undefined, options);
+  return assignmentSchema.array().parse(json);
+}
+
+export async function fetchClassReport(
+  classId: string,
+  assignmentId: string,
+  options?: ApiCallOptions,
+) {
+  const json = await apiFetch(
+    `/teach/classes/${classId}/assignments/${assignmentId}/report`,
+    undefined,
+    options,
+  );
+  return classReportSchema.parse(json);
 }
 
 export async function fetchMyChallenges(options?: ApiCallOptions) {

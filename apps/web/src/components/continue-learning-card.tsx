@@ -26,7 +26,7 @@ export function ContinueLearningCard({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-extrabold text-[var(--jose-accent)]">
-          {isReview ? "A little practice goes a long way" : "Your next step"}
+          {isReview ? "Completed" : "Your next step"}
         </p>
         <h2 className="mt-1 text-2xl font-extrabold leading-tight sm:text-3xl">
           {action.levelTitle}
@@ -43,7 +43,7 @@ export function ContinueLearningCard({
         ) : null}
       </div>
       <Link href={action.href} className="jose-button shrink-0">
-        {isReview ? "Start practice" : "Continue learning"}
+        {isReview ? "Review module" : "Continue learning"}
         <ArrowRight className="size-5" aria-hidden />
       </Link>
     </section>

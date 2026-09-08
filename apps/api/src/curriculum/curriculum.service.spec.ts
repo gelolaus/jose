@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
   DEMO_LEARNER_ID,
+  HEART_DRIP_MS,
   modulesResponseSchema,
   pathResponseSchema,
   type SessionUser,
@@ -790,5 +791,34 @@ describe("authoritative assessment", () => {
         (a) => a.artifactId === play.chest!.artifact.id,
       ),
     ).toHaveLength(1);
+  });
+
+  it("applies a two-minute lesson credit once and ignores replays", async () => {
+    const reader = await createTestAccount(database, {
+      admissionEmail: `reader-${randomUUID()}@student.apc.edu.ph`,
+      displayName: "Reader",
+    });
+    const now = Date.now();
+    await database.db
+      .update(learners)
+      .set({ hearts: 3, heartsUpdatedAt: now })
+      .where(eq(learners.id, reader.learnerId));
+    const first = await service.completeLevel("ateneo-welcome", reader.learnerId);
+    expect(first.lessonCreditApplied).toBe(true);
+    expect(first.learner.hearts).toBe(3);
+    expect(first.learner.nextHeartAt).toBe(
+      (first.learner.heartsUpdatedAt ?? 0) + HEART_DRIP_MS,
+    );
+    expect((first.learner.nextHeartAt ?? 0) - (first.learner.serverNow ?? 0)).toBeGreaterThan(
+      7.9 * 60 * 1000,
+    );
+    expect((first.learner.nextHeartAt ?? 0) - (first.learner.serverNow ?? 0)).toBeLessThanOrEqual(
+      8 * 60 * 1000,
+    );
+
+    const replay = await service.completeLevel("ateneo-welcome", reader.learnerId);
+    expect(replay.lessonCreditApplied).toBe(false);
+    expect(replay.firstTime).toBe(false);
+    expect(replay.learner.nextHeartAt).toBe(first.learner.nextHeartAt);
   });
 });

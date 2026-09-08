@@ -36,6 +36,9 @@ const TABLE_ORDER = [
   "class_challenge_team_members",
   "class_challenge_participants",
   "class_challenge_contributions",
+  "bookmarks",
+  "lesson_life_credits",
+  "role_audit",
 ] as const;
 
 function urlKind(url: string): BackupManifest["sourceUrlKind"] {

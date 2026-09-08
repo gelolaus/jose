@@ -14,6 +14,7 @@ import {
   AUTH_DENIAL_MESSAGES,
   DEFAULT_AVATAR_ID,
   LOCAL_DEV_TEST_EMAIL,
+  learnerLivesFields,
   MAX_HEARTS,
   isAvatarId,
   isLocalDevTestEmail,
@@ -591,13 +592,27 @@ export class AuthService {
       .where(eq(learners.id, userId))
       .limit(1);
     if (!row) return null;
+    const now = Date.now();
+    const lives = learnerLivesFields(row.hearts, row.heartsUpdatedAt, now);
+    if (lives.dripChanged) {
+      await this.db
+        .update(learners)
+        .set({
+          hearts: lives.hearts,
+          heartsUpdatedAt: lives.heartsUpdatedAt,
+        })
+        .where(eq(learners.id, userId));
+    }
     return {
       id: row.id,
       displayName: row.displayName,
       avatarId: isAvatarId(row.avatarId) ? row.avatarId : DEFAULT_AVATAR_ID,
       streak: row.streak,
-      hearts: row.hearts,
+      hearts: lives.hearts,
       xp: row.xp,
+      heartsUpdatedAt: lives.heartsUpdatedAt,
+      nextHeartAt: lives.nextHeartAt,
+      serverNow: lives.serverNow,
     };
   }
 

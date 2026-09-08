@@ -51,6 +51,12 @@ export class ClassroomController {
     return this.classroom.createAssignment(user, id, body);
   }
 
+  @Get("teach/classes/:id/assignments")
+  @UseGuards(SessionAuthGuard, TeacherRoleGuard)
+  listAssignments(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    return this.classroom.listClassAssignments(user, id);
+  }
+
   @Get("teach/classes/:id/assignments/:assignmentId/report")
   @UseGuards(SessionAuthGuard, TeacherRoleGuard)
   report(
@@ -77,6 +83,12 @@ export class ClassroomController {
   @UseGuards(SessionAuthGuard)
   join(@CurrentUser() user: SessionUser, @Body() body: unknown) {
     return this.classroom.joinClass(user, body);
+  }
+
+  @Get("classes/mine")
+  @UseGuards(SessionAuthGuard)
+  mineClasses(@CurrentUser() user: SessionUser) {
+    return this.classroom.listStudentClasses(user);
   }
 
   @Get("assignments/mine")

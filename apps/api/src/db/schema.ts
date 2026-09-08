@@ -485,6 +485,45 @@ export const learnerAchievements = sqliteTable(
   }),
 );
 
+export const bookmarks = sqliteTable(
+  "bookmarks",
+  {
+    learnerId: text("learner_id")
+      .notNull()
+      .references(() => learners.id, { onDelete: "cascade" }),
+    levelId: text("level_id").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.learnerId, table.levelId] }),
+  }),
+);
+
+/** One lesson-time credit per learner and stable lesson id. credit_ms is 0 when already full. */
+export const lessonLifeCredits = sqliteTable(
+  "lesson_life_credits",
+  {
+    learnerId: text("learner_id")
+      .notNull()
+      .references(() => learners.id, { onDelete: "cascade" }),
+    levelId: text("level_id").notNull(),
+    createdAt: integer("created_at").notNull(),
+    creditMs: integer("credit_ms").notNull().default(0),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.learnerId, table.levelId] }),
+  }),
+);
+
+export const roleAudit = sqliteTable("role_audit", {
+  id: text("id").primaryKey(),
+  actorId: text("actor_id").notNull(),
+  targetUserId: text("target_user_id").notNull(),
+  priorRole: text("prior_role").notNull(),
+  newRole: text("new_role").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
+
 export const learnerArtifacts = sqliteTable(
   "learner_artifacts",
   {

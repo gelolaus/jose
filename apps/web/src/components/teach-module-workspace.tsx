@@ -3,6 +3,7 @@
 import { GameEditor } from "@/components/teach-game-editor";
 import { LessonBlocksEditor } from "@/components/lesson-blocks-editor";
 import { LessonBlocksView } from "@/components/lesson-blocks-view";
+import { GameSwitch } from "@/components/game-player";
 import { COVER_COLORS, FieldLabel, TeachTitle } from "@/components/teach-shell";
 import { usePendingMap } from "@/lib/use-pending-map";
 import { useDraftAutosave } from "@/lib/use-draft-autosave";
@@ -66,6 +67,28 @@ type Selection =
 
 type PendingMap = ReturnType<typeof usePendingMap>;
 
+function firstLevelId(mod: TeachModuleDetail): string | undefined {
+  for (const section of mod.sections) {
+    if (section.levels[0]) return section.levels[0].id;
+  }
+  return undefined;
+}
+
+function defaultSelection(mod: TeachModuleDetail, initialLevelId?: string): Selection {
+  if (initialLevelId) return { type: "level", levelId: initialLevelId };
+  const id = firstLevelId(mod);
+  if (id) return { type: "level", levelId: id };
+  if (mod.sections[0]) return { type: "section", sectionId: mod.sections[0].id };
+  return { type: "module" };
+}
+
+function selectionHref(moduleId: string, selection: Selection) {
+  if (selection.type === "level") {
+    return `/teach/modules/${moduleId}?level=${encodeURIComponent(selection.levelId)}`;
+  }
+  return `/teach/modules/${moduleId}`;
+}
+
 export function TeachModuleWorkspace({
   initial,
   initialLevelId,
@@ -76,11 +99,16 @@ export function TeachModuleWorkspace({
   const router = useRouter();
   const pending = usePendingMap();
   const [mod, setMod] = useState(initial);
-  const [selection, setSelection] = useState<Selection>(
-    initialLevelId
-      ? { type: "level", levelId: initialLevelId }
-      : { type: "module" },
+  const [selection, setSelection] = useState<Selection>(() =>
+    defaultSelection(initial, initialLevelId),
   );
+  const [seenLevelId, setSeenLevelId] = useState(initialLevelId);
+  if (initialLevelId !== seenLevelId) {
+    setSeenLevelId(initialLevelId);
+    if (initialLevelId) {
+      setSelection({ type: "level", levelId: initialLevelId });
+    }
+  }
   const [pane, setPane] = useState<Pane>("edit");
   const [error, setError] = useState<string | null>(null);
   const [publishIssues, setPublishIssues] = useState<PublishIssue[]>([]);
@@ -90,6 +118,55 @@ export function TeachModuleWorkspace({
 
   async function reloadModule() {
     setMod(await fetchTeachModule(mod.id));
+  }
+
+  function applySelection(next: Selection, nextPane: Pane = "edit") {
+    setSelection(next);
+    setPane(nextPane);
+    router.replace(selectionHref(mod.id, next), { scroll: false });
+  }
+
+  useEffect(() => {
+    if (initialLevelId) return;
+    const id = firstLevelId(initial);
+    if (!id) return;
+    router.replace(
+      `/teach/modules/${initial.id}?level=${encodeURIComponent(id)}`,
+      { scroll: false },
+    );
+  }, [initial, initialLevelId, router]);
+
+  async function runPublish() {
+    setError(null);
+    if (mod.published) {
+      const result = await pending.run("publish", () => unpublishTeachModule(mod.id));
+      if (result.ok) {
+        setMod(result.data);
+        setPublishIssues([]);
+      } else setError(result.error);
+      return;
+    }
+    const result = await pending.run("publish", async () => {
+      const published = await publishTeachModule(mod.id);
+      return published.module;
+    });
+    if (result.ok) {
+      setMod(result.data);
+      setPublishIssues([]);
+      return;
+    }
+    setError(result.error);
+    const readiness = extractPublishReadiness(new Error(result.error));
+    if (readiness) {
+      setPublishIssues(readiness.blockers);
+    } else {
+      try {
+        const checked = await fetchPublishReadiness(mod.id);
+        setPublishIssues(checked.blockers);
+      } catch {
+        setPublishIssues([]);
+      }
+    }
   }
 
   useEffect(() => {
@@ -122,8 +199,6 @@ export function TeachModuleWorkspace({
     };
   }, [selection]);
 
-  const validation = useMemo(() => validateModule(mod, level), [mod, level]);
-
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="border-b border-black/5 bg-white/90 px-4 py-3 sm:px-6">
@@ -132,38 +207,64 @@ export function TeachModuleWorkspace({
           title={mod.title}
           action={
             <div className="flex flex-wrap gap-2">
-              <Link href="/teach" className="text-sm font-extrabold text-teal-800">
+              <Link href="/teach" className="inline-flex min-h-11 items-center text-sm font-extrabold text-teal-800">
                 All modules
               </Link>
-              <a
-                href={`/learn/${mod.id}`}
-                className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-700"
+              {pane !== "outline" ? (
+                <button
+                  type="button"
+                  className="min-h-11 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-700 lg:hidden"
+                  onClick={() => setPane("outline")}
+                >
+                  Back to outline
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="min-h-11 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-700"
+                onClick={() => setPane(pane === "preview" ? "edit" : "preview")}
               >
-                Playtest path
-              </a>
+                Preview
+              </button>
+              <button
+                type="button"
+                disabled={pending.isPending("publish")}
+                onClick={() => void runPublish()}
+                className="min-h-11 rounded-full bg-teal-700 px-3 py-1.5 text-xs font-extrabold text-white disabled:opacity-50"
+              >
+                {mod.published ? "Unpublish" : "Publish"}
+              </button>
             </div>
           }
         />
-        <div className="mt-2 flex gap-2 lg:hidden" role="tablist" aria-label="Workspace panes">
-          {(["outline", "edit", "preview"] as Pane[]).map((id) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={pane === id}
-              onClick={() => setPane(id)}
-              className={`rounded-full px-3 py-1.5 text-xs font-extrabold capitalize ${
-                pane === id ? "bg-teal-700 text-white" : "bg-slate-100 text-slate-700"
-              }`}
-            >
-              {id}
-            </button>
-          ))}
-        </div>
         {error ? <p className="mt-2 text-sm font-bold text-rose-600">{error}</p> : null}
+        {publishIssues.length > 0 ? (
+          <div className="mt-3 rounded-2xl bg-rose-50 p-3 ring-1 ring-rose-100">
+            <p className="text-sm font-extrabold text-rose-900">Could not publish yet</p>
+            <ul className="mt-2 space-y-2">
+              {publishIssues.map((issue) => (
+                <li key={`${issue.code}-${issue.path}`}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (issue.levelId) {
+                        applySelection({ type: "level", levelId: issue.levelId });
+                      } else {
+                        applySelection({ type: "module" });
+                      }
+                    }}
+                    className="w-full rounded-xl bg-white px-3 py-2 text-left text-sm font-semibold text-rose-800"
+                  >
+                    {issue.message}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
 
-      <div className="grid min-h-0 flex-1 lg:grid-cols-[16rem_minmax(0,1.2fr)_minmax(0,0.9fr)]">
+      <div className="grid min-h-0 flex-1 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <aside
           className={`min-h-0 overflow-y-auto border-r border-black/5 bg-white/80 p-3 ${
             pane === "outline" ? "block" : "hidden lg:block"
@@ -174,11 +275,8 @@ export function TeachModuleWorkspace({
             selection={selection}
             opError={opError}
             pending={pending}
-            onSelect={setSelection}
-            onSelectLevel={(levelId) => {
-              setSelection({ type: "level", levelId });
-              setPane("edit");
-            }}
+            onSelect={(next) => applySelection(next)}
+            onSelectLevel={(levelId) => applySelection({ type: "level", levelId })}
             onModuleChange={setMod}
             setOpError={setOpError}
             setError={setError}
@@ -188,9 +286,17 @@ export function TeachModuleWorkspace({
 
         <section
           className={`min-h-0 overflow-y-auto p-4 sm:p-5 ${
-            pane === "edit" ? "block" : "hidden lg:block"
+            pane === "outline" ? "hidden lg:block" : "block"
           }`}
         >
+          {pane === "preview" ? (
+            <TeacherPreviewPane
+              level={level}
+              loading={levelLoading}
+              onBack={() => setPane("edit")}
+            />
+          ) : (
+            <>
           {selection.type === "module" ? (
             <ModuleEditorPane
               key={`${mod.id}-${mod.revision}`}
@@ -200,10 +306,7 @@ export function TeachModuleWorkspace({
               pending={pending}
               issues={publishIssues}
               onIssues={setPublishIssues}
-              onJumpToLevel={(levelId) => {
-                setSelection({ type: "level", levelId });
-                setPane("edit");
-              }}
+              onJumpToLevel={(levelId) => applySelection({ type: "level", levelId })}
             />
           ) : null}
           {selection.type === "section" ? (
@@ -227,73 +330,67 @@ export function TeachModuleWorkspace({
                 moduleId={mod.id}
                 level={level}
                 onLevelChange={async (next) => {
-                  setLevel(next);
+                  setLevel((current) => {
+                    if (current && current.id !== next.id) return current;
+                    return next;
+                  });
                   await reloadModule();
                 }}
                 onModuleChange={setMod}
               />
             )
           ) : null}
+            </>
+          )}
         </section>
-
-        <aside
-          className={`min-h-0 overflow-y-auto border-l border-black/5 bg-slate-50/80 p-4 ${
-            pane === "preview" ? "block" : "hidden lg:block"
-          }`}
-        >
-          <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
-            Preview / validation
-          </p>
-          <ul className="mt-3 space-y-2">
-            {publishIssues.map((issue) => (
-              <li key={`${issue.code}-${issue.path}`}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (issue.levelId) {
-                      setSelection({ type: "level", levelId: issue.levelId });
-                      setPane("edit");
-                    } else {
-                      setSelection({ type: "module" });
-                      setPane("edit");
-                    }
-                  }}
-                  className={`w-full rounded-xl px-3 py-2 text-left text-sm font-semibold ring-1 ${
-                    issue.severity === "blocker"
-                      ? "bg-rose-50 text-rose-800 ring-rose-100"
-                      : "bg-amber-50 text-amber-900 ring-amber-100"
-                  }`}
-                >
-                  {issue.message}
-                </button>
-              </li>
-            ))}
-            {validation.map((item) => (
-              <li
-                key={item}
-                className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-black/5"
-              >
-                {item}
-              </li>
-            ))}
-          </ul>
-          {level?.kind === "lesson" && level.lesson ? (
-            <div className="mt-5 rounded-2xl bg-white p-4 ring-1 ring-black/5">
-              <LessonBlocksView lesson={level.lesson} />
-            </div>
-          ) : null}
-          {level?.kind === "game" && level.game ? (
-            <div className="mt-5 rounded-2xl bg-white p-4 text-sm font-semibold text-slate-700 ring-1 ring-black/5">
-              <p className="font-extrabold text-slate-800">
-                {level.game.type} playtest lives in the editor Playtest tab.
-              </p>
-              <p className="mt-2">
-                Open the level editor to build and play without leaving the workspace.
-              </p>
-            </div>
-          ) : null}
-        </aside>
       </div>
+    </div>
+  );
+}
+
+function TeacherPreviewPane({
+  level,
+  loading,
+  onBack,
+}: {
+  level: TeachLevelDetail | null;
+  loading: boolean;
+  onBack: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <p className="text-sm font-semibold text-slate-600">
+        Preview uses the student games but does not award XP, spend lives, or submit assignments.
+      </p>
+      <button
+        type="button"
+        onClick={onBack}
+        className="min-h-11 rounded-full bg-slate-100 px-4 py-2 text-sm font-extrabold text-slate-700"
+      >
+        Back to editor
+      </button>
+      {loading || !level ? (
+        <p className="text-sm font-bold text-slate-500">Select a lesson or game to preview.</p>
+      ) : level.kind === "lesson" && level.lesson ? (
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-black/5">
+          <h2 className="font-display text-2xl font-semibold">{level.title}</h2>
+          <div className="mt-4">
+            <LessonBlocksView lesson={level.lesson} />
+          </div>
+        </div>
+      ) : level.kind === "game" && level.game ? (
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-black/5">
+          <h2 className="mb-4 font-display text-2xl font-semibold">{level.title}</h2>
+          <GameSwitch
+            mode="play"
+            game={level.game}
+            onMiss={async () => "ok"}
+            onFinish={() => undefined}
+          />
+        </div>
+      ) : (
+        <p className="text-sm font-bold text-slate-500">This item has no preview yet.</p>
+      )}
     </div>
   );
 }
@@ -344,7 +441,10 @@ function OutlinePane({
         Module details
       </button>
 
-      <div className="space-y-2">
+      <details className="space-y-2">
+        <summary className="cursor-pointer px-1 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+          More tools
+        </summary>
         <p className="px-1 text-xs font-extrabold uppercase tracking-wide text-slate-500">
           Templates
         </p>
@@ -382,7 +482,7 @@ function OutlinePane({
             {opError[`template-lesson-retrieval`]}
           </p>
         ) : null}
-      </div>
+      </details>
 
       {mod.sections.map((section) => (
         <div key={section.id} className="space-y-1">
@@ -421,7 +521,7 @@ function OutlinePane({
                 </button>
                 <div className="flex flex-wrap gap-1 pl-1">
                   <OpButton
-                    label="Up"
+                    label="Move up"
                     disabled={index === 0}
                     pending={pending}
                     pendingKey={`move-up-${level.id}`}
@@ -444,7 +544,7 @@ function OutlinePane({
                     }}
                   />
                   <OpButton
-                    label="Down"
+                    label="Move down"
                     disabled={index === section.levels.length - 1}
                     pending={pending}
                     pendingKey={`move-down-${level.id}`}
@@ -675,7 +775,7 @@ function OpButton({
         type="button"
         disabled={disabled || pending.isPending(pendingKey)}
         onClick={() => void onClick()}
-        className="rounded-full bg-white px-2 py-0.5 text-[10px] font-extrabold text-slate-600 ring-1 ring-black/10 disabled:opacity-40"
+        className="min-h-11 rounded-full bg-white px-3 py-2 text-xs font-extrabold text-slate-600 ring-1 ring-black/10 disabled:opacity-40"
       >
         {pending.isPending(pendingKey) ? "…" : label}
       </button>
@@ -1088,31 +1188,22 @@ function LevelEditorPane({
             }}
           />
           {game.type === "quiz" ? (
-            <QuestionImportPanel
-              levelId={level.id}
-              onImported={async (next) => {
-                await onLevelChange(next);
-                setGame(next.game);
-              }}
-            />
+            <details className="rounded-2xl bg-slate-50 p-3 ring-1 ring-black/5">
+              <summary className="cursor-pointer text-sm font-extrabold text-slate-700">
+                More tools
+              </summary>
+              <div className="mt-3">
+                <QuestionImportPanel
+                  levelId={level.id}
+                  onImported={async (next) => {
+                    await onLevelChange(next);
+                    setGame(next.game);
+                  }}
+                />
+              </div>
+            </details>
           ) : null}
         </>
-      ) : null}
-      {level.kind === "game" && level.gameType ? (
-        <a
-          href={`/learn/${moduleId}/level/${level.id}`}
-          className="inline-flex rounded-full bg-teal-700 px-4 py-2 text-sm font-extrabold text-white"
-        >
-          Playtest this level
-        </a>
-      ) : null}
-      {level.kind === "lesson" ? (
-        <a
-          href={`/learn/${moduleId}/level/${level.id}`}
-          className="inline-flex rounded-full bg-teal-700 px-4 py-2 text-sm font-extrabold text-white"
-        >
-          Playtest this lesson
-        </a>
       ) : null}
     </div>
   );
@@ -1252,11 +1343,11 @@ function SaveStatusBanner({
 }) {
   const label: Record<string, string> = {
     idle: "Ready",
-    dirty: "Unsaved changes",
-    saving: "Saving…",
+    dirty: "Unsaved",
+    saving: "Saving",
     saved: "Saved",
     offline: "Offline — draft kept locally",
-    failed: "Save failed",
+    failed: "Could not save",
     conflict: "Conflict",
   };
   return (
@@ -1310,30 +1401,6 @@ function RecoveryBanner({
       </div>
     </div>
   );
-}
-
-function validateModule(mod: TeachModuleDetail, level: TeachLevelDetail | null) {
-  const notes: string[] = [];
-  if (!mod.title.trim()) notes.push("Module needs a title");
-  if (mod.sections.every((section) => section.levels.length === 0)) {
-    notes.push("Add at least one lesson or game");
-  }
-  const hasLesson = mod.sections.some((section) =>
-    section.levels.some((item) => item.kind === "lesson"),
-  );
-  const hasQuiz = mod.sections.some((section) =>
-    section.levels.some((item) => item.kind === "game" && item.gameType === "quiz"),
-  );
-  if (!hasLesson) notes.push("Add a lesson for a complete first draft");
-  if (!hasQuiz) notes.push("Add a quiz to check understanding");
-  if (level?.kind === "lesson" && level.lesson) {
-    const empty = !(level.lesson.blocks?.length || level.lesson.markdown.trim());
-    if (empty) notes.push("Current lesson is empty");
-  }
-  if (mod.published) notes.push("Published — students stay on the frozen revision; drafts stay private");
-  else notes.push("Draft — publish runs the quality checklist before students see this");
-  if (notes.length === 0) notes.push("Looks ready to playtest");
-  return notes;
 }
 
 /** @deprecated Prefer TeachModuleWorkspace */

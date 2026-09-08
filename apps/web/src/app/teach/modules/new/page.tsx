@@ -45,7 +45,7 @@ export default function NewModulePage() {
 
   return (
     <div className="mx-auto w-full max-w-xl px-4 py-6 sm:px-6 sm:py-8">
-      <TeachTitle kicker="Studio" title="New module wizard" />
+      <TeachTitle kicker="Teach" title="New module" />
       <p className="mb-4 text-sm font-semibold text-slate-600">
         Step {step} of 3 — title, learners, objective, then a starter structure.
       </p>

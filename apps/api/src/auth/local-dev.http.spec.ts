@@ -177,7 +177,7 @@ describe("Local development Arlaus login (localhost only)", () => {
       .expect(201);
     const cookie = login.headers["set-cookie"]![0]!;
     const other = await createTestAccount(database, {
-      admissionEmail: "other-admin-target@student.apc.edu.ph",
+      admissionEmail: "other-admin-target@apc.edu.ph",
       displayName: "Other",
     });
 

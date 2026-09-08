@@ -62,6 +62,8 @@ export function ModuleGrid({
                 Math.round((mod.completedCount / mod.totalCount) * 100),
               )
             : 0;
+          const completed =
+            mod.totalCount > 0 && mod.completedCount >= mod.totalCount;
           return (
             <li key={mod.id}>
               <Link
@@ -80,7 +82,7 @@ export function ModuleGrid({
                     )}
                   </span>
                   <span className="text-xs font-extrabold uppercase tracking-wider text-[var(--jose-text-muted)]">
-                    {mod.featured ? "The full story" : `Explore ${index + 1}`}
+                    {completed ? "Completed" : mod.featured ? "The full story" : `Module ${index + 1}`}
                   </span>
                 </div>
                 <h3 className="text-2xl font-extrabold leading-tight">
@@ -91,7 +93,9 @@ export function ModuleGrid({
                 </p>
                 <div className="mb-2 flex items-center justify-between text-sm font-bold">
                   <span className="text-[var(--jose-text-muted)]">
-                    {mod.completedCount} / {mod.totalCount} levels
+                    {completed
+                      ? "Review module"
+                      : `${mod.completedCount} / ${mod.totalCount} levels`}
                   </span>
                   <ArrowRight
                     className="size-5 text-[var(--jose-accent)]"

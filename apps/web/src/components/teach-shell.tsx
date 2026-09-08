@@ -38,7 +38,7 @@ function TeachShellBody({ children }: { children: ReactNode }) {
             Teachers only
           </p>
           <p className="font-semibold text-slate-600">
-            Teacher studio needs a teacher or admin session. Students cannot open these
+            Teacher area needs a teacher or admin session. Students cannot open these
             tools, and an APC email alone does not grant access.
           </p>
           <div className="flex flex-wrap justify-center gap-2">
@@ -114,7 +114,7 @@ function TeachShellBody({ children }: { children: ReactNode }) {
         <header className="shrink-0 border-b border-black/5 bg-white/95 px-4 py-3 lg:hidden">
           <div className="flex items-center justify-between gap-3">
             <p className="font-display text-xl font-semibold text-slate-800">
-              Teacher studio
+              Teacher area
             </p>
             <Link
               href="/learn"

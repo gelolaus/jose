@@ -11,7 +11,7 @@ import type { WhyPayload } from "./play-types";
 
 export function HeartsHud({ hearts, max = 5 }: { hearts: number; max?: number }) {
   return (
-    <div className="flex items-center gap-1" aria-label={`${hearts} of ${max} hearts`}>
+    <div className="flex items-center gap-1" aria-label={`${hearts} of ${max} lives`}>
       {Array.from({ length: max }, (_, i) => {
         const on = i < hearts;
         return (
@@ -226,8 +226,8 @@ export function HeartsBreak({
       <Heart className="size-16 fill-rose-200 text-rose-300" strokeWidth={2} aria-hidden />
       <p className="font-display text-3xl font-semibold text-[var(--jose-text)]">Take a break</p>
       <p className="text-base font-semibold text-[var(--jose-text)]">
-        Out of arcade challenge lives. Core learning and required coursework stay
-        open — continue a lesson, use Practice, or wait for challenge lives to refill.
+        Out of Lives. Required lessons, class assignments, and revisiting stay
+        open. Lives refill over time.
       </p>
       <Link
         href={`/learn/${moduleId}`}

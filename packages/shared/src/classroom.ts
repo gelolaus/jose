@@ -4,6 +4,7 @@ export const classSummarySchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   inviteCode: z.string().min(1).nullable(),
+  inviteCodeHint: z.string().min(1).nullable().optional(),
   memberCount: z.number().int().nonnegative(),
   challengesEnabled: z.boolean(),
   archivedAt: z.number().int().nullable(),
@@ -77,6 +78,14 @@ export const classReportSchema = z.object({
   }),
   misconceptions: z.array(misconceptionSchema),
 });
+
+export const studentClassMembershipSchema = z.object({
+  classId: z.string().min(1),
+  name: z.string().min(1),
+  joinedAt: z.number().int(),
+  assignmentCount: z.number().int().nonnegative(),
+});
+export type StudentClassMembership = z.infer<typeof studentClassMembershipSchema>;
 
 export type ClassSummary = z.infer<typeof classSummarySchema>;
 export type Assignment = z.infer<typeof assignmentSchema>;

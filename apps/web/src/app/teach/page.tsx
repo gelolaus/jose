@@ -13,7 +13,7 @@ export default async function TeachHomePage() {
     return (
       <div className="mx-auto max-w-xl px-6 py-16 text-center">
         <p className="font-display text-3xl font-semibold text-slate-800">
-          Studio is napping
+          Could not load modules
         </p>
         <p className="mt-2 font-semibold text-slate-600">
           {err instanceof Error ? err.message : "Could not load modules"}
@@ -25,7 +25,7 @@ export default async function TeachHomePage() {
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
       <TeachTitle
-        kicker="Studio"
+        kicker="Teach"
         title="Modules"
         action={
           <div className="flex flex-wrap gap-2">
@@ -39,7 +39,7 @@ export default async function TeachHomePage() {
               href="/teach/modules/new"
               className="rounded-full bg-violet-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-md"
             >
-              New module
+              Create module
             </Link>
           </div>
         }

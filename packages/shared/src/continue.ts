@@ -83,14 +83,14 @@ export function pickContinueLearning(
     kind: "review",
     moduleId: featured.moduleId,
     moduleTitle: featured.moduleTitle,
-    sectionTitle: "Course complete",
+    sectionTitle: featured.sectionTitle,
     levelId: featured.levelId,
-    levelTitle: "Personalized practice",
-    levelKind: "game",
-    approximateMinutes: 8,
+    levelTitle: featured.levelTitle,
+    levelKind: featured.levelKind,
+    approximateMinutes: approximateMinutesForKind(featured.levelKind),
     assignmentLabel: null,
-    href: reviewHref,
-    reason: "You finished the path — review weak spots or explore again",
+    href: reviewHref === "/practice" ? `/learn/${featured.moduleId}` : reviewHref,
+    reason: "Review this completed module anytime",
   };
 }
 

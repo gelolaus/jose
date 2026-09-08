@@ -498,6 +498,60 @@ export const migration009ClassChallenges: Migration = {
   },
 };
 
+/**
+ * Server bookmarks, one-time lesson life credits, and teacher-role audit.
+ * Existing lesson completions are marked consumed with zero credit so old
+ * course replays cannot farm the new 120-second regeneration bonus.
+ */
+export const migration010BookmarksLivesRoles: Migration = {
+  id: "010_bookmarks_lives_roles",
+  async up(client) {
+    await client.execute("PRAGMA foreign_keys = ON");
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS bookmarks (
+        learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+        level_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (learner_id, level_id)
+      )
+    `);
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS lesson_life_credits (
+        learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+        level_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        credit_ms INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (learner_id, level_id)
+      )
+    `);
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS role_audit (
+        id TEXT PRIMARY KEY,
+        actor_id TEXT NOT NULL,
+        target_user_id TEXT NOT NULL,
+        prior_role TEXT NOT NULL,
+        new_role TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )
+    `);
+    await client.execute(
+      `CREATE INDEX IF NOT EXISTS idx_bookmarks_learner_created
+        ON bookmarks (learner_id, created_at)`,
+    );
+    await client.execute(
+      `CREATE INDEX IF NOT EXISTS idx_role_audit_created
+        ON role_audit (created_at)`,
+    );
+    await client.execute(`
+      INSERT OR IGNORE INTO lesson_life_credits (learner_id, level_id, created_at, credit_ms)
+      SELECT p.learner_id, p.level_id, p.completed_at, 0
+      FROM learner_progress p
+      INNER JOIN levels l ON l.id = p.level_id
+      WHERE l.kind = 'lesson'
+    `);
+  },
+};
+
 export const MIGRATIONS: Migration[] = [
   migration001InitialSchema,
   migration002QueryIndexes,
@@ -508,6 +562,7 @@ export const MIGRATIONS: Migration[] = [
   migration007StudentExperience,
   migration008LearnerArtifacts,
   migration009ClassChallenges,
+  migration010BookmarksLivesRoles,
 ];
 
 export async function ensureColumn(
