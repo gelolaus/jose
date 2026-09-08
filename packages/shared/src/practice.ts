@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { gameContentSchema } from "./games";
-import { gameTypeSchema, nodeKindSchema, type GameType } from "./path";
+import { isActiveGameType, gameTypeSchema, nodeKindSchema, type GameType } from "./path";
 
 export const practiceReasonKindSchema = z.enum([
   "recent_miss",
@@ -120,6 +120,7 @@ export function buildPracticeQueue(input: {
   >;
   limit?: number;
 }): PracticeItem[] {
+  input = { ...input, levelMeta: Object.fromEntries(Object.entries(input.levelMeta).filter(([, meta]) => meta.kind !== "game" || isActiveGameType(meta.gameType))) };
   const limit = input.limit ?? 8;
   const reviewByLevel = new Map(
     input.reviews.map((r) => [r.levelId, r] as const),

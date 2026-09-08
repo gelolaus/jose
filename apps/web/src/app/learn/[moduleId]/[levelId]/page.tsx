@@ -85,7 +85,7 @@ export default async function PlayLevelPage({ params }: Props) {
       ) : null}
       {data.level.kind === "game" && data.game && data.attempt ? (
         <GamePlayer
-          key={data.learner.id}
+          key={`${data.learner.id}:${data.attempt.id}`}
           levelId={levelId}
           moduleId={moduleId}
           title={data.level.title}

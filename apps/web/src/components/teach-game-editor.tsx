@@ -1,7 +1,7 @@
 "use client";
 
 import { GameSwitch } from "@/components/game-player";
-import { firstTryScore, pieceCount, type GameContent } from "@jose/shared";
+import { firstTryScore, pieceCount, simplifyGameContent, type GameContent } from "@jose/shared";
 import { useState } from "react";
 import { GameFrame, StarCelebration } from "./games/game-stage";
 import type { WhyPayload } from "./games/play-types";
@@ -15,7 +15,7 @@ export function GameEditor({
   onSave: (game: GameContent) => Promise<void>;
   onChange?: (game: GameContent) => void;
 }) {
-  const [draft, setDraft] = useState<GameContent>(game);
+  const [draft, setDraft] = useState<GameContent>(() => simplifyGameContent(game));
   const [tab, setTab] = useState<"build" | "play">("build");
   const [why, setWhy] = useState<WhyPayload | null>(null);
   const [preview, setPreview] = useState<{
@@ -67,6 +67,7 @@ export function GameEditor({
         <GameSwitch mode="build" game={draft} onChange={updateDraft} />
       ) : preview ? (
         <StarCelebration
+          timedOut={draft.type === "memory" && preview.score === 0}
           title="Playtest"
           score={preview.score}
           maxScore={preview.maxScore}

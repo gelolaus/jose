@@ -67,6 +67,10 @@ import {
   parseChestContent,
   pairExplanation,
   coerceGameContent,
+  simplifyGameContent,
+  isActiveGameType,
+  isPlayableGameContent,
+  memoryDurationMs,
   parseYoutubeVideoId,
   patchLevelBodySchema,
   patchModuleBodySchema,
@@ -316,7 +320,7 @@ export class CurriculumService {
     const ctx = await this.requireStudentVisibleLevel(levelId);
     const publishedRevision = await this.publishedRevisionOrNull(ctx.module);
     const snapshot = publishedRevision
-      ? this.parseSnapshot(publishedRevision.snapshotJson)
+      ? this.parseActiveSnapshot(publishedRevision.snapshotJson)
       : null;
     const snapLevel = snapshot ? this.findSnapshotLevel(snapshot, levelId) : null;
     if (snapshot && !snapLevel) {
@@ -379,7 +383,7 @@ export class CurriculumService {
       }
     } else if (kind === "game") {
       const game = snapLevel
-        ? parseGameContent(snapLevel.game ?? {})
+        ? simplifyGameContent(parseGameContent(snapLevel.game ?? {}))
         : await this.loadGameContent(levelId);
       const opened = await this.openAssessmentAttempt(
         levelId,
@@ -404,7 +408,7 @@ export class CurriculumService {
     const ctx = await this.requireStudentVisibleLevel(levelId);
     const publishedRevision = await this.publishedRevisionOrNull(ctx.module);
     const snapshot = publishedRevision
-      ? this.parseSnapshot(publishedRevision.snapshotJson)
+      ? this.parseActiveSnapshot(publishedRevision.snapshotJson)
       : null;
     const snapLevel = snapshot ? this.findSnapshotLevel(snapshot, levelId) : null;
     const kind = snapLevel?.kind ?? ctx.level.kind;
@@ -566,6 +570,13 @@ export class CurriculumService {
         throw new BadRequestException("Attempt is already finished");
       }
       const events = this.parseEvents(freshAttempt.eventsJson);
+      if (game.type === "memory") {
+        const start = events.find((row) => row.type === "memory_start");
+        if (event.type !== "memory_start" && !start) throw new BadRequestException("Start the matching timer first");
+        result.remainingMs = Math.max(0, memoryDurationMs(game.pairs.length) - (Date.now() - (start?.at ?? Date.now())));
+        if (event.type === "memory_start" && start) return 0;
+        if (result.remainingMs === 0) { result.correct = false; result.feedback = null; }
+      }
       events.push({ ...event, result, at: Date.now() });
       await tx
         .update(attempts)
@@ -637,6 +648,11 @@ export class CurriculumService {
     );
     const secret = this.parseSecret(attempt.secretJson);
 
+    if (game.type === "memory" && data.answers.type === "memory") {
+      const start = events.find((row) => row.type === "memory_start");
+      if (!start) throw new BadRequestException("Start the matching timer first");
+      data.answers.timedOut = data.answers.timedOut === true || Date.now() - start.at >= memoryDurationMs(game.pairs.length);
+    }
     let graded;
     try {
       graded = gradeAssessmentFinish(game, data.answers, priorMisses, secret);
@@ -749,6 +765,7 @@ export class CurriculumService {
         ),
       );
     for (const mod of published) {
+      const activeIds = new Set(await this.orderedLevelIds(mod.id));
       const sectionRows = await this.db
         .select()
         .from(sections)
@@ -759,6 +776,7 @@ export class CurriculumService {
           .from(levels)
           .where(and(eq(levels.sectionId, section.id), isNull(levels.archivedAt)));
         for (const level of levelRows) {
+          if (!activeIds.has(level.id)) continue;
           let tags: string[] = [];
           try {
             tags = JSON.parse(level.instructorTagsJson || "[]") as string[];
@@ -1601,6 +1619,7 @@ export class CurriculumService {
   async createLevel(sectionId: string, body: unknown) {
     const section = await this.requireSection(sectionId);
     const data = parseBody(createLevelBodySchema, body);
+    if (data.kind === "game" && !isActiveGameType(data.gameType)) throw new BadRequestException("This game type is retired");
     const id = randomUUID();
     await this.runTx(async (tx) => {
       const siblings = await this.activeLevels(sectionId);
@@ -1629,7 +1648,7 @@ export class CurriculumService {
       } else {
         await tx.insert(gameContent).values({
           levelId: id,
-          json: JSON.stringify(emptyGameContent(data.gameType!)),
+          json: JSON.stringify(simplifyGameContent(emptyGameContent(data.gameType!))),
         });
       }
       await this.maybeFault("after-level-content");
@@ -1868,7 +1887,8 @@ export class CurriculumService {
       typeof raw.expectedRevision === "number" ? raw.expectedRevision : undefined;
     delete raw.expectedRevision;
     this.assertRevision(ctx.level.revision ?? 0, expectedRevision);
-    const data = parseBody(putGameBodySchema, coerceGameContent(raw));
+    const data = simplifyGameContent(parseBody(putGameBodySchema, coerceGameContent(raw)));
+    if (!isActiveGameType(data.type) || !isPlayableGameContent(data)) throw new BadRequestException("Game configuration is not playable");
     await this.db
       .insert(gameContent)
       .values({ levelId, json: JSON.stringify(data) })
@@ -2224,7 +2244,7 @@ export class CurriculumService {
   ): Promise<PathResponse> {
     const published = await this.publishedRevisionOrNull(mod);
     if (!published) return this.buildPath(mod, learnerId);
-    const snapshot = this.parseSnapshot(published.snapshotJson);
+    const snapshot = this.parseActiveSnapshot(published.snapshotJson);
     const learner = await this.getLearner(learnerId);
     const ordered = snapshot.sections.flatMap((section) =>
       section.levels.map((level) => level.id),
@@ -2272,6 +2292,22 @@ export class CurriculumService {
       learner,
       sections: pathSections,
     };
+  }
+
+  private parseActiveSnapshot(raw: string): ModuleRevisionSnapshot {
+    const snapshot = this.parseSnapshot(raw);
+    return { ...snapshot, sections: snapshot.sections.map((section) => ({
+      ...section, levels: section.levels.filter((level) => this.isActiveLevel(level.kind, level.gameType, level.game)),
+    })).filter((section) => section.levels.length > 0) };
+  }
+
+  private isActiveLevel(kind: string, gameType: unknown, content?: unknown): boolean {
+    if (kind !== "game") return true;
+    if (!isActiveGameType(gameType)) return false;
+    if (gameType !== "sort") return true;
+    try {
+      return isPlayableGameContent(parseGameContent(typeof content === "string" ? JSON.parse(content) : content));
+    } catch { return false; }
   }
 
   private parseSnapshot(raw: string): ModuleRevisionSnapshot {
@@ -2392,9 +2428,9 @@ export class CurriculumService {
   }): Promise<GameContent> {
     const published = await this.publishedRevisionOrNull(ctx.module);
     if (published) {
-      const snapshot = this.parseSnapshot(published.snapshotJson);
+      const snapshot = this.parseActiveSnapshot(published.snapshotJson);
       const snapLevel = this.findSnapshotLevel(snapshot, ctx.level.id);
-      if (snapLevel?.game) return parseGameContent(snapLevel.game);
+      if (snapLevel?.game) return simplifyGameContent(parseGameContent(snapLevel.game));
     }
     return this.loadGameContent(ctx.level.id);
   }
@@ -2422,7 +2458,7 @@ export class CurriculumService {
         instructorReviewStatus: this.parseInstructorReviewStatus(
           section.instructorReviewStatus,
         ),
-        nodes: levelRows.map((level) => {
+        nodes: levelRows.filter((level) => ordered.includes(level.id)).map((level) => {
           const kind = level.kind as NodeKind;
           const status = statuses[level.id] ?? "locked";
           const node = {
@@ -2469,11 +2505,15 @@ export class CurriculumService {
       .select({
         moduleId: sections.moduleId,
         levelId: levels.id,
+        kind: levels.kind,
+        gameType: levels.gameType,
+        gameJson: gameContent.json,
         sectionSort: sections.sortOrder,
         levelSort: levels.sortOrder,
       })
       .from(sections)
       .innerJoin(levels, eq(levels.sectionId, sections.id))
+      .leftJoin(gameContent, eq(gameContent.levelId, levels.id))
       .where(
         and(
           inArray(sections.moduleId, moduleIds),
@@ -2495,7 +2535,7 @@ export class CurriculumService {
       });
       result.set(
         moduleId,
-        list.map((row) => row.levelId),
+        list.filter((row) => this.isActiveLevel(row.kind, row.gameType, row.gameJson)).map((row) => row.levelId),
       );
     }
     return result;
@@ -2573,7 +2613,7 @@ export class CurriculumService {
     const mod = await this.requireModule(moduleId);
     const published = await this.publishedRevisionOrNull(mod);
     const ordered = published
-      ? this.parseSnapshot(published.snapshotJson).sections.flatMap((section) =>
+      ? this.parseActiveSnapshot(published.snapshotJson).sections.flatMap((section) =>
           section.levels.map((level) => level.id),
         )
       : await this.orderedLevelIds(moduleId);
@@ -2877,6 +2917,7 @@ export class CurriculumService {
     if (!ctx.module.published || ctx.module.archivedAt || ctx.module.trashedAt) {
       throw new NotFoundException("Level not found");
     }
+    if (ctx.level.kind === "game" && (!isActiveGameType(ctx.level.gameType) || !isPlayableGameContent(await this.loadStudentGame(ctx)))) throw new NotFoundException("Level is retired");
     return ctx;
   }
 
@@ -3302,6 +3343,7 @@ export class CurriculumService {
       }
       return {
         type: "memory" as const,
+        durationMs: memoryDurationMs(game.pairs.length),
         pairCount: game.pairs.length,
         cards: shuffledCopy(fixed),
       };
@@ -3315,6 +3357,9 @@ export class CurriculumService {
     event: AttemptEvent,
   ): EvaluateEventResult {
     switch (event.type) {
+      case "memory_start":
+        if (game.type !== "memory") throw new BadRequestException("Event type mismatch");
+        return { correct: true, misses: 0 };
       case "quiz_choice":
         if (game.type !== "quiz") throw new BadRequestException("Event type mismatch");
         return evaluateQuizChoice(game, event.questionIndex, event.choiceId ?? event.choiceIndex);
@@ -3352,7 +3397,7 @@ export class CurriculumService {
       .select()
       .from(gameContent)
       .where(eq(gameContent.levelId, levelId));
-    return parseGameContent(JSON.parse(content?.json ?? "{}"));
+    return simplifyGameContent(parseGameContent(JSON.parse(content?.json ?? "{}")));
   }
 
   private assertAttemptRevision(revision: string, game: GameContent) {

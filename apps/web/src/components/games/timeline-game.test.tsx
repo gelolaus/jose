@@ -92,7 +92,7 @@ describe("TimelineGame play", () => {
     });
   });
 
-  it("asks its causal question before finishing a perfect timeline", () => {
+  it("finishes immediately after ordering even with a legacy causal question", () => {
     const onMiss = vi.fn(async () => "ok" as const);
     const onFinish = vi.fn();
     render(
@@ -114,8 +114,16 @@ describe("TimelineGame play", () => {
     }
     fireEvent.click(screen.getByRole("button", { name: "Check" }));
 
-    expect(screen.getByText("What made Rizal's move to Biñan possible?")).toBeTruthy();
-    expect(onFinish).not.toHaveBeenCalled();
+    expect(screen.queryByText("What made Rizal's move to Biñan possible?")).toBeNull();
+    expect(onFinish).toHaveBeenCalledWith(3, 3, 0, { type: "timeline", order: ["a", "b", "c"] });
+  });
+
+  it("opens the timeline editor without a causalLink property", () => {
+    const simpleGame = { ...game };
+    delete simpleGame.causalLink;
+    render(<TimelineGame game={simpleGame} mode="build" onChange={vi.fn()} />);
+    expect(screen.getByRole("textbox", { name: "Event for stop 1" })).toHaveValue("Born in Calamba");
+    expect(screen.queryByText("Add cause and consequence question")).toBeNull();
   });
 
   it("keeps an event selected after pointerdown plus click", () => {

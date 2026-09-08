@@ -44,15 +44,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 const GAME_TYPES: { id: GameType; label: string }[] = [
-  { id: "quiz", label: "Evidence duel" },
-  { id: "memory", label: "Archive match" },
-  { id: "timeline", label: "Cause & consequence" },
-  { id: "blank", label: "Restore the passage" },
-  { id: "sort", label: "Curator's desk" },
-  { id: "case-files", label: "Case Files" },
-  { id: "dispatches", label: "Dispatches" },
-  { id: "editorial", label: "Editorial Room" },
-  { id: "dapitan", label: "Dapitan Workshop" },
+  { id: "timeline", label: "Timeline" },
+  { id: "quiz", label: "Quiz" },
+  { id: "memory", label: "Matching" },
+  { id: "sort", label: "Sorting" },
+  { id: "blank", label: "Fill in the Blank" },
 ];
 
 const TEMPLATES: { id: ModuleTemplateId; label: string }[] = [

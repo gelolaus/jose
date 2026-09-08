@@ -256,10 +256,10 @@ describe("blank validation", () => {
 });
 
 describe("memoryScore", () => {
-  it("starts at pairs * 100 and subtracts 10 per mismatch", () => {
+  it("keeps full points regardless of mismatches", () => {
     expect(memoryScore(4, 0)).toEqual({ score: 400, maxScore: 400 });
-    expect(memoryScore(4, 3)).toEqual({ score: 370, maxScore: 400 });
-    expect(memoryScore(2, 50)).toEqual({ score: 0, maxScore: 200 });
+    expect(memoryScore(4, 3)).toEqual({ score: 400, maxScore: 400 });
+    expect(memoryScore(2, 50)).toEqual({ score: 200, maxScore: 200 });
   });
 });
 

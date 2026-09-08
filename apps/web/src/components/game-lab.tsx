@@ -29,10 +29,6 @@ const ICONS: Record<LabGame["type"], LucideIcon> = {
 };
 
 export function GameLabHub({ embedded = false }: { embedded?: boolean }) {
-  const [filter, setFilter] = useState<"all" | "quick" | "deep">("all");
-  const quickTypes: LabGame["type"][] = ["quiz", "memory", "blank", "timeline"];
-  const visibleGames = LAB_GAMES.filter((entry) => filter === "all" || (filter === "quick" ? quickTypes.includes(entry.type) : !quickTypes.includes(entry.type)));
-
   return (
     <div
       className={
@@ -42,21 +38,8 @@ export function GameLabHub({ embedded = false }: { embedded?: boolean }) {
       }
     >
       {!embedded ? <header className="mb-7"><h1 className="text-3xl font-extrabold sm:text-4xl">Pick a game. Learn something new.</h1><p className="mt-2 font-semibold text-[var(--jose-text-muted)]">Short rounds to put your Rizal knowledge to the test.</p></header> : null}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-bold text-[var(--jose-ink)]">Pick your kind of fun</p>
-          <p className="text-sm text-[var(--jose-ink-muted)]">Everything here is optional practice.</p>
-        </div>
-        <div className="flex rounded-full bg-white p-1 shadow-sm ring-1 ring-black/5" role="group" aria-label="Filter games">
-          {(["all", "quick", "deep"] as const).map((kind) => (
-            <button key={kind} type="button" onClick={() => setFilter(kind)} aria-pressed={filter === kind} className={`rounded-full px-3 py-2 text-xs font-extrabold capitalize transition sm:px-4 ${filter === kind ? "jose-nav-active" : "text-stone-500 hover:bg-stone-100"}`}>
-              {kind === "all" ? "All games" : kind === "quick" ? "Quick play" : "Take your time"}
-            </button>
-          ))}
-        </div>
-      </div>
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {visibleGames.map((entry, index) => {
+        {LAB_GAMES.map((entry, index) => {
           const Icon = ICONS[entry.type];
           return (
             <li key={entry.type}>
@@ -78,7 +61,7 @@ export function GameLabHub({ embedded = false }: { embedded?: boolean }) {
                       {entry.blurb}
                     </p>
                     <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-[var(--jose-text-muted)]">
-                      {quickTypes.includes(entry.type) ? "2–5 min · quick play" : "5–10 min · deep dive"}
+                      {entry.type === "memory" ? "Beat the clock" : "Play a round"}
                     </p>
                   </div>
                 </div>
@@ -104,6 +87,7 @@ export function GameLabPlay({ entry }: { entry: LabGame }) {
   if (result) {
     return (
       <StarCelebration
+        timedOut={entry.type === "memory" && result.score === 0}
         title={entry.title}
         score={result.score}
         maxScore={result.maxScore}

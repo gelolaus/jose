@@ -116,6 +116,7 @@ export function WhySheet({
 }
 
 export function StarCelebration({
+  timedOut = false,
   title,
   score,
   maxScore,
@@ -131,6 +132,7 @@ export function StarCelebration({
   playAgainLabel = "Play again",
   continueLabel = "Continue",
 }: {
+  timedOut?: boolean;
   title: string;
   score: number;
   maxScore: number;
@@ -160,7 +162,7 @@ export function StarCelebration({
           <Star
             key={n}
             className={`size-12 sm:size-14 ${
-              n <= stars ? "fill-amber-400 text-amber-400" : "text-slate-200"
+              !timedOut && n <= stars ? "fill-amber-400 text-amber-400" : "text-slate-200"
             } ${reducedMotion ? "" : "star-pop"}`}
             strokeWidth={2.2}
             style={reducedMotion ? undefined : { animationDelay: `${n * 80}ms` }}
@@ -169,7 +171,7 @@ export function StarCelebration({
         ))}
       </div>
       <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-[var(--jose-accent)]">
-        {stars === 3 ? "Perfect" : stars === 2 ? "Nice work" : "You finished"}
+        {timedOut ? "Time’s up — try again!" : stars === 3 ? "Perfect" : stars === 2 ? "Nice work" : "You finished"}
       </p>
       <p className="font-display text-5xl font-semibold text-[var(--jose-text)]">
         {score}

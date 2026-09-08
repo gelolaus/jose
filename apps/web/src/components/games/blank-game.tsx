@@ -166,23 +166,10 @@ function BlankPlay({
         ));
 
   return (
-    <GameBoard scene="blank" step={`Passage ${index + 1} of ${game.items.length}`}>
+    <GameBoard scene="blank" step={`Sentence ${index + 1} of ${game.items.length}`}>
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-extrabold text-[var(--jose-text-muted)]">
-          Passage {index + 1} of {game.items.length}
-        </p>
-        <p className="rounded-full bg-rose-50 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-rose-700">
-          Restore the passage
-        </p>
-      </div>
-      {"objective" in item && item.objective ? (
-        <p className="text-xs font-semibold text-slate-500">
-          Objective: {item.objective}
-        </p>
-      ) : null}
-      <div className="rounded-[1.8rem] bg-[#fff7e8] px-5 py-8 shadow-inner ring-2 ring-amber-200 sm:px-8">
-        <p className="font-display text-2xl font-semibold leading-snug text-amber-950 sm:text-3xl">
+      <div className="rounded-3xl border-2 border-[var(--jose-rule)] bg-[var(--jose-wash)] px-5 py-8 sm:px-8">
+        <p className="text-2xl font-extrabold leading-relaxed text-[var(--jose-text)] sm:text-3xl">
           {sentence}
         </p>
         {"source" in item && item.source ? (
@@ -209,7 +196,7 @@ function BlankPlay({
               type="button"
               disabled={disabled || Boolean(picked)}
               onClick={() => void choose(word)}
-              className={`rounded-full px-4 py-2 text-sm font-extrabold ring-2 ${tone}`}
+              className={`min-h-14 rounded-2xl px-5 py-3 text-base font-extrabold ring-2 shadow-[0_3px_0_var(--jose-rule)] ${tone}`}
             >
               {word}
             </button>
@@ -236,7 +223,7 @@ function BlankPlay({
           disabled={disabled}
           className="jose-button w-full"
         >
-          {last ? "See stars" : "Next passage"}
+          {last ? "Finish" : "Next"}
         </button>
       ) : null}
     </div>

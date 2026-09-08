@@ -3,15 +3,15 @@ import type { GameContent } from "@jose/shared";
 export function hintFor(type: GameContent["type"]) {
   switch (type) {
     case "timeline":
-      return "Order the events, then explain the connection.";
+      return "Put the events in order. Tap a card, then a space.";
     case "memory":
-      return "Match archive cards. Learning mode has no timer.";
+      return "Find all the pairs before the timer runs out.";
     case "sort":
-      return "Sort evidence into the curator chests, then Check.";
+      return "Tap a card, choose its category, then Check.";
     case "quiz":
-      return "Answer the claim with the strongest evidence when asked.";
+      return "Tap the answer you think is right.";
     case "blank":
-      return "Restore the missing word in the sourced passage.";
+      return "Tap the word that completes the sentence.";
     case "case-files":
       return "Read the claim. Tap the evidence that supports it best.";
     case "dispatches":
@@ -26,15 +26,15 @@ export function hintFor(type: GameContent["type"]) {
 export function labelFor(type: GameContent["type"]) {
   switch (type) {
     case "timeline":
-      return "Cause & consequence";
+      return "Timeline";
     case "memory":
-      return "Archive match";
+      return "Matching";
     case "sort":
-      return "Curator's desk";
+      return "Sorting";
     case "quiz":
-      return "Evidence duel";
+      return "Quiz";
     case "blank":
-      return "Restore the passage";
+      return "Fill in the Blank";
     case "case-files":
       return "Find the proof";
     case "dispatches":

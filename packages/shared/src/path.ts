@@ -88,3 +88,8 @@ export function nodeIconFor(kind: NodeKind, status: NodeStatus): NodeIcon {
   if (kind === "game") return "game";
   return "book";
 }
+
+export const ACTIVE_GAME_TYPES = ["quiz", "memory", "timeline", "sort", "blank"] as const;
+export function isActiveGameType(type: unknown): type is (typeof ACTIVE_GAME_TYPES)[number] {
+  return ACTIVE_GAME_TYPES.some((active) => active === type);
+}

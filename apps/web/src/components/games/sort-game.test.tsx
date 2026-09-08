@@ -79,4 +79,15 @@ describe("SortGame play", () => {
       placements: { a: "noli", b: "fili", c: "noli" },
     });
   });
+  it("omits legacy insufficient-evidence cards and categories", () => {
+    const legacy = {
+      ...sortGame,
+      buckets: [...sortGame.buckets, { id: "unsure", label: "Insufficient evidence", role: "insufficient-evidence" as const }],
+      items: [...sortGame.items, { id: "rumor", label: "A vague rumor", bucketId: "unsure", scoring: "auto" as const }],
+    };
+    render(<SortGame game={legacy} onMiss={vi.fn(async () => "ok" as const)} onFinish={vi.fn()} />);
+    expect(screen.queryByText(/insufficient evidence/i)).toBeNull();
+    expect(screen.queryByText("A vague rumor")).toBeNull();
+  });
+
 });

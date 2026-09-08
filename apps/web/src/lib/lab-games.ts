@@ -1,10 +1,7 @@
 import {
-  emptyCaseFilesGame,
-  emptyDapitanGame,
-  emptyDispatchesGame,
-  emptyEditorialGame,
-  gameTypeSchema,
   parseGameContent,
+  simplifyGameContent,
+  isActiveGameType,
   type GameContent,
   type GameType,
 } from "@jose/shared";
@@ -18,14 +15,18 @@ export type LabGame = {
   game: GameContent;
 };
 
+function simpleGame(value: unknown): GameContent {
+  return simplifyGameContent(parseGameContent(value));
+}
+
 export const LAB_GAMES: LabGame[] = [
   {
     type: "timeline",
-    title: "Cause & consequence",
-    blurb: "Order the path, then explain one connection.",
-    how: "Place events on the rail (tap or drag). Optional date hints stay available. After ordering, answer the causal question.",
+    title: "Timeline",
+    blurb: "Put the events in the right order.",
+    how: "Tap a card, then tap its place on the timeline.",
     color: "#F59E0B",
-    game: parseGameContent({
+    game: simpleGame({
       type: "timeline",
       dateHints: "optional",
       items: [
@@ -82,11 +83,11 @@ export const LAB_GAMES: LabGame[] = [
   },
   {
     type: "quiz",
-    title: "Evidence duel",
-    blurb: "Recall checks plus source-backed claims.",
-    how: "Quick checks test facts. Evidence duels show a claim and sources — pick the strongest, then justify.",
+    title: "Quiz",
+    blurb: "Pick the right answer, one question at a time.",
+    how: "Tap an answer to check it.",
     color: "#7C3AED",
-    game: parseGameContent({
+    game: simpleGame({
       type: "quiz",
       questions: [
         {
@@ -200,11 +201,11 @@ export const LAB_GAMES: LabGame[] = [
   },
   {
     type: "memory",
-    title: "Archive match",
-    blurb: "Untimed matching with explanations and artifacts.",
-    how: "Match person/place pairs. Read why they belong together. Timed challenge is a separate mode teachers can enable.",
+    title: "Matching",
+    blurb: "Flip the cards and find every pair before time runs out.",
+    how: "The clock starts on your first flip. Wrong matches have no penalty.",
     color: "#0EA5E9",
-    game: parseGameContent({
+    game: simpleGame({
       type: "memory",
       playMode: "learning",
       pairs: [
@@ -262,11 +263,11 @@ export const LAB_GAMES: LabGame[] = [
   },
   {
     type: "sort",
-    title: "Curator's desk",
-    blurb: "Sort evidence, then inspect the reasoning.",
-    how: "Place chips into chests. Auto-scored items need the right category. Discussion prompts are reviewed, not falsely graded.",
+    title: "Sorting",
+    blurb: "Put each card in the right category.",
+    how: "Tap a card, tap its category, then Check.",
     color: "#22C55E",
-    game: parseGameContent({
+    game: simpleGame({
       type: "sort",
       buckets: [
         { id: "noli", label: "Noli Me Tangere", role: "category" },
@@ -326,11 +327,11 @@ export const LAB_GAMES: LabGame[] = [
   },
   {
     type: "blank",
-    title: "Restore the passage",
-    blurb: "Fill meaningful blanks in sourced lines.",
-    how: "Each blank ties to an objective and source. Decoys include explanations on a miss.",
+    title: "Fill in the Blank",
+    blurb: "Choose the missing word to finish the sentence.",
+    how: "Tap the word that fits.",
     color: "#F43F5E",
-    game: parseGameContent({
+    game: simpleGame({
       type: "blank",
       items: [
         {
@@ -369,42 +370,11 @@ export const LAB_GAMES: LabGame[] = [
       ],
     }),
   },
-  {
-    type: "case-files",
-    title: "Find the proof",
-    blurb: "Read a claim and tap the evidence that supports it best.",
-    how: "Read the claim. Tap the evidence that supports it best.",
-    color: "#0F766E",
-    game: emptyCaseFilesGame(),
-  },
-  {
-    type: "dispatches",
-    title: "Choose the next stop",
-    blurb: "Follow Rizal’s route one postcard stop at a time.",
-    how: "Follow Rizal’s route. Tap the place that comes next.",
-    color: "#0369A1",
-    game: emptyDispatchesGame(),
-  },
-  {
-    type: "editorial",
-    title: "Build the story",
-    blurb: "Put claim, evidence, and conclusion in order.",
-    how: "Put these three pieces in order: Claim, Evidence, Conclusion.",
-    color: "#C2410C",
-    game: emptyEditorialGame(),
-  },
-  {
-    type: "dapitan",
-    title: "Choose the best plan",
-    blurb: "Choose the action that best helps the community.",
-    how: "Choose the action that best helps the community.",
-    color: "#0F766E",
-    game: emptyDapitanGame(),
-  },
+
 ];
 
 export function isLabGameType(value: string): value is GameType {
-  return gameTypeSchema.safeParse(value).success;
+  return isActiveGameType(value);
 }
 
 export function getLabGame(type: string): LabGame | undefined {

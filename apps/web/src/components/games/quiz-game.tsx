@@ -2,7 +2,6 @@
 
 import {
   shuffledCopy,
-  scoreQuizRationale,
   type AssessmentQuiz,
   type QuizGame as QuizContent,
   type QuizQuestion,
@@ -63,12 +62,11 @@ function QuizPlay({
 }: { game: QuizPlayContent } & PlayBoardProps) {
   const [index, setIndex] = useState(0);
   const [pickedId, setPickedId] = useState<string | null>(null);
-  const [rationaleId, setRationaleId] = useState<string | null>(null);
+  const [answerReady, setAnswerReady] = useState(false);
   const [correctPanel, setCorrectPanel] = useState<WhyPayload | null>(null);
   const [revealedId, setRevealedId] = useState<string | null>(null);
   const missesRef = useRef(0);
   const choicesRef = useRef<(string | number)[]>([]);
-  const rationaleRef = useRef<(string | null)[]>([]);
   const { playCue } = useMotionSound();
   const question = game.questions[index]!;
   const last = index === game.questions.length - 1;
@@ -126,15 +124,14 @@ function QuizPlay({
       if (result.correct) {
         playCue("accept");
         setRevealedId(choiceId);
-        if (!question.rationales?.length) {
-          setCorrectPanel(
-            result.feedback
-              ? { title: result.feedback.title, body: result.feedback.body, tone: "success" }
-              : authored
-                ? buildCorrectPanel(authored)
-                : null,
-          );
-        }
+        setAnswerReady(true);
+        setCorrectPanel(
+          result.feedback
+            ? { title: result.feedback.title, body: result.feedback.body, tone: "success" }
+            : authored
+              ? buildCorrectPanel(authored)
+              : null,
+        );
         return;
       }
       playCue("reject");
@@ -147,8 +144,10 @@ function QuizPlay({
         });
         if (miss === "empty") return;
       } else {
-        await onMiss(null);
+        const miss = await onMiss(null);
+        if (miss === "empty") return;
       }
+      setAnswerReady(true);
       return;
     }
 
@@ -157,9 +156,8 @@ function QuizPlay({
     if (right) {
       playCue("accept");
       setRevealedId(authored.correctChoiceId);
-      if (!question.rationales?.length) {
-        setCorrectPanel(buildCorrectPanel(authored));
-      }
+      setCorrectPanel(buildCorrectPanel(authored));
+      setAnswerReady(true);
       return;
     }
     playCue("reject");
@@ -176,66 +174,11 @@ function QuizPlay({
     missesRef.current += 1;
     setRevealedId(authored.correctChoiceId);
     if (result === "empty") return;
-  }
-
-  async function pickRationale(id: string) {
-    if (disabled || rationaleId || pickedId === null) return;
-    if (authored && pickedId !== authored.correctChoiceId) return;
-    setRationaleId(id);
-    rationaleRef.current[index] = id;
-    if (onEvaluate) {
-      const result = await onEvaluate({
-        type: "quiz_rationale",
-        questionIndex: index,
-        rationaleId: id,
-      });
-      if (result.correct) {
-        playCue("accept");
-        setCorrectPanel(
-          result.feedback
-            ? { title: result.feedback.title, body: result.feedback.body, tone: "success" }
-            : authored
-              ? buildCorrectPanel(authored)
-              : null,
-        );
-        return;
-      }
-      missesRef.current += 1;
-      playCue("reject");
-      if (result.feedback) {
-        await onMiss({
-          title: result.feedback.title,
-          body: result.feedback.body,
-          tone: "miss",
-        });
-      }
-      return;
-    }
-    if (!authored) return;
-    const scored = scoreQuizRationale(authored, id);
-    if (scored.scored && !scored.correct) {
-      missesRef.current += 1;
-      playCue("reject");
-      const right = authored.rationales?.find((item) => item.id === authored.correctRationaleId);
-      await onMiss({
-        title: right?.text ?? "Stronger reason",
-        body: authored.why?.trim() || "Pick the reason that ties the evidence to the claim.",
-        tone: "miss",
-      });
-      return;
-    }
-    playCue("accept");
-    setCorrectPanel(buildCorrectPanel(authored));
+    setAnswerReady(true);
   }
 
   function next() {
-    if (pickedId === null) return;
-    if (question.rationales?.length && !rationaleId) {
-      const needs =
-        Boolean(onEvaluate) ||
-        (authored && pickedId === authored.correctChoiceId);
-      if (needs) return;
-    }
+    if (!answerReady || disabled) return;
     if (last) {
       onFinish(
         game.questions.length - missesRef.current,
@@ -244,25 +187,16 @@ function QuizPlay({
         {
           type: "quiz",
           choices: game.questions.map((_, i) => choicesRef.current[i] ?? ""),
-          rationales: rationaleRef.current.length
-            ? game.questions.map((_, i) => rationaleRef.current[i] ?? null)
-            : undefined,
         },
       );
       return;
     }
     setIndex((i) => i + 1);
     setPickedId(null);
-    setRationaleId(null);
+    setAnswerReady(false);
     setCorrectPanel(null);
     setRevealedId(null);
   }
-
-  const needsRationale = Boolean(question.rationales?.length) && pickedId !== null && (
-    Boolean(onEvaluate) || (authored != null && pickedId === authored.correctChoiceId)
-  );
-  const canAdvance =
-    pickedId !== null && (!needsRationale || rationaleId !== null);
 
   return (
     <GameBoard scene="quiz" step={`Question ${index + 1} of ${game.questions.length}`}>
@@ -323,32 +257,6 @@ function QuizPlay({
           );
         })}
       </ul>
-      {needsRationale ? (
-        <div className="space-y-2 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
-          <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
-            Why is this the strongest evidence?
-          </p>
-          {question.rationales!.map((item) => {
-            const on = rationaleId === item.id;
-            const right = item.id === (authored?.correctRationaleId ?? rationaleId);
-            let tone = "bg-white ring-black/10";
-            if (rationaleId && on && right) tone = "bg-emerald-100 ring-emerald-300";
-            else if (rationaleId && on && !right) tone = "bg-rose-100 ring-rose-300";
-            else if (rationaleId && right) tone = "bg-emerald-50 ring-emerald-200";
-            return (
-              <button
-                key={item.id}
-                type="button"
-                disabled={disabled || rationaleId !== null}
-                onClick={() => void pickRationale(item.id)}
-                className={`w-full rounded-2xl px-3 py-2.5 text-left text-sm font-bold ring-2 ${tone}`}
-              >
-                {item.text}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
       {correctPanel ? (
         <div className="motion-artifact rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-950 ring-1 ring-emerald-200">
           <p className="text-[10px] font-extrabold uppercase tracking-wide text-emerald-700">
@@ -362,7 +270,7 @@ function QuizPlay({
           ) : null}
         </div>
       ) : null}
-      {canAdvance ? (
+      {answerReady ? (
         <button
           type="button"
           onClick={next}
@@ -396,7 +304,7 @@ function QuizBuild({
   return (
     <div className="space-y-4">
       <p className="text-sm font-semibold text-slate-500">
-        Use Quick check for recall. Use Evidence duel for a claim, sources, and a structured reason.
+        Write a question, add choices, and mark one correct answer.
       </p>
       <div className="flex flex-wrap gap-2">
         {game.questions.map((q, i) => (
@@ -409,20 +317,6 @@ function QuizBuild({
             }`}
           >
             Q{i + 1}
-          </button>
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {(["recall", "evidence"] as const).map((kind) => (
-          <button
-            key={kind}
-            type="button"
-            onClick={() => patch({ ...question, kind })}
-            className={`rounded-full px-3 py-1.5 text-xs font-extrabold ${
-              question.kind === kind ? "bg-amber-500 text-white" : "bg-amber-50 text-amber-900"
-            }`}
-          >
-            {kind === "recall" ? "Quick check" : "Evidence duel"}
           </button>
         ))}
       </div>
@@ -489,7 +383,7 @@ function QuizBuild({
         Add choice
       </button>
       <label className="block text-xs font-extrabold text-slate-500">
-        Why (miss)
+        Feedback after a wrong answer
         <textarea
           value={question.why ?? ""}
           onChange={(e) => patch({ ...question, why: e.target.value || undefined })}
@@ -498,7 +392,7 @@ function QuizBuild({
         />
       </label>
       <label className="block text-xs font-extrabold text-slate-500">
-        Why correct
+        Feedback after a correct answer
         <textarea
           value={question.whyCorrect ?? ""}
           onChange={(e) => patch({ ...question, whyCorrect: e.target.value || undefined })}

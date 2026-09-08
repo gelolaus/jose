@@ -61,6 +61,26 @@ describe("CurriculumService", () => {
     });
   });
 
+  it("enforces the matching deadline across repeated starts and grades timeout as zero", async () => {
+    const mod = await service.createModule({ title: "Matching timer", subtitle: "Rules", coverColor: "#38BDF8" }, teacherUser(teacher));
+    const level = await service.createLevel(mod.sections[0]!.id, { title: "Matching", kind: "game", gameType: "memory" });
+    await expect(service.createLevel(mod.sections[0]!.id, { title: "Retired", kind: "game", gameType: "case-files" })).rejects.toThrow(/retired/i);
+    await database.db.update(modules).set({ published: true }).where(eq(modules.id, mod.id));
+    const play = await service.getPlayLevel(level.id, student.learnerId);
+    const id = play.attempt!.id;
+    await expect(service.finishAttempt(id, { answers: { type: "memory", matches: [], timedOut: true } }, student.learnerId)).rejects.toThrow(/start/i);
+    const start = await service.evaluateAttempt(id, { type: "memory_start" }, student.learnerId);
+    expect(start.remainingMs).toBeGreaterThan(0);
+    const [attempt] = await database.db.select().from(attempts).where(eq(attempts.id, id));
+    const events = JSON.parse(attempt!.eventsJson!);
+    events[0].at = Date.now() - 61_000;
+    await database.db.update(attempts).set({ eventsJson: JSON.stringify(events) }).where(eq(attempts.id, id));
+    const resumed = await service.evaluateAttempt(id, { type: "memory_start" }, student.learnerId);
+    expect(resumed.remainingMs).toBe(0);
+    const finished = await service.finishAttempt(id, { answers: { type: "memory", matches: [] } }, student.learnerId);
+    expect(finished.score).toBe(0);
+  });
+
   afterAll(async () => {
     await database?.onModuleDestroy();
     await moduleRef?.close();

@@ -1,18 +1,15 @@
 "use client";
 
 import {
-  pairExplanation,
   type AssessmentMemory,
   type MemoryGame as MemoryContent,
 } from "@jose/shared";
 import { Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMotionSound } from "@/lib/motion-sound";
 import {
-  applyMismatch,
   clockMs,
   formatClock,
-  roundPhase,
 } from "./memory-round";
 import { GameBoard } from "./game-board";
 import type { PlayBoardProps } from "./play-types";
@@ -28,6 +25,9 @@ type Card = {
 
 const FLIP_BACK_MS = 700;
 const TICK_MS = 100;
+
+// Read the wall clock only from event handlers and timer callbacks.
+const eventTime = () => Date.now();
 
 function shuffle<T>(items: T[]): T[] {
   const next = [...items];
@@ -83,390 +83,151 @@ function isAuthorMemory(game: MemoryPlayContent): game is MemoryContent {
   return "pairs" in game;
 }
 
-export function MemoryGame({
-  game,
-  mode = "play",
-  disabled = false,
-  onMiss,
-  onFinish,
-  onEvaluate,
-  onHeartsEmpty,
-  onChange,
-}: {
+export function MemoryGame({ game, mode = "play", disabled = false, onFinish, onEvaluate, onChange }: {
   game: MemoryPlayContent;
   mode?: "play" | "build";
   disabled?: boolean;
   onChange?: (game: MemoryContent) => void;
 } & Partial<PlayBoardProps>) {
-  if (mode === "build" && onChange && isAuthorMemory(game)) {
-    return <MemoryBuild game={game} onChange={onChange} />;
-  }
-  if (!onMiss || !onFinish) return null;
-  return (
-    <MemoryPlay
-      game={game}
-      disabled={disabled}
-      onMiss={onMiss}
-      onFinish={onFinish}
-      onEvaluate={onEvaluate}
-      onHeartsEmpty={onHeartsEmpty}
-    />
-  );
+  if (mode === "build" && onChange && isAuthorMemory(game)) return <MemoryBuild game={game} onChange={onChange} />;
+  if (!onFinish) return null;
+  return <MemoryPlay key={JSON.stringify(game)} game={game} disabled={disabled} onFinish={onFinish} onEvaluate={onEvaluate} />;
 }
 
-function MemoryPlay({
-  game,
-  disabled,
-  onMiss,
-  onFinish,
-  onEvaluate,
-  onHeartsEmpty,
-}: { game: MemoryPlayContent } & PlayBoardProps) {
+function MemoryPlay({ game, disabled, onFinish, onEvaluate }: { game: MemoryPlayContent } & Pick<PlayBoardProps, "disabled" | "onFinish" | "onEvaluate">) {
   const author = isAuthorMemory(game);
   const pairCount = author ? game.pairs.length : game.pairCount;
-  const timed = author ? game.playMode === "timed" : false;
-  const timing = author ? game.timing : undefined;
-  const [cards, setCards] = useState(() =>
-    author ? buildDeck(game.pairs) : assessmentCards(game),
-  );
+  const duration = !author && game.durationMs ? game.durationMs : clockMs(pairCount);
+  const [cards, setCards] = useState(() => author ? buildDeck(game.pairs) : assessmentCards(game));
   const [flipped, setFlipped] = useState<string[]>([]);
-  const [matched, setMatched] = useState<Set<number>>(new Set());
-  const [lock, setLock] = useState(false);
+  const [matched, setMatched] = useState<Set<string>>(new Set());
+  const [locked, setLocked] = useState(false);
   const [started, setStarted] = useState(false);
-  const [remainingMs, setRemainingMs] = useState(() => clockMs(pairCount, timing));
-  const [whyPair, setWhyPair] = useState<number | null>(null);
-  const [artifact, setArtifact] = useState<string | null>(null);
-  const [lost, setLost] = useState(false);
-  const [lostEmpty, setLostEmpty] = useState(false);
-  const [hit, setHit] = useState(false);
-  const [shake, setShake] = useState(false);
+  const [remainingMs, setRemainingMs] = useState(duration);
+  const [error, setError] = useState<string | null>(null);
   const { playCue } = useMotionSound();
-
-  const flippedRef = useRef<string[]>([]);
-  const matchedRef = useRef<Set<number>>(new Set());
-  const remainingRef = useRef(clockMs(pairCount, timing));
-  const startedRef = useRef(false);
-  const missesRef = useRef(0);
-  const endingRef = useRef(false);
-  const onMissRef = useRef(onMiss);
-  const onFinishRef = useRef(onFinish);
-  const lostDialogRef = useRef<HTMLDivElement>(null);
-  const [matchedIds, setMatchedIds] = useState<Set<string>>(new Set());
-  const matchedIdsRef = useRef<Set<string>>(new Set());
-  const matchesRef = useRef<{ cardA: string; cardB: string }[]>([]);
-  const onEvaluateRef = useRef(onEvaluate);
-
+  const state = useRef({ flipped: [] as string[], matched: new Set<string>(), matches: [] as {cardA: string; cardB: string}[], deadline: 0, locked: false, ended: false, alive: true });
+  const callbacks = useRef({ onFinish, onEvaluate });
+  useEffect(() => { callbacks.current = { onFinish, onEvaluate }; }, [onFinish, onEvaluate]);
   useEffect(() => {
-    onMissRef.current = onMiss;
-    onFinishRef.current = onFinish;
-    onEvaluateRef.current = onEvaluate;
-  }, [onFinish, onMiss, onEvaluate]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setCards(author ? deal(game.pairs) : assessmentCards(game));
-    }, 0);
-    return () => window.clearTimeout(timer);
+    const round = state.current;
+    round.alive = true;
+    const dealTimer = window.setTimeout(() => { if (!round.deadline) setCards(author ? deal(game.pairs) : assessmentCards(game)); }, 0);
+    return () => { round.alive = false; window.clearTimeout(dealTimer); };
   }, [author, game]);
 
-  useEffect(() => {
-    if (lost) lostDialogRef.current?.focus();
-  }, [lost]);
-
-  function resetBoard() {
-    endingRef.current = false;
-    startedRef.current = false;
-    missesRef.current = 0;
-    flippedRef.current = [];
-    matchedRef.current = new Set();
-    matchedIdsRef.current = new Set();
-    matchesRef.current = [];
-    remainingRef.current = clockMs(pairCount, timing);
-    setFlipped([]);
-    setMatched(new Set());
-    setMatchedIds(new Set());
-    setLock(false);
-    setStarted(false);
-    setRemainingMs(clockMs(pairCount, timing));
-    setWhyPair(null);
-    setArtifact(null);
-    setLost(false);
-    setLostEmpty(false);
-    setHit(false);
-    setShake(false);
-    setCards(author ? deal(game.pairs) : assessmentCards(game));
+  const finish = useCallback((timedOut: boolean) => {
+    const round = state.current;
+    if (round.ended || !round.alive) return;
+    round.ended = true;
+    round.locked = true;
+    setLocked(true);
+    callbacks.current.onFinish(timedOut ? 0 : pairCount, pairCount, timedOut ? pairCount : 0, {
+      type: "memory", matches: [...round.matches], ...(timedOut ? { timedOut: true } : {}),
+    });
+  }, [pairCount]);
+  function expired() {
+    if (!state.current.alive || state.current.ended) return true;
+    if (state.current.deadline && eventTime() >= state.current.deadline) { finish(true); return true; }
+    return false;
   }
-
-  async function lose() {
-    if (endingRef.current) return;
-    endingRef.current = true;
-    setLock(true);
-    setLost(true);
-    const result = await onMissRef.current(null, { hold: true });
-    setLostEmpty(result === "empty");
-  }
-
   useEffect(() => {
-    if (!timed || !started || disabled || lost) return;
+    if (!started) return;
     const id = window.setInterval(() => {
-      if (endingRef.current) return;
-      remainingRef.current = Math.max(0, remainingRef.current - TICK_MS);
-      setRemainingMs(remainingRef.current);
-      const phase = roundPhase({
-        started: true,
-        remainingMs: remainingRef.current,
-        matchedCount: matchedRef.current.size,
-        pairCount,
-        timed: true,
-      });
-      if (phase === "lost") void lose();
+      const round = state.current;
+      if (round.ended || !round.alive) return;
+      const left = Math.max(0, round.deadline - eventTime());
+      setRemainingMs(left);
+      if (left === 0) finish(true);
     }, TICK_MS);
     return () => window.clearInterval(id);
-  }, [timed, started, disabled, lost, pairCount]);
+  }, [started, finish]);
 
   async function flip(card: Card) {
-    if (disabled || lock || lost || endingRef.current) return;
-    const already =
-      onEvaluateRef.current
-        ? matchedIdsRef.current.has(card.id)
-        : matched.has(card.pairIndex);
-    if (already || flippedRef.current.includes(card.id)) return;
-
-    if (!startedRef.current) {
-      startedRef.current = true;
-      setStarted(true);
-    }
-
-    const next = [...flippedRef.current, card.id];
-    flippedRef.current = next;
-    setFlipped(next);
+    const round = state.current;
+    if (disabled || round.locked || expired() || round.matched.has(card.id) || round.flipped.includes(card.id)) return;
+    setError(null);
+    const firstFlip = !round.deadline;
+    if (firstFlip) { round.deadline = eventTime() + duration; setStarted(true); }
+    round.flipped = [...round.flipped, card.id];
+    setFlipped(round.flipped);
     playCue("select");
-    if (next.length === 1) return;
-
-    const first = cards.find((item) => item.id === next[0]);
-    const second = cards.find((item) => item.id === next[1]);
-    if (!first || !second) return;
-
-    const finishIfDone = (matchedCount: number) => {
-      if (matchedCount !== pairCount) return;
-      endingRef.current = true;
-      playCue("artifact");
-      onFinishRef.current(pairCount - missesRef.current, pairCount, missesRef.current, {
-        type: "memory",
-        matches: matchesRef.current,
-      });
-    };
-
-    if (onEvaluateRef.current) {
-      setLock(true);
-      const result = await onEvaluateRef.current({
-        type: "memory_match",
-        cardA: first.id,
-        cardB: second.id,
-      });
-      if (result.correct) {
-        matchesRef.current.push({ cardA: first.id, cardB: second.id });
-        const nextIds = new Set(matchedIdsRef.current);
-        nextIds.add(first.id);
-        nextIds.add(second.id);
-        matchedIdsRef.current = nextIds;
-        setMatchedIds(nextIds);
-        if (result.feedback) {
-          setWhyPair(0);
-          setArtifact(result.feedback.body);
+    if (firstFlip && callbacks.current.onEvaluate) {
+      round.locked = true; setLocked(true);
+      try {
+        const result = await callbacks.current.onEvaluate({ type: "memory_start" });
+        if (expired()) return;
+        if (result.remainingMs !== undefined) {
+          round.deadline = Math.min(round.deadline, eventTime() + result.remainingMs);
+          setRemainingMs(Math.max(0, round.deadline - eventTime()));
+          if (expired()) return;
         }
-        playCue("match");
-        flippedRef.current = [];
-        setFlipped([]);
-        setLock(false);
-        finishIfDone(nextIds.size / 2);
-        return;
+      } catch {
+        if (expired()) return;
+        // Retry the idempotent start event on the next card tap.
+        round.deadline = 0; round.flipped = []; setFlipped([]); setStarted(false);
+        setError("Couldn't start the round. Tap a card to try again.");
+      } finally {
+        if (round.alive && !round.ended) { round.locked = false; setLocked(false); }
       }
-      missesRef.current += 1;
-      playCue("reject");
-      setHit(true);
-      setShake(true);
-      window.setTimeout(() => setHit(false), 400);
-      window.setTimeout(() => {
-        flippedRef.current = [];
-        setFlipped([]);
-        setLock(false);
-        setShake(false);
-      }, FLIP_BACK_MS);
       return;
     }
-
-    if (first.pairIndex === second.pairIndex) {
-      const nextMatched = new Set(matchedRef.current);
-      nextMatched.add(first.pairIndex);
-      matchedRef.current = nextMatched;
-      setMatched(nextMatched);
-      matchesRef.current.push({ cardA: first.id, cardB: second.id });
-      setWhyPair(first.pairIndex);
-      const pair = author ? game.pairs[first.pairIndex] : undefined;
-      setArtifact(pair?.artifactLabel?.trim() || pairExplanation(pair ?? {}) || null);
+    if (round.flipped.length < 2) return;
+    const first = cards.find(item => item.id === round.flipped[0])!;
+    round.locked = true; setLocked(true);
+    let correct = first.pairIndex === card.pairIndex;
+    try {
+      if (callbacks.current.onEvaluate) {
+        const result = await callbacks.current.onEvaluate({ type: "memory_match", cardA: first.id, cardB: card.id });
+        if (expired()) return;
+        correct = result.correct;
+      }
+    } catch {
+      if (expired()) return;
+      correct = false;
+      setError("Couldn't check that pair. Try again.");
+    }
+    if (expired()) return;
+    if (correct) {
+      round.matches.push({ cardA: first.id, cardB: card.id });
+      round.matched = new Set([...round.matched, first.id, card.id]);
+      setMatched(round.matched);
+      round.flipped = []; setFlipped([]);
+      round.locked = false; setLocked(false);
       playCue("match");
-      flippedRef.current = [];
-      setFlipped([]);
-      finishIfDone(nextMatched.size);
-      return;
+      if (round.matches.length === pairCount) finish(false);
+    } else {
+      window.setTimeout(() => {
+        if (expired()) return;
+        round.flipped = []; setFlipped([]);
+        round.locked = false; setLocked(false);
+      }, FLIP_BACK_MS);
     }
-
-    missesRef.current += 1;
-    if (timed) {
-      remainingRef.current = applyMismatch(remainingRef.current, timing);
-      setRemainingMs(remainingRef.current);
-    }
-    playCue("reject");
-    setHit(true);
-    setShake(true);
-    window.setTimeout(() => setHit(false), 400);
-    setLock(true);
-    window.setTimeout(() => {
-      flippedRef.current = [];
-      setFlipped([]);
-      setLock(false);
-      setShake(false);
-      const phase = roundPhase({
-        started: true,
-        remainingMs: remainingRef.current,
-        matchedCount: matchedRef.current.size,
-        pairCount,
-        timed,
-      });
-      if (phase === "lost") void lose();
-    }, FLIP_BACK_MS);
   }
-
-  const fact =
-    whyPair !== null && author
-      ? pairExplanation(game.pairs[whyPair] ?? {})
-      : artifact;
-
   return (
-    <GameBoard scene="memory" step="Tap two cards to match">
-    <div>
-      <div
-        className={`rounded-[1.75rem] p-3 shadow-[inset_0_0_0_3px_#245538,0_8px_0_#1a3d28] sm:p-5 ${
-          shake ? "snap-back" : ""
-        }`}
-        style={{
-          background:
-            "radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.12), transparent 50%), #2f6a45",
-        }}
-      >
-        <div className="mb-3 flex items-center justify-center gap-3 sm:mb-4">
-          {timed ? (
-            <p
-              className={`rounded-full border-[1.5px] border-amber-300 px-3 py-1 text-sm font-extrabold text-amber-100 ${
-                hit ? "clock-hit" : "bg-emerald-950"
-              }`}
-              aria-label={`${Math.ceil(remainingMs / 1000)} seconds left`}
-            >
-              {formatClock(remainingMs)}
-            </p>
-          ) : (
-            <p className="rounded-full border-[1.5px] border-amber-300/70 bg-emerald-950 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-amber-100">
-              Archive match · untimed
-            </p>
-          )}
-          <p className="text-xs font-extrabold uppercase tracking-wide text-emerald-100/80">
-            {(onEvaluate ? matchedIds.size / 2 : matched.size)} / {pairCount}
-          </p>
+    <GameBoard scene="memory" how="Flip two cards and find every pair before time runs out." step={started ? "Keep finding pairs!" : "Your first flip starts the timer"}>
+      <div className="rounded-3xl border-2 border-sky-100 bg-sky-50/70 p-3 sm:p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <p className="rounded-2xl border-2 border-sky-200 bg-white px-4 py-2 text-xl font-extrabold tabular-nums text-sky-700" role="timer" aria-label={`${Math.ceil(remainingMs / 1000)} seconds left`}>{formatClock(remainingMs)}</p>
+          <p className="text-sm font-extrabold text-slate-600" aria-live="polite">{matched.size / 2} / {pairCount} pairs</p>
         </div>
-        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-          {cards.map((card) => {
-            const open =
-              flipped.includes(card.id) ||
-              (onEvaluate ? matchedIds.has(card.id) : matched.has(card.pairIndex));
-            const label =
-              card.text?.trim() ||
-              card.alt?.trim() ||
-              `Archive card ${card.id}`;
-            return (
-              <li key={card.id} className="[perspective:1000px]">
-                <button
-                  type="button"
-                  data-card-id={card.id}
-                  aria-label={open ? `Revealed: ${label}` : "Hidden card"}
-                  aria-pressed={open}
-                  onClick={() => void flip(card)}
-                  className="block w-full [transform-style:preserve-3d]"
-                >
-                  <span
-                    className={`card-flip relative block aspect-[3/4] w-full ${
-                      open ? "card-flip-open" : ""
-                    }`}
-                  >
-                    <span className="card-face absolute inset-0 overflow-hidden rounded-xl border-2 border-amber-300 bg-gradient-to-br from-violet-700 to-violet-950 shadow-[0_4px_0_#3b0764] sm:rounded-2xl">
-                      <span
-                        className="absolute inset-1.5 rounded-lg border border-amber-300/50 sm:inset-2 sm:rounded-xl"
-                        aria-hidden
-                      />
-                      <span className="relative flex h-full items-center justify-center font-display text-2xl text-amber-300 sm:text-3xl">
-                        ★
-                      </span>
-                    </span>
-                    <span className="card-face card-face-front absolute inset-0 overflow-hidden rounded-xl border-2 border-amber-200 bg-[#fff8ef] shadow-[0_4px_0_#c4b48a] sm:rounded-2xl">
-                      <CardFace text={card.text} imageUrl={card.imageUrl} alt={card.alt} />
-                    </span>
-                  </span>
-                </button>
-              </li>
-            );
+        <div className="mb-4 h-3 overflow-hidden rounded-full bg-sky-100" role="progressbar" aria-label="Pairs matched" aria-valuenow={matched.size / 2} aria-valuemin={0} aria-valuemax={pairCount}>
+          <div className="h-full rounded-full bg-lime-500 transition-all" style={{ width: `${pairCount ? matched.size / 2 / pairCount * 100 : 0}%` }} />
+        </div>
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {cards.map((card, index) => {
+            const done = matched.has(card.id), open = done || flipped.includes(card.id);
+            const label = card.text?.trim() || card.alt?.trim() || "Image card";
+            return <li key={card.id}>
+              <button type="button" data-card-id={card.id} aria-label={open ? `Revealed: ${label}` : "Hidden card"} aria-pressed={open} disabled={disabled || locked || done} onClick={() => void flip(card)} className={`relative block min-h-32 w-full rounded-2xl border-2 border-b-[5px] p-2 transition-transform focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-sky-500 active:translate-y-1 sm:min-h-40 ${done ? "border-lime-500 bg-lime-50" : open ? "border-sky-300 bg-white" : index % 2 ? "border-lime-600 bg-lime-500 text-white" : "border-sky-600 bg-sky-400 text-white"}`}>
+                {open ? <CardFace text={card.text} imageUrl={card.imageUrl} alt={card.alt} /> : <span aria-hidden="true" className="text-4xl font-extrabold">?</span>}
+                {done ? <span aria-hidden="true" className="absolute right-1 top-1 rounded-full bg-lime-500 px-1.5 text-xs font-extrabold text-white">✓</span> : null}
+              </button>
+            </li>;
           })}
         </ul>
+        {error ? <p role="status" className="mt-3 text-sm text-slate-600">{error}</p> : null}
       </div>
-      {fact ? (
-        <div className="motion-artifact mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 ring-1 ring-amber-200">
-          <p>{fact}</p>
-          {artifact ? (
-            <p className="mt-2 text-xs font-extrabold uppercase tracking-wide text-amber-700">
-              Artifact collected: {artifact}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-      {lost ? (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 p-4 sm:items-center">
-          <div
-            ref={lostDialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="memory-timeout-title"
-            tabIndex={-1}
-            className="w-full max-w-md rounded-[1.75rem] bg-white p-5 shadow-xl outline-none ring-2 ring-amber-200 sm:p-6"
-          >
-            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-600">
-              Timed challenge
-            </p>
-            <h2 id="memory-timeout-title" className="mt-2 font-display text-2xl font-semibold text-slate-800">
-              Time’s up
-            </h2>
-            <p className="mt-2 text-base font-semibold leading-relaxed text-slate-600">
-              Timed results stay separate from the untimed archive match used for learning.
-            </p>
-            {lostEmpty ? (
-              <button
-                type="button"
-                onClick={() => onHeartsEmpty?.()}
-                className="mt-5 w-full rounded-full bg-violet-600 px-5 py-3.5 text-base font-extrabold text-white shadow-md"
-              >
-                Take a break
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={resetBoard}
-                className="mt-5 w-full rounded-full bg-violet-600 px-5 py-3.5 text-base font-extrabold text-white shadow-md"
-              >
-                Try again
-              </button>
-            )}
-          </div>
-        </div>
-      ) : null}
-    </div>
     </GameBoard>
   );
 }
@@ -483,7 +244,7 @@ function CardFace({
   if (imageUrl) {
     return (
       <span className="flex h-full flex-col items-center justify-center gap-1.5 p-2">
-        <span className="flex aspect-[3/4] w-[72%] max-h-[78%] items-end justify-center overflow-hidden rounded-full border-2 border-amber-400 bg-amber-100">
+        <span className="flex aspect-[3/4] w-[72%] max-h-[78%] items-end justify-center overflow-hidden rounded-xl border-2 border-sky-200 bg-sky-50">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imageUrl}
@@ -501,7 +262,7 @@ function CardFace({
   }
   return (
     <span className="flex h-full items-center justify-center p-3">
-      <span className="font-display text-sm font-semibold leading-snug text-slate-800 sm:text-base">
+      <span className="text-sm font-bold leading-snug text-slate-800 sm:text-base">
         {text}
       </span>
     </span>
@@ -518,67 +279,8 @@ function MemoryBuild({
   return (
     <div className="space-y-4">
       <p className="text-sm font-semibold text-slate-500">
-        Archive Match defaults to untimed learning. Add an explanation so every pair teaches why it
-        belongs together. Timed challenge is optional.
+        Add pairs for students to match. They have 15 seconds per pair, with at least one minute to play.
       </p>
-      <div className="flex flex-wrap gap-2">
-        {(["learning", "timed"] as const).map((playMode) => (
-          <button
-            key={playMode}
-            type="button"
-            onClick={() => onChange({ ...game, playMode })}
-            className={`rounded-full px-3 py-1.5 text-xs font-extrabold ${
-              game.playMode === playMode ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600"
-            }`}
-          >
-            {playMode === "learning" ? "Learning (untimed)" : "Timed challenge"}
-          </button>
-        ))}
-      </div>
-      {game.playMode === "timed" ? (
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="text-xs font-extrabold text-slate-500">
-            Seconds per pair
-            <input
-              type="number"
-              min={3}
-              max={60}
-              value={game.timing?.secondsPerPair ?? 8}
-              onChange={(e) =>
-                onChange({
-                  ...game,
-                  timing: {
-                    ...game.timing,
-                    secondsPerPair: Number(e.target.value) || 8,
-                    mismatchPenaltyMs: game.timing?.mismatchPenaltyMs ?? 3000,
-                  },
-                })
-              }
-              className="mt-1 w-full rounded-xl bg-white px-3 py-2 font-bold ring-1 ring-black/10"
-            />
-          </label>
-          <label className="text-xs font-extrabold text-slate-500">
-            Mismatch penalty (ms)
-            <input
-              type="number"
-              min={0}
-              max={30000}
-              step={500}
-              value={game.timing?.mismatchPenaltyMs ?? 3000}
-              onChange={(e) =>
-                onChange({
-                  ...game,
-                  timing: {
-                    secondsPerPair: game.timing?.secondsPerPair ?? 8,
-                    mismatchPenaltyMs: Number(e.target.value) || 0,
-                  },
-                })
-              }
-              className="mt-1 w-full rounded-xl bg-white px-3 py-2 font-bold ring-1 ring-black/10"
-            />
-          </label>
-        </div>
-      ) : null}
       {game.pairs.map((pair, i) => (
         <div key={pair.id} className="space-y-2 rounded-[1.5rem] bg-violet-50 p-3 ring-1 ring-violet-100">
           <div className="grid gap-2 sm:grid-cols-2">
@@ -605,30 +307,6 @@ function MemoryBuild({
               }}
             />
           </div>
-          <input
-            value={pair.explanation ?? pair.why ?? ""}
-            placeholder="Why these match"
-            onChange={(e) => {
-              const pairs = [...game.pairs];
-              pairs[i] = {
-                ...pair,
-                explanation: e.target.value || undefined,
-                why: e.target.value || undefined,
-              };
-              onChange({ ...game, pairs });
-            }}
-            className="w-full rounded-xl bg-white px-3 py-2 text-sm font-semibold"
-          />
-          <input
-            value={pair.artifactLabel ?? ""}
-            placeholder="Artifact label (optional)"
-            onChange={(e) => {
-              const pairs = [...game.pairs];
-              pairs[i] = { ...pair, artifactLabel: e.target.value || undefined };
-              onChange({ ...game, pairs });
-            }}
-            className="w-full rounded-xl bg-white px-3 py-2 text-sm font-semibold"
-          />
         </div>
       ))}
       <button
@@ -640,7 +318,7 @@ function MemoryBuild({
             pairs: [
               ...game.pairs,
               {
-                id: `pair-${Date.now()}`,
+                id: `pair-${eventTime()}`,
                 a: { text: "New A" },
                 b: { text: "New B" },
                 explanation: "Explain the link.",

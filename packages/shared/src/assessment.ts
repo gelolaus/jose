@@ -9,6 +9,8 @@ import {
   type SortGame,
   type TimelineGame,
   pairExplanation,
+  simplifyGameContent,
+  memoryDurationMs,
   pieceCount,
   shuffledCopy,
   normalizeBlankKey,
@@ -143,6 +145,7 @@ export const assessmentSortSchema = z.object({
 /** Memory cards with opaque ids — pair map stays server-side. */
 export const assessmentMemorySchema = z.object({
   type: z.literal("memory"),
+  durationMs: z.number().int().positive().optional(),
   pairCount: z.number().int().min(2).max(8),
   cards: z
     .array(
@@ -186,6 +189,7 @@ export const attemptInfoSchema = z.object({
 export type AttemptInfo = z.infer<typeof attemptInfoSchema>;
 
 export const attemptEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("memory_start") }),
   z.object({
     type: z.literal("quiz_choice"),
     questionIndex: z.number().int().nonnegative(),
@@ -244,6 +248,7 @@ export const finishAnswersSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("memory"),
+    timedOut: z.boolean().optional(),
     matches: z
       .array(
         z.object({
@@ -251,7 +256,7 @@ export const finishAnswersSchema = z.discriminatedUnion("type", [
           cardB: z.string().trim().min(1),
         }),
       )
-      .min(1),
+      .min(0),
   }),
   z.object({
     type: z.literal("case-files"),
@@ -297,6 +302,7 @@ export const finishAttemptBodySchema = z
   });
 
 export const evaluateEventResultSchema = z.object({
+  remainingMs: z.number().int().nonnegative().optional(),
   correct: z.boolean(),
   perfect: z.boolean().optional(),
   correctIds: z.array(z.string()).optional(),
@@ -357,6 +363,7 @@ export function sanitizeGameForAssessment(
   game: GameContent,
   secret?: AssessmentSecret,
 ): { play: AssessmentGame; secret: AssessmentSecret } {
+  game = simplifyGameContent(game);
   switch (game.type) {
     case "quiz":
       return {
@@ -478,6 +485,7 @@ export function buildMemoryAssessment(
   return {
     play: {
       type: "memory",
+      durationMs: memoryDurationMs(game.pairs.length),
       pairCount: game.pairs.length,
       cards: shuffledCopy(cards),
     },
@@ -597,12 +605,12 @@ export function evaluateMemoryMatch(
   whyForPair: (pairIndex: number) => string | undefined,
 ): EvaluateEventResult {
   if (cardA === cardB) {
-    return { correct: false, feedback: null, misses: 1 };
+    return { correct: false, feedback: null, misses: 0 };
   }
   const a = pairMap[cardA];
   const b = pairMap[cardB];
   if (a === undefined || b === undefined || a !== b) {
-    return { correct: false, feedback: null, misses: 1 };
+    return { correct: false, feedback: null, misses: 0 };
   }
   const why = whyForPair(a)?.trim();
   return {
@@ -726,6 +734,7 @@ export function gradeAssessmentFinish(
   priorMisses: number,
   secret?: AssessmentSecret,
 ): GradedAttempt {
+  game = simplifyGameContent(game);
   switch (answers.type) {
     case "quiz": {
       if (game.type !== "quiz") throw new Error("Answer type mismatch");
@@ -739,13 +748,6 @@ export function gradeAssessmentFinish(
           typeof choice === "number" ? question.choices[choice]?.id : choice;
         if (choiceId !== question.correctChoiceId) misses += 1;
       });
-      if (answers.rationales?.length) {
-        answers.rationales.forEach((rationaleId, index) => {
-          const question = game.questions[index]!;
-          if (!question.correctRationaleId) return;
-          if (rationaleId !== question.correctRationaleId) misses += 1;
-        });
-      }
       return gradeFromMisses(game, misses);
     }
     case "blank": {
@@ -764,12 +766,6 @@ export function gradeAssessmentFinish(
       if (game.type !== "timeline") throw new Error("Answer type mismatch");
       const check = evaluateTimelineCheck(game, answers.order);
       if (!check.perfect) throw new Error("Timeline is not complete");
-      if (game.causalLink) {
-        if (!answers.causalChoiceId) throw new Error("Causal choice missing");
-        const causal = evaluateTimelineCausal(game, answers.causalChoiceId);
-        if (!causal.correct) throw new Error("Causal choice is not complete");
-        return gradeFromMisses(game, priorMisses + causal.misses);
-      }
       return gradeFromMisses(game, priorMisses);
     }
     case "sort": {
@@ -780,6 +776,7 @@ export function gradeAssessmentFinish(
     }
     case "memory": {
       if (game.type !== "memory") throw new Error("Answer type mismatch");
+      if (answers.timedOut) return { ...gradeFromMisses(game, game.pairs.length), score: 0 };
       const pairMap = secret?.memoryPairMap;
       if (!pairMap) throw new Error("Memory pair map missing");
       const matchedPairs = new Set<number>();
@@ -797,7 +794,7 @@ export function gradeAssessmentFinish(
       if (matchedPairs.size !== game.pairs.length) {
         throw new Error("Memory matches incomplete");
       }
-      return gradeFromMisses(game, priorMisses);
+      return gradeFromMisses(game, 0);
     }
     case "case-files":
     case "dispatches":
