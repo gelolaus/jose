@@ -4,6 +4,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  HttpCode,
   Patch,
   Post,
   Query,
@@ -46,13 +47,27 @@ export class AuthController {
   ) {}
 
   @Get("status")
-  status() {
-    return this.auth.getStatus();
+  status(@Req() req: Request) {
+    return this.auth.getStatus(req);
   }
 
   @Get("me")
   async me(@Req() req: Request) {
     return this.auth.me(readSessionToken(req));
+  }
+
+  @Post("dev/login")
+  async devLogin(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const { token, me } = await this.auth.localDevLogin(req);
+    const config = this.auth.getRuntimeConfig();
+    this.setSessionCookie(res, token, config.cookieSecure, config.sessionTtlSeconds);
+    return me;
+  }
+
+  @Post("dev/role")
+  @HttpCode(200)
+  async devRole(@Req() req: Request, @Body() body: unknown) {
+    return this.auth.localDevSwitchRole(req, readSessionToken(req), body);
   }
 
   @Patch("profile")

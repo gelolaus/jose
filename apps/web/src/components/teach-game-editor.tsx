@@ -81,13 +81,8 @@ export function GameEditor({
         <GameFrame
           title="Playtest"
           hint="Hearts are off. This is only for you."
-          wide={
-            draft.type === "timeline" ||
-            draft.type === "case-files" ||
-            draft.type === "dispatches" ||
-            draft.type === "editorial" ||
-            draft.type === "dapitan"
-          }
+          scene={draft.type}
+          wide
         >
           <GameSwitch
             key={playKey}

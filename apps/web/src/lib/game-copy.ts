@@ -13,13 +13,13 @@ export function hintFor(type: GameContent["type"]) {
     case "blank":
       return "Restore the missing word in the sourced passage.";
     case "case-files":
-      return "Inspect the documents, tag evidence, then defend a conclusion.";
+      return "Read the claim. Tap the evidence that supports it best.";
     case "dispatches":
-      return "Open each stop from the list (or map), then send a short dispatch.";
+      return "Follow Rizal’s route. Tap the place that comes next.";
     case "editorial":
-      return "Build a coherent editorial. More than one structure can work.";
+      return "Put these three pieces in order: Claim, Evidence, Conclusion.";
     case "dapitan":
-      return "Plan projects with limited resources. Undo anytime — no timers.";
+      return "Choose the action that best helps the community.";
   }
 }
 
@@ -36,12 +36,16 @@ export function labelFor(type: GameContent["type"]) {
     case "blank":
       return "Restore the passage";
     case "case-files":
-      return "Case Files";
+      return "Find the proof";
     case "dispatches":
-      return "Dispatches";
+      return "Choose the next stop";
     case "editorial":
-      return "Editorial";
+      return "Build the story";
     case "dapitan":
-      return "Dapitan";
+      return "Choose the best plan";
   }
+}
+
+export function howToPlay(type: GameContent["type"]) {
+  return hintFor(type);
 }

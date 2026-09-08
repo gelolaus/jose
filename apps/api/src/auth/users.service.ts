@@ -1,14 +1,17 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import {
   DEFAULT_AVATAR_ID,
+  isLocalDevTestEmail,
   MAX_HEARTS,
   roleFromAdmissionEmail,
   userRoleSchema,
+  type LocalDevRole,
   type SessionUser,
   type UserRole,
 } from "@jose/shared";
@@ -157,6 +160,29 @@ export class UsersService {
     }
     if (existing.role === "admin") {
       throw new BadRequestException("Admin accounts cannot be demoted through this route");
+    }
+    await this.db
+      .update(users)
+      .set({ role: input.role, updatedAt: Date.now() })
+      .where(eq(users.id, existing.id));
+    return this.requireById(existing.id);
+  }
+
+  /**
+   * Localhost Arlaus shortcut only. May set student, teacher, or admin and may
+   * demote that same account so the local switch can return to Student.
+   * Production role grants still cannot assign admin.
+   */
+  async setLocalDevTestRole(input: {
+    email: string;
+    role: LocalDevRole;
+  }): Promise<SessionUser> {
+    if (!isLocalDevTestEmail(input.email)) {
+      throw new ForbiddenException("This switch exists only for the local test account.");
+    }
+    const existing = await this.findByAdmissionEmail(input.email);
+    if (!existing) {
+      throw new NotFoundException("No Jose account for that APC mailbox yet.");
     }
     await this.db
       .update(users)

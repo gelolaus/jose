@@ -85,6 +85,11 @@ export const authStatusSchema = z.object({
   demoMode: z.boolean().default(false),
   allowedDomains: z.array(z.string()),
   webOrigin: z.string().nullable(),
+  /**
+   * True only when THIS request is a local non-production loopback call.
+   * Clients must not infer this from window.location.
+   */
+  localDevAccess: z.boolean().default(false),
 });
 export type AuthStatus = z.infer<typeof authStatusSchema>;
 
@@ -155,6 +160,31 @@ export const grantRoleBodySchema = z.object({
   role: z.enum(["student", "teacher"]),
 });
 export type GrantRoleBody = z.infer<typeof grantRoleBodySchema>;
+
+/** Exact mailbox allowed to use the localhost-only development login. */
+export const LOCAL_DEV_TEST_EMAIL = "arlaus@student.apc.edu.ph";
+
+export const localDevRoleSchema = z.enum(["student", "teacher", "admin"]);
+export type LocalDevRole = z.infer<typeof localDevRoleSchema>;
+
+/** Local role switch body. Only the Arlaus localhost shortcut may send admin. */
+export const localDevRoleBodySchema = z
+  .object({
+    role: localDevRoleSchema,
+  })
+  .strict();
+export type LocalDevRoleBody = z.infer<typeof localDevRoleBodySchema>;
+
+export function normalizeAdmissionEmail(email: string): string {
+  const trimmed = email.trim();
+  const at = trimmed.lastIndexOf("@");
+  if (at < 0) return trimmed.toLowerCase();
+  return `${trimmed.slice(0, at).toLowerCase()}@${trimmed.slice(at + 1).toLowerCase()}`;
+}
+
+export function isLocalDevTestEmail(email: string): boolean {
+  return normalizeAdmissionEmail(email) === LOCAL_DEV_TEST_EMAIL;
+}
 
 export const grantCollaboratorBodySchema = z.object({
   email: z.string().email(),

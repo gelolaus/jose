@@ -14,6 +14,7 @@ import {
   scoredSortItems,
 } from "./sort-grade";
 import { PlaceGhost, usePlaceDrag } from "./use-place-drag";
+import { GameBoard } from "./game-board";
 
 const CHEST_BODY = ["#f59e0b", "#f97316", "#eab308"] as const;
 const CHEST_SHADOW = ["#d97706", "#c2410c", "#a16207"] as const;
@@ -198,20 +199,23 @@ function SortPlay({
 
   if (phase === "discussion") {
     return (
-      <DiscussionReview
-        items={discussionSortItems(game.items).filter((item) => discussionIds.includes(item.id))}
-        selectedJustifications={selectedJustifications}
-        curatorNotes={curatorNotes}
-        disabled={disabled}
-        onChoose={(itemId, choiceId) =>
-          setSelectedJustifications((current) => ({ ...current, [itemId]: choiceId }))
-        }
-        onFinish={finish}
-      />
+      <GameBoard scene="sort" step="Explain a placement">
+        <DiscussionReview
+          items={discussionSortItems(game.items).filter((item) => discussionIds.includes(item.id))}
+          selectedJustifications={selectedJustifications}
+          curatorNotes={curatorNotes}
+          disabled={disabled}
+          onChoose={(itemId, choiceId) =>
+            setSelectedJustifications((current) => ({ ...current, [itemId]: choiceId }))
+          }
+          onFinish={finish}
+        />
+      </GameBoard>
     );
   }
 
   return (
+    <GameBoard scene="sort" step="Sort into the chests">
     <div className={`flex flex-col gap-3 pb-28 sm:gap-5 sm:pb-0 ${shake ? "snap-back" : ""}`}>
       <PlaceGhost ghost={drag.ghost} />
       <div
@@ -267,8 +271,8 @@ function SortPlay({
                           }}
                           className={`w-full rounded-full px-3 py-1.5 text-left text-xs font-extrabold ring-2 sm:text-sm ${
                             on
-                              ? "bg-violet-600 text-white ring-violet-700"
-                              : "bg-white text-slate-800 ring-black/10"
+                              ? "bg-violet-700 text-white ring-violet-900"
+                              : "bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)]"
                           }`}
                         >
                           {item.label}
@@ -313,8 +317,8 @@ function SortPlay({
                       lifting
                         ? "cursor-grabbing bg-violet-100 text-violet-400 opacity-40 ring-violet-200"
                         : on
-                          ? "cursor-grab bg-violet-600 text-white ring-violet-700"
-                          : "cursor-grab bg-white text-slate-800 ring-black/10"
+                          ? "cursor-grab bg-violet-700 text-white ring-violet-900"
+                          : "cursor-grab bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)]"
                     }`}
                   >
                     {item.label}
@@ -328,12 +332,13 @@ function SortPlay({
           type="button"
           disabled={disabled || !canCheck}
           onClick={() => void check()}
-          className="w-full rounded-full bg-violet-600 px-5 py-3 text-base font-extrabold text-white shadow-md disabled:bg-violet-200 disabled:text-white"
+          className="w-full rounded-full bg-violet-600 px-5 py-3 text-base font-extrabold text-white shadow-md disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
         >
           Check
         </button>
       </div>
     </div>
+    </GameBoard>
   );
 }
 

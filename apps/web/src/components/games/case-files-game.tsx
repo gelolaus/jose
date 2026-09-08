@@ -6,6 +6,8 @@ import {
 } from "@jose/shared";
 import { Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
+import { GameBoard } from "./game-board";
+import { caseClaimText, strongestCaseSourceIds } from "./advanced-play";
 import type { PlayBoardProps } from "./play-types";
 
 export function CaseFilesGame({
@@ -41,6 +43,8 @@ function CaseFilesPlay({
   onMiss,
   onFinish,
 }: { game: CaseContent } & PlayBoardProps) {
+  const [phase, setPhase] = useState<"proof" | "case">("proof");
+  const [pickedId, setPickedId] = useState<string | null>(null);
   const [openId, setOpenId] = useState(game.sources[0]?.id ?? null);
   const [evidenceIds, setEvidenceIds] = useState<string[]>([]);
   const [conclusionId, setConclusionId] = useState<string | null>(null);
@@ -48,6 +52,25 @@ function CaseFilesPlay({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const missesRef = useRef(0);
+  const strongest = strongestCaseSourceIds(game);
+  const claim = caseClaimText(game);
+  const cards = game.sources.slice(0, 3);
+  const picked = game.sources.find((source) => source.id === pickedId) ?? null;
+  const correctPick = pickedId ? strongest.has(pickedId) : false;
+
+  async function pickProof(id: string) {
+    if (disabled || done || pickedId) return;
+    setPickedId(id);
+    if (strongest.has(id)) return;
+    missesRef.current += 1;
+    const right = game.sources.find((source) => strongest.has(source.id));
+    await onMiss({
+      title: "Stronger evidence",
+      body: right
+        ? `${right.title} is the strongest support for this claim. ${right.excerpt}`
+        : "That card does not support the claim as strongly.",
+    });
+  }
 
   function toggleEvidence(id: string) {
     if (disabled || done) return;
@@ -78,7 +101,87 @@ function CaseFilesPlay({
 
   const open = game.sources.find((source) => source.id === openId) ?? null;
 
+  if (phase === "proof") {
+    return (
+      <GameBoard scene="case-files" step="Choose the strongest evidence">
+        <div className="space-y-4">
+          {game.approvalStatus === "draft" ? (
+            <p className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950 ring-1 ring-amber-200" role="status">
+              Draft source pack — replace excerpts before classroom publish.
+            </p>
+          ) : null}
+          <section className="game-claim-card rounded-[1.6rem] px-4 py-5">
+            <p className="text-xs font-extrabold uppercase tracking-wide text-amber-200">
+              The claim
+            </p>
+            <p className="mt-1 font-display text-xl font-semibold text-amber-50 sm:text-2xl">
+              {claim}
+            </p>
+            <p className="mt-2 text-sm font-semibold text-amber-100/90">
+              Read the claim. Tap the evidence that supports it best.
+            </p>
+          </section>
+          <p className="text-sm font-extrabold text-[var(--jose-text)]">
+            Choose the strongest evidence
+          </p>
+          <ul className="grid gap-3" aria-label="Evidence cards">
+            {cards.map((source) => {
+              const selected = pickedId === source.id;
+              const tone = !pickedId
+                ? "bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)]"
+                : selected && correctPick
+                  ? "bg-emerald-100 text-emerald-950 ring-emerald-400"
+                  : selected
+                    ? "bg-rose-100 text-rose-950 ring-rose-300"
+                    : strongest.has(source.id)
+                      ? "bg-emerald-50 text-emerald-950 ring-emerald-200"
+                      : "bg-[var(--jose-surface-control)] text-[var(--jose-text-muted)] ring-[var(--jose-rule)]";
+              return (
+                <li key={source.id}>
+                  <button
+                    type="button"
+                    disabled={disabled || Boolean(pickedId)}
+                    onClick={() => void pickProof(source.id)}
+                    className={`w-full rounded-[1.4rem] px-4 py-4 text-left ring-2 disabled:opacity-100 ${tone}`}
+                  >
+                    <span className="block font-display text-lg font-semibold">{source.title}</span>
+                    <span className="mt-2 block text-sm font-semibold leading-relaxed">
+                      {source.excerpt}
+                    </span>
+                    <span className="mt-2 block text-xs font-extrabold uppercase tracking-wide opacity-80">
+                      Source: {source.citation}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {picked ? (
+            <div className="rounded-[1.3rem] bg-[var(--jose-surface-elevated)] px-4 py-3 ring-1 ring-[var(--jose-rule)]" aria-live="polite">
+              <p className="text-xs font-extrabold uppercase tracking-wide text-[var(--jose-text-muted)]">
+                Why this supports the claim
+              </p>
+              <p className="mt-1 text-sm font-semibold text-[var(--jose-text)]">
+                {correctPick
+                  ? picked.excerpt
+                  : "That card is weaker. The strongest support is marked above."}
+              </p>
+              <button
+                type="button"
+                onClick={() => setPhase("case")}
+                className="mt-3 min-h-11 w-full rounded-full bg-teal-800 px-4 py-3 text-sm font-extrabold text-white"
+              >
+                Next file
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </GameBoard>
+    );
+  }
+
   return (
+    <GameBoard scene="case-files" step="Tag evidence and defend a conclusion">
     <div className="space-y-4">
       {game.approvalStatus === "draft" ? (
         <p
@@ -88,14 +191,14 @@ function CaseFilesPlay({
           Draft source pack — replace excerpts before classroom publish.
         </p>
       ) : null}
-      <div className="rounded-[1.6rem] bg-slate-900 px-4 py-5 text-white">
-        <p className="text-xs font-extrabold uppercase tracking-wide text-amber-300">
-          Case question
+      <div className="game-claim-card rounded-[1.6rem] px-4 py-5">
+        <p className="text-xs font-extrabold uppercase tracking-wide text-amber-200">
+          The claim
         </p>
-        <p className="mt-1 font-display text-xl font-semibold sm:text-2xl">
+        <p className="mt-1 font-display text-xl font-semibold text-amber-50 sm:text-2xl">
           {game.question}
         </p>
-        <p className="mt-2 text-sm font-semibold text-slate-300">{game.objective}</p>
+        <p className="mt-2 text-sm font-semibold text-amber-100/90">{game.objective}</p>
       </div>
 
       <div className="grid gap-3 lg:grid-cols-[1fr_1fr]">
@@ -110,11 +213,11 @@ function CaseFilesPlay({
                   className={`flex-1 rounded-2xl px-3 py-3 text-left text-sm font-extrabold ring-2 ${
                     active
                       ? "bg-emerald-50 ring-emerald-400 text-emerald-950"
-                      : "bg-white ring-black/10 text-slate-800"
+                      : "bg-[var(--jose-surface-elevated)] ring-[var(--jose-rule)] text-[var(--jose-text)]"
                   }`}
                   onClick={() => setOpenId(source.id)}
                 >
-                  <span className="block text-[10px] uppercase tracking-wide text-slate-500">
+                  <span className="block text-[10px] uppercase tracking-wide text-[var(--jose-text-muted)]">
                     {source.kind}
                   </span>
                   {source.title}
@@ -124,10 +227,10 @@ function CaseFilesPlay({
                   aria-pressed={tagged}
                   disabled={disabled || done}
                   onClick={() => toggleEvidence(source.id)}
-                  className={`rounded-2xl px-3 py-2 text-xs font-extrabold ${
+                  className={`rounded-2xl px-3 py-2 text-xs font-extrabold disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)] ${
                     tagged
-                      ? "bg-violet-600 text-white"
-                      : "bg-slate-100 text-slate-700"
+                      ? "bg-violet-700 text-white"
+                      : "bg-[var(--jose-surface-control)] text-[var(--jose-text)]"
                   }`}
                 >
                   {tagged ? "In tray" : "Tag"}
@@ -138,26 +241,26 @@ function CaseFilesPlay({
         </div>
 
         <div
-          className="min-h-48 rounded-[1.6rem] bg-white px-4 py-4 ring-1 ring-black/10"
+          className="min-h-48 rounded-[1.6rem] bg-[var(--jose-surface-elevated)] px-4 py-4 ring-1 ring-[var(--jose-rule)]"
           aria-live="polite"
         >
           {open ? (
             <>
-              <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
+              <p className="text-xs font-extrabold uppercase tracking-wide text-[var(--jose-text-muted)]">
                 Document viewer
               </p>
-              <h3 className="mt-1 font-display text-lg font-semibold text-slate-900">
+              <h3 className="mt-1 font-display text-lg font-semibold text-[var(--jose-text)]">
                 {open.title}
               </h3>
-              <p className="mt-1 text-xs font-semibold text-slate-500">
+              <p className="mt-1 text-xs font-semibold text-[var(--jose-text-muted)]">
                 {open.citation}
               </p>
-              <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-relaxed text-slate-700">
+              <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-relaxed text-[var(--jose-text)]">
                 {open.excerpt}
               </p>
             </>
           ) : (
-            <p className="text-sm font-semibold text-slate-500">
+            <p className="text-sm font-semibold text-[var(--jose-text-muted)]">
               Open a document to inspect it.
             </p>
           )}
@@ -165,7 +268,7 @@ function CaseFilesPlay({
       </div>
 
       <div className="rounded-[1.4rem] bg-violet-50 px-4 py-3 ring-1 ring-violet-200">
-        <p className="text-xs font-extrabold uppercase tracking-wide text-violet-700">
+        <p className="text-xs font-extrabold uppercase tracking-wide text-violet-800">
           Evidence tray
         </p>
         <p className="mt-1 text-sm font-bold text-violet-950">
@@ -178,13 +281,13 @@ function CaseFilesPlay({
       </div>
 
       <fieldset className="space-y-2" disabled={disabled || done}>
-        <legend className="text-sm font-extrabold text-slate-700">
+        <legend className="text-sm font-extrabold text-[var(--jose-text)]">
           Conclusion
         </legend>
         {game.conclusions.map((conclusion) => (
           <label
             key={conclusion.id}
-            className="flex cursor-pointer items-start gap-3 rounded-2xl bg-white px-3 py-3 ring-1 ring-black/10"
+            className="flex cursor-pointer items-start gap-3 rounded-2xl bg-[var(--jose-surface-elevated)] px-3 py-3 ring-1 ring-[var(--jose-rule)]"
           >
             <input
               type="radio"
@@ -193,7 +296,7 @@ function CaseFilesPlay({
               onChange={() => setConclusionId(conclusion.id)}
               className="mt-1"
             />
-            <span className="text-sm font-bold text-slate-800">
+            <span className="text-sm font-bold text-[var(--jose-text)]">
               {conclusion.label}
             </span>
           </label>
@@ -201,7 +304,7 @@ function CaseFilesPlay({
       </fieldset>
 
       <label className="block space-y-1">
-        <span className="text-sm font-extrabold text-slate-700">
+        <span className="text-sm font-extrabold text-[var(--jose-text)]">
           {game.reasoningPrompt}
         </span>
         <textarea
@@ -209,7 +312,7 @@ function CaseFilesPlay({
           disabled={disabled || done}
           onChange={(e) => setReasoning(e.target.value)}
           rows={3}
-          className="w-full rounded-2xl bg-white px-3 py-2 text-sm font-semibold ring-1 ring-black/10"
+          className="w-full rounded-2xl bg-[var(--jose-surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--jose-text)] ring-1 ring-[var(--jose-rule)] disabled:text-[var(--jose-text-disabled)]"
         />
       </label>
 
@@ -217,16 +320,17 @@ function CaseFilesPlay({
         type="button"
         disabled={disabled || done || !conclusionId || evidenceIds.length === 0}
         onClick={() => void submit()}
-        className="w-full rounded-full bg-emerald-600 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-50"
+        className="w-full rounded-full bg-emerald-700 px-5 py-3 text-sm font-extrabold text-white disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
       >
         Submit case
       </button>
       {feedback ? (
-        <p className="rounded-2xl bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 ring-1 ring-black/5">
+        <p className="rounded-2xl bg-[var(--jose-surface-control)] px-3 py-3 text-sm font-semibold text-[var(--jose-text)] ring-1 ring-[var(--jose-rule)]">
           {feedback}
         </p>
       ) : null}
     </div>
+    </GameBoard>
   );
 }
 

@@ -4,9 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { ArrowLeft, Layers, Users } from "lucide-react";
-import { useJoseSession } from "@/lib/use-jose-session";
+import { ConnectedLocalDevPanel } from "@/components/local-dev-panel";
+import { JoseSessionProvider, useJoseSession } from "@/lib/use-jose-session";
 
 export function TeachShell({ children }: { children: ReactNode }) {
+  return (
+    <JoseSessionProvider>
+      <TeachShellBody>{children}</TeachShellBody>
+    </JoseSessionProvider>
+  );
+}
+
+function TeachShellBody({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const modulesActive = pathname === "/teach" || pathname.startsWith("/teach/modules");
   const classesActive = pathname.startsWith("/teach/classes");
@@ -45,6 +54,9 @@ export function TeachShell({ children }: { children: ReactNode }) {
             >
               Back to learning
             </Link>
+          </div>
+          <div className="mx-auto max-w-sm pt-2 text-left">
+            <ConnectedLocalDevPanel />
           </div>
         </div>
       </div>
@@ -94,6 +106,9 @@ export function TeachShell({ children }: { children: ReactNode }) {
             Student view
           </Link>
         </nav>
+        <div className="mt-4 px-2">
+          <ConnectedLocalDevPanel compact />
+        </div>
       </aside>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="shrink-0 border-b border-black/5 bg-white/95 px-4 py-3 lg:hidden">

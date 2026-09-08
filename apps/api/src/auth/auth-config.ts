@@ -223,5 +223,6 @@ export function toAuthStatus(config: AuthRuntimeConfig): AuthStatus {
     demoMode: config.demoMode,
     allowedDomains: [...APC_ADMISSION_DOMAINS],
     webOrigin: config.webOrigin,
+    localDevAccess: false,
   };
 }

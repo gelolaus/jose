@@ -17,6 +17,7 @@ import {
   gradeTimelineCheck,
 } from "./timeline-grade";
 import { PlaceGhost, usePlaceDrag } from "./use-place-drag";
+import { GameBoard } from "./game-board";
 
 function useWideScreen() {
   const [wide, setWide] = useState(false);
@@ -337,16 +338,19 @@ function TimelinePlay({
 
   if (phase !== "timeline" && game.causalLink) {
     return (
-      <CausalChallenge
-        link={game.causalLink as NonNullable<TimelineContent["causalLink"]>}
-        showingExplanation={phase === "causal-explanation"}
-        disabled={disabled}
-        onChoose={answerCausal}
-      />
+      <GameBoard scene="timeline" step="Explain the connection">
+        <CausalChallenge
+          link={game.causalLink as NonNullable<TimelineContent["causalLink"]>}
+          showingExplanation={phase === "causal-explanation"}
+          disabled={disabled}
+          onChoose={answerCausal}
+        />
+      </GameBoard>
     );
   }
 
   return (
+    <GameBoard scene="timeline" step="Place the events">
     <div className={`flex flex-col gap-4 pb-28 sm:gap-5 sm:pb-0 ${shake ? "snap-back" : ""}`}>
       <PlaceGhost ghost={drag.ghost} />
       <TimelineRail
@@ -409,8 +413,8 @@ function TimelinePlay({
                       lifting
                         ? "cursor-grabbing bg-violet-100 text-violet-400 opacity-40 ring-violet-200"
                         : on
-                          ? "cursor-grab bg-violet-600 text-white ring-violet-700"
-                          : "cursor-grab bg-white text-slate-800 ring-black/10"
+                          ? "cursor-grab bg-violet-700 text-white ring-violet-900"
+                          : "cursor-grab bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)]"
                     }`}
                   >
                     {item.label}
@@ -424,12 +428,13 @@ function TimelinePlay({
           type="button"
           disabled={disabled || !canCheck}
           onClick={() => void check()}
-          className="w-full rounded-full bg-violet-600 px-5 py-3 text-base font-extrabold text-white shadow-md disabled:bg-violet-200 disabled:text-white sm:ml-auto sm:block sm:w-auto sm:px-8"
+          className="w-full rounded-full bg-violet-600 px-5 py-3 text-base font-extrabold text-white shadow-md disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)] sm:ml-auto sm:block sm:w-auto sm:px-8"
         >
           Check
         </button>
       </div>
     </div>
+    </GameBoard>
   );
 }
 

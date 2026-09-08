@@ -93,7 +93,8 @@ export function PracticeReviewPlayer({
         hearts={0}
         showHearts={false}
         progress={labelFor(game.type)}
-        wide={game.type === "timeline"}
+        scene={game.type}
+        wide
       >
         {error ? (
           <p className="mb-4 text-sm font-semibold text-rose-700" role="alert">
