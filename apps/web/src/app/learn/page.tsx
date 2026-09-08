@@ -1,6 +1,5 @@
 import { AppShell } from "@/components/learning-shell";
 import { ModuleGrid } from "@/components/module-grid";
-import { ThemeToggle } from "@/components/presentation-toggle";
 import { RecoveryState } from "@/components/recovery-state";
 import { TopBar } from "@/components/top-bar";
 import { SignInRequired } from "@/components/sign-in-required";
@@ -70,9 +69,6 @@ export default async function LearnPage() {
             hearts={data.learner.hearts}
             xp={data.learner.xp}
           />
-          <div className="flex justify-end border-b border-[var(--jose-rule)] bg-[var(--jose-paper)]/80 px-4 py-2 lg:hidden">
-            <ThemeToggle compact />
-          </div>
         </div>
       }
     >

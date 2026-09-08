@@ -51,14 +51,14 @@ export function LevelNode({
         </span>
       ) : (
         <span
-          className={`flex h-20 w-20 items-center justify-center rounded-full bg-[var(--jose-gold)] text-slate-800 node-3d transition md:h-24 md:w-24 ${
-            locked ? "opacity-45 grayscale" : ""
+          className={`flex h-20 w-20 items-center justify-center rounded-full level-disc transition md:h-24 md:w-24 ${
+            locked ? "level-disc--locked" : node.status === "completed" ? "level-disc--completed" : ""
           } ${current ? "ring-4 ring-white/80" : ""}`}
         >
           <NodeGlyph icon={node.icon} status={node.status} />
         </span>
       )}
-      <span className="absolute left-1/2 top-[calc(100%+0.65rem)] w-max max-w-[10.5rem] -translate-x-1/2 text-center text-base font-extrabold leading-snug text-white drop-shadow md:max-w-[13rem] md:text-lg">
+      <span className="absolute left-1/2 top-[calc(100%+0.65rem)] w-max max-w-[10.5rem] -translate-x-1/2 text-center text-base font-extrabold leading-snug path-node-label md:max-w-[13rem] md:text-lg">
         {node.title}
       </span>
     </button>

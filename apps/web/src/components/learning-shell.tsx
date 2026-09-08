@@ -1,7 +1,5 @@
 "use client";
 
-import { ConnectedLocalDevPanel } from "@/components/local-dev-panel";
-import { ThemeToggle } from "@/components/presentation-toggle";
 import { SkipLink } from "@/components/skip-link";
 import { ThemeDocumentSync } from "@/lib/theme-mode";
 import { t } from "@/lib/reading-preferences";
@@ -10,7 +8,7 @@ import { useReadingPreferences } from "@/lib/use-reading-preferences";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { BookMarked, Map, Sparkles, UserRound, Wrench, type LucideIcon } from "lucide-react";
+import { BookMarked, Map, Settings, Sparkles, UserRound, Wrench, type LucideIcon } from "lucide-react";
 
 const tabDefs: {
   href: string;
@@ -36,7 +34,7 @@ export function AppShell({
 }) {
   return (
     <JoseSessionProvider>
-      <div className="flex h-dvh overflow-hidden bg-transparent lg:grid lg:grid-cols-[18rem_minmax(0,1fr)]">
+      <div className="flex h-dvh overflow-hidden bg-transparent lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
         <SkipLink />
         <ThemeDocumentSync />
         <SideNav />
@@ -59,17 +57,16 @@ export function AppShell({
 function SideNav() {
   const pathname = usePathname();
   const prefs = useReadingPreferences();
-  const { canTeach, localDevAccess } = useJoseSession();
-  const inGame = pathname.startsWith("/practice/lab") || pathname.includes("/play");
+  const { canTeach } = useJoseSession();
 
   return (
     <aside className="hidden h-dvh flex-col border-r border-[var(--jose-rule)] bg-[var(--jose-paper)]/95 px-5 py-7 backdrop-blur-md lg:flex">
       <div className="mb-8 px-2">
-        <p className="font-display text-3xl font-semibold tracking-tight text-[var(--jose-ink)]">
+        <p className="font-display text-4xl font-black tracking-tight text-[var(--jose-accent)]">
           Jose
         </p>
         <p className="mt-1 text-sm text-[var(--jose-ink-muted)]">
-          Historical investigation
+          Learn something new today
         </p>
       </div>
       <nav className="flex flex-1 flex-col gap-2" aria-label="Main">
@@ -82,9 +79,9 @@ function SideNav() {
               key={tab.href}
               href={tab.href}
               aria-current={active ? "page" : undefined}
-              className={`flex min-h-11 items-center gap-3.5 rounded-xl px-4 py-3 text-base font-semibold transition ${
+              className={`flex min-h-11 items-center gap-3.5 rounded-2xl px-4 py-3.5 text-base font-extrabold transition ${
                 active
-                  ? "bg-teal-100 text-teal-900 shadow-sm"
+                  ? "jose-nav-active"
                   : "text-[var(--jose-text-muted)] hover:bg-[var(--jose-surface-control)]"
               }`}
             >
@@ -97,9 +94,9 @@ function SideNav() {
           <Link
             href="/teach"
             aria-current={isActive(pathname, "/teach") ? "page" : undefined}
-            className={`flex min-h-11 items-center gap-3.5 rounded-xl px-4 py-3 text-base font-semibold transition ${
+            className={`flex min-h-11 items-center gap-3.5 rounded-2xl px-4 py-3.5 text-base font-extrabold transition ${
               isActive(pathname, "/teach")
-                ? "bg-teal-100 text-teal-900 shadow-sm"
+                ? "jose-nav-active"
                 : "text-[var(--jose-text-muted)] hover:bg-[var(--jose-surface-control)]"
             }`}
           >
@@ -109,9 +106,7 @@ function SideNav() {
         ) : null}
       </nav>
       <div className="space-y-3 px-2">
-        {localDevAccess && !inGame ? <ConnectedLocalDevPanel compact /> : null}
-        <ThemeToggle compact />
-        <p className="text-sm text-[var(--jose-text-muted)]">Field journal for APC RIZLIFE</p>
+        <Link href="/profile/preferences" className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-[var(--jose-text-muted)]"><Settings className="size-5" aria-hidden /> Preferences</Link>
       </div>
     </aside>
   );
@@ -120,19 +115,13 @@ function SideNav() {
 export function BottomTabs() {
   const pathname = usePathname();
   const prefs = useReadingPreferences();
-  const { canTeach, localDevAccess } = useJoseSession();
-  const inGame = pathname.startsWith("/practice/lab");
+  const { canTeach } = useJoseSession();
 
   return (
     <nav
       className="shrink-0 border-t border-[var(--jose-rule)] bg-[var(--jose-paper)]/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] backdrop-blur-md lg:hidden"
       aria-label="Main"
     >
-      {localDevAccess && !inGame ? (
-        <div className="border-b border-[var(--jose-rule)] px-3 py-2">
-          <ConnectedLocalDevPanel compact />
-        </div>
-      ) : null}
       <div className="mx-auto flex w-full max-w-3xl items-stretch justify-around px-2 pt-2.5">
         {tabDefs.map((tab) => {
           const active = isActive(pathname, tab.href);
@@ -145,7 +134,7 @@ export function BottomTabs() {
               aria-current={active ? "page" : undefined}
               className={`flex min-h-11 min-w-[4.5rem] flex-col items-center gap-1 rounded-xl px-2 py-2.5 text-xs font-semibold transition sm:text-sm ${
                 active
-                  ? "bg-teal-100 text-teal-900"
+                  ? "jose-nav-active"
                   : "text-[var(--jose-text-muted)] hover:bg-[var(--jose-surface-control)]"
               }`}
             >
@@ -160,7 +149,7 @@ export function BottomTabs() {
             aria-current={isActive(pathname, "/teach") ? "page" : undefined}
             className={`flex min-h-11 min-w-[4.5rem] flex-col items-center gap-1 rounded-xl px-2 py-2.5 text-xs font-semibold transition sm:text-sm ${
               isActive(pathname, "/teach")
-                ? "bg-teal-100 text-teal-900"
+                ? "jose-nav-active"
                 : "text-[var(--jose-text-muted)] hover:bg-[var(--jose-surface-control)]"
             }`}
           >

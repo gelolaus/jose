@@ -1,5 +1,7 @@
 "use client";
 
+import { ConnectedLocalDevPanel } from "@/components/local-dev-panel";
+import { ThemeToggle } from "@/components/presentation-toggle";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import {
   clearLessonPacksForLogout,
@@ -40,7 +42,7 @@ function useLessonPacks(ownerKey: string): LessonPackManifest[] {
 
 export function ReadingPreferencesForm() {
   const prefs = useReadingPreferences();
-  const { user, learner } = useJoseSession();
+  const { user, learner, localDevAccess } = useJoseSession();
   const accountId = learner?.id ?? user?.id ?? "";
   const ownerKey = accountId ? journalOwnerKey(accountId) : "";
   const packs = useLessonPacks(ownerKey);
@@ -66,6 +68,8 @@ export function ReadingPreferencesForm() {
         you provide curated content.
       </p>
 
+      <div className="mt-6"><p className="mb-2 text-sm font-extrabold">Appearance</p><ThemeToggle /></div>
+      {localDevAccess ? <details className="mt-6"><summary className="cursor-pointer text-sm font-bold">Local testing</summary><div className="mt-3"><ConnectedLocalDevPanel compact /></div></details> : null}
       <fieldset className="mt-6 space-y-2">
         <legend className="text-sm font-extrabold text-slate-600">
           {t(prefs.locale, "prefs.language")}

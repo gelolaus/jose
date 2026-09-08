@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode 
 import { SoundFocusControls, useFocusMode, useMotionSound } from "@/lib/motion-sound";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import type { GameContent } from "@jose/shared";
+import { hintFor } from "@/lib/game-copy";
 import type { WhyPayload } from "./play-types";
 
 export function HeartsHud({ hearts, max = 5 }: { hearts: number; max?: number }) {
@@ -78,9 +79,9 @@ export function WhySheet({
         aria-describedby={bodyId}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className="why-pop motion-screen w-full max-w-md rounded-[1.75rem] bg-[var(--jose-surface-elevated)] p-5 text-[var(--jose-text)] shadow-xl outline-none ring-2 ring-amber-400 sm:p-6"
+        className="why-pop motion-screen w-full max-w-md rounded-[1.75rem] bg-[var(--jose-surface-elevated)] p-5 text-[var(--jose-text)] shadow-xl outline-none ring-2 ring-[var(--jose-rule)] sm:p-6"
       >
-        <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-600">
+        <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-[var(--jose-accent)]">
           {eyebrow}
         </p>
         <h2 id={titleId} className="mt-2 font-display text-2xl font-semibold text-[var(--jose-text)]">
@@ -105,7 +106,7 @@ export function WhySheet({
           type="button"
           disabled={!ready}
           onClick={onDismiss}
-          className="mt-5 min-h-11 w-full rounded-full bg-violet-700 px-5 py-3.5 text-base font-extrabold text-white shadow-md disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
+          className="jose-button mt-5 w-full"
         >
           {ready ? "Got it" : "…"}
         </button>
@@ -154,7 +155,7 @@ export function StarCelebration({
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center gap-4 px-6 py-12 text-center">
-      <div className="flex gap-2">
+      <div className="game-celebration-stars flex gap-2">
         {[1, 2, 3].map((n) => (
           <Star
             key={n}
@@ -167,7 +168,7 @@ export function StarCelebration({
           />
         ))}
       </div>
-      <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-violet-500">
+      <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-[var(--jose-accent)]">
         {stars === 3 ? "Perfect" : stars === 2 ? "Nice work" : "You finished"}
       </p>
       <p className="font-display text-5xl font-semibold text-[var(--jose-text)]">
@@ -195,7 +196,7 @@ export function StarCelebration({
           <button
             type="button"
             onClick={playAgain}
-            className="flex-1 rounded-full bg-[var(--jose-surface-control)] px-5 py-3 text-sm font-extrabold text-[var(--jose-text)]"
+            className="jose-button jose-button--secondary flex-1"
           >
             {onPlayAgain ? playAgainLabel : retryLabel}
           </button>
@@ -203,7 +204,7 @@ export function StarCelebration({
         <button
           type="button"
           onClick={onContinue}
-          className="flex-1 rounded-full bg-violet-600 px-5 py-3 text-sm font-extrabold text-white shadow-md"
+          className="jose-button flex-1"
         >
           {continueLabel}
         </button>
@@ -265,23 +266,21 @@ export function GameFrame({
   return (
     <div
       data-game-stage={scene}
-      className={`game-stage mx-auto w-full px-4 py-3 sm:px-6 sm:py-8 ${wide ? "max-w-5xl" : "max-w-3xl"} ${
+      className={`game-stage mx-auto w-full px-4 py-3 sm:px-6 sm:py-8 ${wide && scene !== "quiz" && scene !== "blank" ? "max-w-5xl" : "max-w-3xl"} ${
         scene ? `game-stage--${scene}` : ""
       } ${focus ? "jose-focus" : ""}`}
     >
       <div className="mb-2.5 flex items-start justify-between gap-3 sm:mb-5">
         <div className="min-w-0">
-          <h1 className="font-display text-xl font-semibold tracking-tight text-[var(--jose-text)] sm:text-4xl">
+          <h1 className="font-display text-xl font-extrabold tracking-tight text-[var(--jose-text)] sm:text-4xl">
             {title}
           </h1>
-          <p className="mt-0.5 text-sm font-semibold leading-snug text-[var(--jose-text)] sm:mt-1 sm:text-base">
-            {hint}
-          </p>
+          {(!scene || hint !== hintFor(scene)) ? <p className="mt-1 text-sm font-semibold text-[var(--jose-text-muted)]">{hint}</p> : null}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           {showHearts && hearts !== undefined ? <HeartsHud hearts={hearts} /> : null}
           {progress ? (
-            <p className="hidden text-xs font-extrabold uppercase tracking-wide text-[var(--jose-accent)] sm:block">
+            <p className="text-xs font-extrabold tracking-wide text-[var(--jose-accent)] sm:block">
               {progress}
             </p>
           ) : null}

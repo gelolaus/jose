@@ -332,7 +332,7 @@ function SortPlay({
           type="button"
           disabled={disabled || !canCheck}
           onClick={() => void check()}
-          className="w-full rounded-full bg-violet-600 px-5 py-3 text-base font-extrabold text-white shadow-md disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
+          className="jose-button w-full"
         >
           Check
         </button>

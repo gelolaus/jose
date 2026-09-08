@@ -200,14 +200,14 @@ export function LessonPlayer({
           type="button"
           onClick={onContinue}
           disabled={busy}
-          className="rounded-xl bg-[var(--jose-ink)] px-7 py-3.5 text-base font-semibold text-[var(--jose-paper)] shadow-md disabled:opacity-60"
+          className="jose-button"
         >
           {busy ? "Saving…" : nextLevelId ? "Continue to next" : "Continue"}
         </button>
         <button
           type="button"
           onClick={() => router.push(`/learn/${moduleId}`)}
-          className="rounded-xl border border-[var(--jose-rule)] bg-white px-5 py-3.5 text-base font-semibold text-[var(--jose-ink)]"
+          className="jose-button jose-button--secondary"
         >
           Back to map
         </button>

@@ -234,7 +234,7 @@ function BlankPlay({
           type="button"
           onClick={next}
           disabled={disabled}
-          className="w-full rounded-full bg-violet-600 px-5 py-3.5 text-base font-extrabold text-white shadow-md"
+          className="jose-button w-full"
         >
           {last ? "See stars" : "Next passage"}
         </button>

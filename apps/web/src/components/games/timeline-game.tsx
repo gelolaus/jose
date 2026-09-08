@@ -80,8 +80,8 @@ function StopBead({
     tone === "locked"
       ? "border-emerald-700 bg-emerald-600 text-white"
       : tone === "empty"
-        ? "border-violet-700 bg-white text-violet-700"
-        : "border-violet-800 bg-violet-700 text-white";
+        ? "border-[#1cb0f6] bg-[#dcf3ff] text-[#096d9b]"
+        : "border-[#1596d2] bg-[#1cb0f6] text-[#083b54]";
   const beadClass = `relative z-[1] flex size-7 shrink-0 items-center justify-center rounded-full border-[3px] text-[11px] font-extrabold shadow-[0_2px_0_#4c1d95] ${toneClass}`;
   return (
     <div className="relative z-[1] col-start-1 row-start-1 row-span-3 mt-5 flex justify-center self-start sm:mt-0 sm:w-full">
@@ -101,7 +101,7 @@ function StopBead({
 }
 
 const YEAR_PILL =
-  "col-start-2 row-start-1 mb-1 flex min-h-[2.35rem] w-full items-center justify-center rounded-full bg-[#f5c518] px-2.5 py-1 text-center text-[11px] font-extrabold leading-snug text-slate-800 shadow-[0_3px_0_#d97706] sm:mb-2";
+  "col-start-2 row-start-1 mb-1 flex min-h-[2.35rem] w-full items-center justify-center rounded-full bg-[#f5c518] px-2.5 py-1 text-center text-[11px] font-extrabold leading-snug text-[#5f4300] shadow-[0_3px_0_#d97706] sm:mb-2";
 
 function StopStem() {
   return <span aria-hidden className="col-start-2 row-start-2 mx-auto mb-1 block h-3 w-0.5 rounded-full bg-amber-700" />;
@@ -428,7 +428,7 @@ function TimelinePlay({
           type="button"
           disabled={disabled || !canCheck}
           onClick={() => void check()}
-          className="w-full rounded-full bg-violet-600 px-5 py-3 text-base font-extrabold text-white shadow-md disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)] sm:ml-auto sm:block sm:w-auto sm:px-8"
+          className="jose-button w-full"
         >
           Check
         </button>

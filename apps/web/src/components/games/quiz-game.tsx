@@ -8,7 +8,7 @@ import {
   type QuizQuestion,
 } from "@jose/shared";
 import { Plus, Trash2 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMotionSound } from "@/lib/motion-sound";
 import { GameBoard } from "./game-board";
 import type { PlayBoardProps, WhyPayload } from "./play-types";
@@ -74,14 +74,24 @@ function QuizPlay({
   const last = index === game.questions.length - 1;
   const authored = authoredQuestion(game, index);
 
-  const order = useMemo(() => {
-    const ids = question.choices.map((choice) => choice.id);
-    const shuffled = shuffledCopy(ids);
-    if (shuffled.length > 1 && shuffled.every((id, i) => id === ids[i])) {
-      [shuffled[0], shuffled[1]] = [shuffled[1]!, shuffled[0]!];
-    }
-    return shuffled;
-  }, [question]);
+  // Keep server and initial client markup identical, then shuffle once per game.
+  const [orders, setOrders] = useState(() =>
+    game.questions.map((entry) => entry.choices.map((choice) => choice.id)),
+  );
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setOrders(game.questions.map((entry) => {
+        const ids = entry.choices.map((choice) => choice.id);
+        const shuffled = shuffledCopy(ids);
+        if (shuffled.length > 1 && shuffled.every((id, i) => id === ids[i])) {
+          [shuffled[0], shuffled[1]] = [shuffled[1]!, shuffled[0]!];
+        }
+        return shuffled;
+      }));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [game]);
+  const order = orders[index] ?? question.choices.map((choice) => choice.id);
 
   const orderedChoices = order
     .map((id) => question.choices.find((choice) => choice.id === id))
@@ -257,22 +267,14 @@ function QuizPlay({
   return (
     <GameBoard scene="quiz" step={`Question ${index + 1} of ${game.questions.length}`}>
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-extrabold text-[var(--jose-text-muted)]">
-          Question {index + 1} of {game.questions.length}
-        </p>
-        <p className="rounded-full bg-[var(--jose-surface-control)] px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[var(--jose-text)]">
-          {question.kind === "evidence" ? "Evidence duel" : "Quick check"}
-        </p>
-      </div>
       {question.kind === "evidence" && question.claim ? (
         <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950 ring-1 ring-amber-200">
           <p className="text-[10px] font-extrabold uppercase tracking-wide text-amber-700">Claim</p>
           <p className="mt-1">{question.claim}</p>
         </div>
       ) : null}
-      <div className="rounded-[1.8rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-5 py-8 text-center shadow-lg sm:px-8">
-        <p className="font-display text-2xl font-semibold text-white sm:text-3xl">
+      <div className="quiz-prompt">
+        <p className="font-display text-2xl font-extrabold text-[var(--jose-text)] sm:text-3xl">
           {question.prompt}
         </p>
       </div>
@@ -300,20 +302,20 @@ function QuizPlay({
           const selected = pickedId === choice.id;
           const right = choice.id === (authored?.correctChoiceId ?? revealedId);
           let tone =
-            "bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)] hover:ring-violet-400 node-3d motion-control";
+            "quiz-answer--idle motion-control";
           if (pickedId !== null && selected && right)
-            tone = "bg-emerald-700 text-white ring-emerald-800 motion-accept";
+            tone = "quiz-answer--correct motion-accept";
           else if (pickedId !== null && selected && !right)
-            tone = "bg-rose-800 text-white ring-rose-900 snap-back";
+            tone = "quiz-answer--miss snap-back";
           else if (pickedId !== null && right)
-            tone = "bg-emerald-700/20 text-emerald-950 ring-emerald-700";
+            tone = "quiz-answer--correct";
           return (
             <li key={choice.id}>
               <button
                 type="button"
                 disabled={pickedId !== null || disabled}
                 onClick={() => void choose(choice.id)}
-                className={`w-full rounded-3xl px-4 py-3.5 text-left text-base font-extrabold ring-2 disabled:bg-[var(--jose-surface-control)] ${tone}`}
+                className={`quiz-answer w-full px-5 py-4 text-left text-base font-extrabold ${tone}`}
               >
                 {choice.text}
               </button>
@@ -365,7 +367,7 @@ function QuizPlay({
           type="button"
           onClick={next}
           disabled={disabled}
-          className="w-full rounded-full bg-violet-600 px-5 py-3.5 text-base font-extrabold text-white shadow-md disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
+          className="jose-button w-full"
         >
           {last ? "See stars" : "Next"}
         </button>

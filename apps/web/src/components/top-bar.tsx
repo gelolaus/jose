@@ -10,15 +10,15 @@ type TopBarProps = {
 
 export function TopBar({ courseTitle, streak, hearts, xp }: TopBarProps) {
   return (
-    <header className="border-b border-[var(--jose-rule)] bg-[var(--jose-paper)]/95 backdrop-blur-md">
+    <header className="border-b border-[var(--jose-rule)] bg-[var(--jose-paper)]">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-teal-800 lg:hidden">
             Jose
           </p>
-          <h1 className="truncate font-display text-lg font-semibold leading-tight tracking-tight text-[var(--jose-ink)] sm:text-2xl md:text-3xl">
+          <p className="truncate text-sm font-extrabold text-[var(--jose-ink)] sm:text-base">
             {courseTitle}
-          </h1>
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <Chip tone="sky" icon={Zap} label={`${xp} XP`} accessibleName={`${xp} experience points`} />
@@ -64,7 +64,7 @@ function Chip({
       role="status"
       title={title}
       aria-label={accessibleName}
-      className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold tabular-nums sm:px-3.5 sm:py-2 sm:text-base ${tones[tone]}`}
+      className={`inline-flex min-h-11 items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-extrabold tabular-nums sm:px-3.5 sm:py-2 sm:text-base ${tones[tone]}`}
     >
       <Icon className="size-4 sm:size-5" strokeWidth={2.25} aria-hidden />
       <span aria-hidden>{label}</span>
