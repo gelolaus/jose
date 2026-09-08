@@ -10,6 +10,7 @@ import {
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useMotionSound } from "@/lib/motion-sound";
+import { GameBoard } from "./game-board";
 import type { PlayBoardProps } from "./play-types";
 
 type BlankPlayContent = BlankContent | AssessmentBlank;
@@ -165,9 +166,10 @@ function BlankPlay({
         ));
 
   return (
+    <GameBoard scene="blank" step={`Passage ${index + 1} of ${game.items.length}`}>
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-extrabold text-slate-500">
+        <p className="text-sm font-extrabold text-[var(--jose-text-muted)]">
           Passage {index + 1} of {game.items.length}
         </p>
         <p className="rounded-full bg-rose-50 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-rose-700">
@@ -180,7 +182,7 @@ function BlankPlay({
         </p>
       ) : null}
       <div className="rounded-[1.8rem] bg-[#fff7e8] px-5 py-8 shadow-inner ring-2 ring-amber-200 sm:px-8">
-        <p className="font-display text-2xl font-semibold leading-snug text-slate-800 sm:text-3xl">
+        <p className="font-display text-2xl font-semibold leading-snug text-amber-950 sm:text-3xl">
           {sentence}
         </p>
         {"source" in item && item.source ? (
@@ -196,10 +198,11 @@ function BlankPlay({
             authoredItem
               ? normalizeBlankKey(word) === normalizeBlankKey(authoredItem.answer)
               : revealed !== null && normalizeBlankKey(word) === normalizeBlankKey(revealed);
-          let tone = "bg-white text-slate-800 ring-black/10 motion-control";
-          if (picked && on && right) tone = "bg-emerald-100 text-emerald-900 ring-emerald-300 motion-accept";
-          else if (picked && on && !right) tone = "bg-rose-100 text-rose-800 ring-rose-300";
-          else if (picked && right) tone = "bg-emerald-50 text-emerald-800 ring-emerald-200";
+          let tone =
+            "bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)] motion-control";
+          if (picked && on && right) tone = "bg-emerald-700 text-white ring-emerald-800 motion-accept";
+          else if (picked && on && !right) tone = "bg-rose-800 text-white ring-rose-900";
+          else if (picked && right) tone = "bg-emerald-700/20 text-emerald-950 ring-emerald-700";
           return (
             <button
               key={word}
@@ -237,6 +240,7 @@ function BlankPlay({
         </button>
       ) : null}
     </div>
+    </GameBoard>
   );
 }
 

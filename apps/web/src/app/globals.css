@@ -638,3 +638,171 @@ html[data-text-size="lg"] {
 html[data-text-size="xl"] {
   font-size: 125%;
 }
+
+/* Full-page Adventure game boards */
+.game-stage {
+  min-height: 100%;
+}
+
+.game-board {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  padding: 0.7rem;
+  box-shadow: 0 14px 28px rgb(28 25 23 / 16%);
+}
+
+.game-board__paper {
+  position: relative;
+  z-index: 1;
+  border-radius: 1.15rem;
+  background: var(--jose-surface-elevated);
+  color: var(--jose-text);
+  padding: 0.9rem 0.95rem 1.1rem;
+  box-shadow: inset 0 0 0 1px var(--jose-rule);
+}
+
+.game-board__how {
+  margin: 0 0 0.75rem;
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--jose-text);
+}
+
+.game-board__how-label {
+  display: block;
+  margin-bottom: 0.15rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--jose-text-muted);
+}
+
+.game-board__step {
+  margin: 0 0 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--jose-accent);
+}
+
+.game-board__play {
+  min-width: 0;
+}
+
+.game-claim-card {
+  background:
+    linear-gradient(160deg, #3f2a14 0%, #1c140c 100%);
+  box-shadow: 0 8px 0 #0f0a06;
+  animation: jose-file-open var(--jose-motion-screen) var(--jose-motion-ease);
+}
+
+.game-board--quiz {
+  background:
+    radial-gradient(circle at 50% 0%, rgb(167 139 250 / 55%), transparent 58%),
+    linear-gradient(180deg, #4c1d95 0%, #1e1b4b 100%);
+}
+
+.game-board--memory {
+  background:
+    radial-gradient(ellipse at 30% 10%, rgb(255 255 255 / 12%), transparent 46%),
+    repeating-linear-gradient(45deg, #245538 0 10px, #1c4330 10px 20px),
+    #2f6a45;
+}
+
+.game-board--timeline {
+  background:
+    linear-gradient(90deg, transparent 12px, rgb(180 83 9 / 35%) 13px, transparent 14px),
+    linear-gradient(180deg, #78350f 0%, #431407 100%);
+}
+
+.game-board--blank {
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 27px, rgb(146 64 14 / 18%) 28px),
+    linear-gradient(180deg, #b45309 0%, #7c2d12 100%);
+}
+
+.game-board--sort {
+  background:
+    linear-gradient(145deg, #92400e 0%, #78350f 48%, #451a03 100%);
+}
+
+.game-board--case-files {
+  background:
+    repeating-linear-gradient(90deg, transparent, transparent 17px, rgb(0 0 0 / 12%) 18px),
+    linear-gradient(160deg, #6b4423 0%, #3d2914 52%, #21150c 100%);
+}
+
+.game-board--dispatches {
+  background:
+    radial-gradient(circle at 80% 0%, rgb(125 211 252 / 35%), transparent 42%),
+    linear-gradient(165deg, #0c4a6e 0%, #082f49 100%);
+}
+
+.game-board--editorial {
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 6px, rgb(255 255 255 / 6%) 7px),
+    linear-gradient(180deg, #9a3412 0%, #431407 100%);
+}
+
+.game-board--dapitan {
+  background:
+    radial-gradient(circle at 20% 0%, rgb(45 212 191 / 28%), transparent 46%),
+    linear-gradient(180deg, #115e59 0%, #134e4a 48%, #042f2e 100%);
+}
+
+html[data-theme="dark"] .game-board__paper {
+  background: var(--jose-surface-elevated);
+  color: var(--jose-text);
+}
+
+html[data-theme="dark"] .game-board__how,
+html[data-theme="dark"] .game-board__how-text {
+  color: var(--jose-text);
+}
+
+@keyframes jose-file-open {
+  from {
+    opacity: 0.4;
+    transform: rotate(-2deg) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes jose-stamp {
+  0% {
+    transform: scale(1.18) rotate(-8deg);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.game-board--case-files .game-claim-card {
+  animation: jose-stamp var(--jose-motion-milestone) var(--jose-motion-ease);
+}
+
+@media (max-width: 430px) {
+  .game-board {
+    border-radius: 1.15rem;
+    padding: 0.45rem;
+  }
+
+  .game-board__paper {
+    padding: 0.8rem 0.75rem 1rem;
+  }
+
+  .game-stage {
+    padding-left: 0.85rem;
+    padding-right: 0.85rem;
+  }
+}

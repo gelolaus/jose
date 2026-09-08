@@ -1,14 +1,16 @@
 "use client";
 
+import { ConnectedLocalDevPanel } from "@/components/local-dev-panel";
 import { ThemeToggle } from "@/components/presentation-toggle";
 import { SkipLink } from "@/components/skip-link";
 import { ThemeDocumentSync } from "@/lib/theme-mode";
 import { t } from "@/lib/reading-preferences";
+import { JoseSessionProvider, useJoseSession } from "@/lib/use-jose-session";
 import { useReadingPreferences } from "@/lib/use-reading-preferences";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { BookMarked, Map, Sparkles, UserRound, type LucideIcon } from "lucide-react";
+import { BookMarked, Map, Sparkles, UserRound, Wrench, type LucideIcon } from "lucide-react";
 
 const tabDefs: {
   href: string;
@@ -33,28 +35,32 @@ export function AppShell({
   topBar?: ReactNode;
 }) {
   return (
-    <div className="flex h-dvh overflow-hidden bg-transparent lg:grid lg:grid-cols-[18rem_minmax(0,1fr)]">
-      <SkipLink />
-      <ThemeDocumentSync />
-      <SideNav />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {topBar ? <div className="shrink-0">{topBar}</div> : null}
-        <main
-          id="main-content"
-          tabIndex={-1}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain outline-none"
-        >
-          {children}
-        </main>
-        <BottomTabs />
+    <JoseSessionProvider>
+      <div className="flex h-dvh overflow-hidden bg-transparent lg:grid lg:grid-cols-[18rem_minmax(0,1fr)]">
+        <SkipLink />
+        <ThemeDocumentSync />
+        <SideNav />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {topBar ? <div className="shrink-0">{topBar}</div> : null}
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain outline-none"
+          >
+            {children}
+          </main>
+          <BottomTabs />
+        </div>
       </div>
-    </div>
+    </JoseSessionProvider>
   );
 }
 
 function SideNav() {
   const pathname = usePathname();
   const prefs = useReadingPreferences();
+  const { canTeach, localDevAccess } = useJoseSession();
+  const inGame = pathname.startsWith("/practice/lab") || pathname.includes("/play");
 
   return (
     <aside className="hidden h-dvh flex-col border-r border-[var(--jose-rule)] bg-[var(--jose-paper)]/95 px-5 py-7 backdrop-blur-md lg:flex">
@@ -79,7 +85,7 @@ function SideNav() {
               className={`flex min-h-11 items-center gap-3.5 rounded-xl px-4 py-3 text-base font-semibold transition ${
                 active
                   ? "bg-teal-100 text-teal-900 shadow-sm"
-                  : "text-stone-600 hover:bg-stone-50"
+                  : "text-[var(--jose-text-muted)] hover:bg-[var(--jose-surface-control)]"
               }`}
             >
               <Icon className="size-5 shrink-0" strokeWidth={2.25} aria-hidden />
@@ -87,10 +93,25 @@ function SideNav() {
             </Link>
           );
         })}
+        {canTeach ? (
+          <Link
+            href="/teach"
+            aria-current={isActive(pathname, "/teach") ? "page" : undefined}
+            className={`flex min-h-11 items-center gap-3.5 rounded-xl px-4 py-3 text-base font-semibold transition ${
+              isActive(pathname, "/teach")
+                ? "bg-teal-100 text-teal-900 shadow-sm"
+                : "text-[var(--jose-text-muted)] hover:bg-[var(--jose-surface-control)]"
+            }`}
+          >
+            <Wrench className="size-5 shrink-0" strokeWidth={2.25} aria-hidden />
+            Teacher tools
+          </Link>
+        ) : null}
       </nav>
       <div className="space-y-3 px-2">
+        {localDevAccess && !inGame ? <ConnectedLocalDevPanel compact /> : null}
         <ThemeToggle compact />
-        <p className="text-sm text-stone-500">Field journal for APC RIZLIFE</p>
+        <p className="text-sm text-[var(--jose-text-muted)]">Field journal for APC RIZLIFE</p>
       </div>
     </aside>
   );
@@ -99,12 +120,19 @@ function SideNav() {
 export function BottomTabs() {
   const pathname = usePathname();
   const prefs = useReadingPreferences();
+  const { canTeach, localDevAccess } = useJoseSession();
+  const inGame = pathname.startsWith("/practice/lab");
 
   return (
     <nav
       className="shrink-0 border-t border-[var(--jose-rule)] bg-[var(--jose-paper)]/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] backdrop-blur-md lg:hidden"
       aria-label="Main"
     >
+      {localDevAccess && !inGame ? (
+        <div className="border-b border-[var(--jose-rule)] px-3 py-2">
+          <ConnectedLocalDevPanel compact />
+        </div>
+      ) : null}
       <div className="mx-auto flex w-full max-w-3xl items-stretch justify-around px-2 pt-2.5">
         {tabDefs.map((tab) => {
           const active = isActive(pathname, tab.href);
@@ -118,7 +146,7 @@ export function BottomTabs() {
               className={`flex min-h-11 min-w-[4.5rem] flex-col items-center gap-1 rounded-xl px-2 py-2.5 text-xs font-semibold transition sm:text-sm ${
                 active
                   ? "bg-teal-100 text-teal-900"
-                  : "text-stone-500 hover:bg-stone-50"
+                  : "text-[var(--jose-text-muted)] hover:bg-[var(--jose-surface-control)]"
               }`}
             >
               <Icon className="size-5" strokeWidth={2.25} aria-hidden />
@@ -126,6 +154,20 @@ export function BottomTabs() {
             </Link>
           );
         })}
+        {canTeach ? (
+          <Link
+            href="/teach"
+            aria-current={isActive(pathname, "/teach") ? "page" : undefined}
+            className={`flex min-h-11 min-w-[4.5rem] flex-col items-center gap-1 rounded-xl px-2 py-2.5 text-xs font-semibold transition sm:text-sm ${
+              isActive(pathname, "/teach")
+                ? "bg-teal-100 text-teal-900"
+                : "text-[var(--jose-text-muted)] hover:bg-[var(--jose-surface-control)]"
+            }`}
+          >
+            <Wrench className="size-5" strokeWidth={2.25} aria-hidden />
+            Teacher tools
+          </Link>
+        ) : null}
       </div>
     </nav>
   );

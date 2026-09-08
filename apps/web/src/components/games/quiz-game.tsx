@@ -10,6 +10,7 @@ import {
 import { Plus, Trash2 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useMotionSound } from "@/lib/motion-sound";
+import { GameBoard } from "./game-board";
 import type { PlayBoardProps, WhyPayload } from "./play-types";
 
 type QuizPlayContent = QuizContent | AssessmentQuiz;
@@ -254,12 +255,13 @@ function QuizPlay({
     pickedId !== null && (!needsRationale || rationaleId !== null);
 
   return (
+    <GameBoard scene="quiz" step={`Question ${index + 1} of ${game.questions.length}`}>
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-extrabold text-slate-500">
+        <p className="text-sm font-extrabold text-[var(--jose-text-muted)]">
           Question {index + 1} of {game.questions.length}
         </p>
-        <p className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-600">
+        <p className="rounded-full bg-[var(--jose-surface-control)] px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[var(--jose-text)]">
           {question.kind === "evidence" ? "Evidence duel" : "Quick check"}
         </p>
       </div>
@@ -297,17 +299,21 @@ function QuizPlay({
           if (!choice) return null;
           const selected = pickedId === choice.id;
           const right = choice.id === (authored?.correctChoiceId ?? revealedId);
-          let tone = "bg-white ring-black/10 hover:bg-violet-50 node-3d motion-control";
-          if (pickedId !== null && selected && right) tone = "bg-emerald-100 ring-emerald-300 motion-accept";
-          else if (pickedId !== null && selected && !right) tone = "bg-rose-100 ring-rose-300 snap-back";
-          else if (pickedId !== null && right) tone = "bg-emerald-50 ring-emerald-200";
+          let tone =
+            "bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)] hover:ring-violet-400 node-3d motion-control";
+          if (pickedId !== null && selected && right)
+            tone = "bg-emerald-700 text-white ring-emerald-800 motion-accept";
+          else if (pickedId !== null && selected && !right)
+            tone = "bg-rose-800 text-white ring-rose-900 snap-back";
+          else if (pickedId !== null && right)
+            tone = "bg-emerald-700/20 text-emerald-950 ring-emerald-700";
           return (
             <li key={choice.id}>
               <button
                 type="button"
                 disabled={pickedId !== null || disabled}
                 onClick={() => void choose(choice.id)}
-                className={`w-full rounded-3xl px-4 py-3.5 text-left text-base font-extrabold text-slate-800 ring-2 ${tone}`}
+                className={`w-full rounded-3xl px-4 py-3.5 text-left text-base font-extrabold ring-2 disabled:bg-[var(--jose-surface-control)] ${tone}`}
               >
                 {choice.text}
               </button>
@@ -359,12 +365,13 @@ function QuizPlay({
           type="button"
           onClick={next}
           disabled={disabled}
-          className="w-full rounded-full bg-violet-600 px-5 py-3.5 text-base font-extrabold text-white shadow-md disabled:opacity-60"
+          className="w-full rounded-full bg-violet-600 px-5 py-3.5 text-base font-extrabold text-white shadow-md disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
         >
           {last ? "See stars" : "Next"}
         </button>
       ) : null}
     </div>
+    </GameBoard>
   );
 }
 

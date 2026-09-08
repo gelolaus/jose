@@ -305,13 +305,8 @@ export function GamePlayer({
         hearts={hearts}
         showHearts={false}
         progress={labelFor(game.type)}
-        wide={
-          game.type === "timeline" ||
-          game.type === "case-files" ||
-          game.type === "dispatches" ||
-          game.type === "editorial" ||
-          game.type === "dapitan"
-        }
+        scene={game.type}
+        wide
       >
         {error ? (
           <p className="mb-4 text-sm font-bold text-rose-600" role="alert">

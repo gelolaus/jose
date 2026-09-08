@@ -3,6 +3,7 @@ import {
   APC_ADMISSION_DOMAINS,
   AUTH_DENIAL_MESSAGES,
   AVATAR_IDS,
+  LOCAL_DEV_TEST_EMAIL,
   SESSION_COOKIE_NAME,
   adminBootstrapBodySchema,
   authMeResponseSchema,
@@ -10,6 +11,8 @@ import {
   canAccessTeacherStudio,
   grantCollaboratorBodySchema,
   grantRoleBodySchema,
+  isLocalDevTestEmail,
+  localDevRoleBodySchema,
   profilePatchBodySchema,
   roleFromAdmissionEmail,
   sessionUserSchema,
@@ -47,6 +50,32 @@ describe("auth contracts", () => {
     });
     expect(status.mockEnabled).toBe(true);
     expect(status.demoMode).toBe(true);
+    expect(status.localDevAccess).toBe(false);
+  });
+
+  it("carries an explicit local development access flag", () => {
+    const status = authStatusSchema.parse({
+      mode: "microsoft",
+      microsoftConfigured: true,
+      mockEnabled: false,
+      allowedDomains: [...APC_ADMISSION_DOMAINS],
+      webOrigin: "http://localhost:3000",
+      localDevAccess: true,
+    });
+    expect(status.localDevAccess).toBe(true);
+  });
+
+  it("rejects a non-boolean local development access flag", () => {
+    expect(
+      authStatusSchema.safeParse({
+        mode: "disabled",
+        microsoftConfigured: false,
+        mockEnabled: false,
+        allowedDomains: [...APC_ADMISSION_DOMAINS],
+        webOrigin: null,
+        localDevAccess: "yes",
+      }).success,
+    ).toBe(false);
   });
 
   it("names the session cookie the API sets", () => {
@@ -72,6 +101,27 @@ describe("canAccessTeacherStudio", () => {
     expect(canAccessTeacherStudio("student")).toBe(false);
     expect(canAccessTeacherStudio(null)).toBe(false);
     expect(canAccessTeacherStudio(undefined)).toBe(false);
+  });
+});
+
+describe("local development test account", () => {
+  it("names the exact Arlaus mailbox", () => {
+    expect(LOCAL_DEV_TEST_EMAIL).toBe("arlaus@student.apc.edu.ph");
+  });
+
+  it("accepts only the normalized Arlaus email", () => {
+    expect(isLocalDevTestEmail("arlaus@student.apc.edu.ph")).toBe(true);
+    expect(isLocalDevTestEmail("  ARLAUS@Student.APC.edu.ph ")).toBe(true);
+    expect(isLocalDevTestEmail("faculty@apc.edu.ph")).toBe(false);
+    expect(isLocalDevTestEmail("other@student.apc.edu.ph")).toBe(false);
+  });
+
+  it("accepts student, teacher, or admin and refuses unknown roles", () => {
+    expect(localDevRoleBodySchema.safeParse({ role: "student" }).success).toBe(true);
+    expect(localDevRoleBodySchema.safeParse({ role: "teacher" }).success).toBe(true);
+    expect(localDevRoleBodySchema.safeParse({ role: "admin" }).success).toBe(true);
+    expect(localDevRoleBodySchema.safeParse({ role: "owner" }).success).toBe(false);
+    expect(localDevRoleBodySchema.safeParse({}).success).toBe(false);
   });
 });
 

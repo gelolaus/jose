@@ -7,7 +7,7 @@ import { EditorialGame } from "./editorial-game";
 describe("EditorialGame", () => {
   afterEach(() => cleanup());
 
-  it("shows briefing and scoring preview that reject opinion scoring", () => {
+  it("starts with three tap-first slots and hides scoring preview", () => {
     render(
       <EditorialGame
         game={emptyEditorialGame()}
@@ -16,11 +16,9 @@ describe("EditorialGame", () => {
       />,
     );
 
-    expect(screen.getByText(/historical briefing/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/preferred modern political opinion/i),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /check editorial/i })).toBeDisabled();
+    expect(screen.getAllByText(/build the article/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/preferred modern political opinion/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /check the story/i })).toBeDisabled();
     fireEvent.click(screen.getByText(/draft claim a/i));
     expect(screen.getByRole("button", { name: /put in claim/i })).toBeInTheDocument();
   });

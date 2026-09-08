@@ -7,7 +7,7 @@ import { DispatchesGame } from "./dispatches-game";
 describe("DispatchesGame", () => {
   afterEach(() => cleanup());
 
-  it("works from the place list without the map", () => {
+  it("works from stacked stops without a tiny map", () => {
     const onMiss = vi.fn(async () => "ok" as const);
     const onFinish = vi.fn();
     render(
@@ -18,11 +18,12 @@ describe("DispatchesGame", () => {
       />,
     );
 
-    expect(screen.getByRole("tab", { name: /place list/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /madrid/i })).toBeInTheDocument();
+    expect(screen.getAllByText(/choose the next stop/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /paris/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /paris/i }));
     fireEvent.click(
       screen.getByRole("button", { name: /draft strong dispatch — replace/i }),
     );
-    expect(screen.getByRole("button", { name: /paris/i })).toBeInTheDocument();
+    expect(screen.getAllByText(/continue the route|paris/i).length).toBeGreaterThan(0);
   });
 });

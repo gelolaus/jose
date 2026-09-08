@@ -133,7 +133,7 @@ export function GameLabPlay({ entry }: { entry: LabGame }) {
       <div className="mx-auto w-full max-w-3xl px-4 pt-3 sm:px-6 sm:pt-4">
         <Link
           href="/practice"
-          className="inline-flex min-h-11 items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-extrabold text-slate-700"
+          className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[var(--jose-surface-control)] px-4 py-2 text-sm font-extrabold text-[var(--jose-text)]"
         >
           <ArrowLeft className="size-4" strokeWidth={2.5} aria-hidden />
           All games
@@ -146,7 +146,7 @@ export function GameLabPlay({ entry }: { entry: LabGame }) {
               className={`flex min-h-11 shrink-0 items-center rounded-full px-3 py-2 text-xs font-semibold ${
                 item.type === entry.type
                   ? "bg-teal-800 text-white"
-                  : "bg-white text-stone-600 ring-1 ring-black/10"
+                  : "bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-1 ring-[var(--jose-rule)]"
               }`}
             >
               {item.title}
@@ -161,13 +161,8 @@ export function GameLabPlay({ entry }: { entry: LabGame }) {
         title={entry.title}
         hint={hintFor(entry.type)}
         progress={labelFor(entry.type)}
-        wide={
-          entry.type === "timeline" ||
-          entry.type === "case-files" ||
-          entry.type === "dispatches" ||
-          entry.type === "editorial" ||
-          entry.type === "dapitan"
-        }
+        scene={entry.type}
+        wide
       >
         <GameSwitch
           key={nonce}

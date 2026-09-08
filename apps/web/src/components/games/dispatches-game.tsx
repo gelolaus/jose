@@ -1,7 +1,9 @@
 "use client";
 
 import type { DispatchesGame as DispatchesContent } from "@jose/shared";
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState } from "react";
+import { GameBoard } from "./game-board";
+import { dispatchNextOptions, nextDispatchStop } from "./advanced-play";
 import type { PlayBoardProps } from "./play-types";
 
 export function DispatchesGame({
@@ -39,7 +41,9 @@ function DispatchesPlay({
 }: { game: DispatchesContent } & PlayBoardProps) {
   const [cleared, setCleared] = useState<Record<string, true>>({});
   const [activeId, setActiveId] = useState(game.stops[0]?.id ?? null);
-  const [view, setView] = useState<"list" | "map">("list");
+  const [routePicked, setRoutePicked] = useState(false);
+  const [routeFeedback, setRouteFeedback] = useState<string | null>(null);
+  const [pickedStopId, setPickedStopId] = useState<string | null>(null);
   const missesRef = useRef(0);
 
   const unlockedIds = useMemo(() => {
@@ -53,22 +57,47 @@ function DispatchesPlay({
 
   const active = game.stops.find((stop) => stop.id === activeId) ?? null;
   const allDone = game.stops.every((stop) => cleared[stop.id]);
+  const next = active ? nextDispatchStop(game, active.id) : null;
+  const options = active ? dispatchNextOptions(game, active.id) : [];
+
+  async function pickNext(stopId: string) {
+    if (!active || disabled || routePicked || pickedStopId) return;
+    if (next && stopId === next.id) {
+      setPickedStopId(stopId);
+      setRoutePicked(true);
+      setRouteFeedback(`${next.name} is the next stop.`);
+      return;
+    }
+    missesRef.current += 1;
+    setPickedStopId(stopId);
+    setRouteFeedback(
+      next
+        ? `He went to ${next.name} next. ${next.contextCard}`
+        : "That was not the next stop.",
+    );
+    await onMiss({
+      title: "Next stop",
+      body: next
+        ? `He went to ${next.name} next. ${next.contextCard}`
+        : "That was not the next stop on this route.",
+    });
+  }
 
   async function choose(choiceId: string) {
     if (!active || disabled || cleared[active.id]) return;
     const choice = active.dispatchChoices.find((item) => item.id === choiceId);
     if (!choice) return;
     if (choice.teachesObjective) {
-      const next = { ...cleared, [active.id]: true as const };
-      setCleared(next);
-      const finished = game.stops.every((stop) => next[stop.id]);
+      const nextCleared = { ...cleared, [active.id]: true as const };
+      setCleared(nextCleared);
+      const finished = game.stops.every((stop) => nextCleared[stop.id]);
       if (finished) {
         onFinish(game.stops.length - missesRef.current, game.stops.length, missesRef.current, {
           type: "dispatches",
           completed: true,
         });
       } else {
-        const nextStop = game.stops.find((stop) => !next[stop.id]);
+        const nextStop = game.stops.find((stop) => !nextCleared[stop.id]);
         if (nextStop) setActiveId(nextStop.id);
       }
       return;
@@ -77,159 +106,135 @@ function DispatchesPlay({
     await onMiss({ title: "Dispatch feedback", body: choice.why });
   }
 
+  const showRoute = Boolean(active && !routePicked && !cleared[active.id] && next);
+
   return (
-    <div className="space-y-4">
-      {game.approvalStatus === "draft" ? (
-        <p className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950 ring-1 ring-amber-200">
-          Draft route — replace excerpts before publish. Map is schematic only.
-        </p>
-      ) : null}
-      <div className="rounded-[1.5rem] bg-sky-900 px-4 py-4 text-white">
-        <p className="font-display text-2xl font-semibold">{game.routeTitle}</p>
-        <p className="mt-1 text-sm font-semibold text-sky-100">{game.mapCaption}</p>
-      </div>
+    <GameBoard
+      scene="dispatches"
+      step={showRoute ? "Choose the next stop" : "Read the dispatch"}
+    >
+      <div className="space-y-4">
+        {game.approvalStatus === "draft" ? (
+          <p className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950 ring-1 ring-amber-200">
+            Draft route — replace excerpts before publish. Map is schematic only.
+          </p>
+        ) : null}
+        <div className="rounded-[1.5rem] bg-sky-900 px-4 py-4 text-sky-50">
+          <p className="font-display text-2xl font-semibold">{game.routeTitle}</p>
+          <p className="mt-1 text-sm font-semibold text-sky-100">
+            Follow Rizal’s route. Tap the place that comes next.
+          </p>
+        </div>
 
-      <div className="flex gap-2" role="tablist" aria-label="Dispatch navigation">
-        <TabButton active={view === "list"} onClick={() => setView("list")}>
-          Place list
-        </TabButton>
-        <TabButton active={view === "map"} onClick={() => setView("map")}>
-          Schematic map
-        </TabButton>
-      </div>
+        {active ? (
+          <section className="rounded-[1.4rem] bg-[var(--jose-surface-elevated)] px-4 py-4 ring-1 ring-[var(--jose-rule)]">
+            <p className="text-xs font-extrabold uppercase tracking-wide text-sky-800">
+              Current stop
+            </p>
+            <h3 className="mt-1 font-display text-xl font-semibold text-[var(--jose-text)]">
+              {active.name}
+            </h3>
+            <p className="mt-1 text-sm font-semibold text-[var(--jose-text)]">
+              {active.contextCard}
+            </p>
+          </section>
+        ) : null}
 
-      {view === "map" ? (
-        <svg
-          viewBox="0 0 100 70"
-          role="img"
-          aria-label="Schematic Europe route. Equivalent place list is also available."
-          className="w-full rounded-[1.4rem] bg-gradient-to-br from-sky-100 to-emerald-50 ring-1 ring-black/10"
-        >
-          <title>Schematic route map</title>
-          {game.stops.map((stop) => {
-            const unlocked = unlockedIds.has(stop.id);
-            const done = Boolean(cleared[stop.id]);
-            return (
-              <g key={stop.id}>
-                <circle
-                  cx={stop.x}
-                  cy={stop.y}
-                  r={done ? 4.5 : 3.8}
-                  className={
-                    done
-                      ? "fill-emerald-500"
-                      : unlocked
-                        ? "fill-sky-600"
-                        : "fill-slate-400"
-                  }
-                />
-                <text
-                  x={stop.x}
-                  y={Math.max(6, stop.y - 5)}
-                  textAnchor="middle"
-                  className="fill-slate-700 text-[4px] font-bold"
-                >
-                  {stop.name}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-      ) : null}
-
-      <ul className="space-y-2" aria-label="Stops">
-        {game.stops.map((stop) => {
-          const unlocked = unlockedIds.has(stop.id);
-          const done = Boolean(cleared[stop.id]);
-          return (
-            <li key={stop.id}>
+        {showRoute ? (
+          <section className="space-y-3">
+            <p className="text-sm font-extrabold text-[var(--jose-text)]">
+              Where did he go next?
+            </p>
+            <p className="text-sm font-semibold text-[var(--jose-text-muted)]">
+              Choose the next stop
+            </p>
+            <ul className="grid gap-3" aria-label="Possible next stops">
+              {options.map((stop) => {
+                const selected = pickedStopId === stop.id;
+                const correct = Boolean(next && stop.id === next.id && pickedStopId);
+                const tone = !pickedStopId
+                  ? "bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)]"
+                  : correct
+                    ? "bg-emerald-700 text-white ring-emerald-800"
+                    : selected
+                      ? "bg-rose-800 text-white ring-rose-900"
+                      : "bg-[var(--jose-surface-control)] text-[var(--jose-text-muted)] ring-[var(--jose-rule)]";
+                return (
+                  <li key={stop.id}>
+                    <button
+                      type="button"
+                      disabled={disabled || Boolean(pickedStopId)}
+                      onClick={() => void pickNext(stop.id)}
+                      className={`w-full rounded-[1.3rem] px-4 py-4 text-left ring-2 disabled:opacity-100 ${tone}`}
+                    >
+                      <span className="block text-xs font-extrabold uppercase tracking-wide opacity-80">
+                        {stop.regionLabel}
+                      </span>
+                      <span className="font-display text-lg font-semibold">{stop.name}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            {routeFeedback ? (
+              <p className="text-sm font-semibold text-[var(--jose-text)]" aria-live="polite">
+                {routeFeedback}
+              </p>
+            ) : null}
+            {pickedStopId && !routePicked ? (
               <button
                 type="button"
-                disabled={!unlocked || disabled}
-                onClick={() => setActiveId(stop.id)}
-                className={`w-full rounded-2xl px-4 py-3 text-left ring-2 ${
-                  activeId === stop.id
-                    ? "bg-sky-50 ring-sky-400"
-                    : "bg-white ring-black/10"
-                } ${!unlocked ? "opacity-50" : ""}`}
+                onClick={() => setRoutePicked(true)}
+                className="min-h-11 w-full rounded-full bg-sky-800 px-4 py-3 text-sm font-extrabold text-white"
               >
-                <span className="block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-                  {stop.regionLabel}
-                  {done ? " · cleared" : unlocked ? "" : " · locked"}
-                </span>
-                <span className="text-sm font-extrabold text-slate-800">
-                  {stop.name}
-                </span>
-                <span className="mt-1 block text-xs font-semibold text-slate-600">
-                  {stop.objective}
-                </span>
+                Continue the route
               </button>
-            </li>
-          );
-        })}
-      </ul>
+            ) : null}
+          </section>
+        ) : null}
 
-      {active && unlockedIds.has(active.id) ? (
-        <section className="space-y-3 rounded-[1.5rem] bg-white p-4 ring-1 ring-black/10">
-          <h3 className="font-display text-xl font-semibold text-slate-900">
-            {active.name}
-          </h3>
-          <p className="text-sm font-semibold text-slate-700">{active.contextCard}</p>
-          <blockquote className="rounded-2xl bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 ring-1 ring-black/5">
-            <p>{active.sourceExcerpt}</p>
-            <footer className="mt-2 text-xs font-bold text-slate-500">
-              {active.sourceCitation}
-            </footer>
-          </blockquote>
-          <p className="text-sm font-bold text-slate-800">{active.encounter}</p>
-          <p className="text-sm font-extrabold text-sky-800">{active.prompt}</p>
-          <ul className="space-y-2">
-            {active.dispatchChoices.map((choice) => (
-              <li key={choice.id}>
-                <button
-                  type="button"
-                  disabled={disabled || Boolean(cleared[active.id])}
-                  onClick={() => void choose(choice.id)}
-                  className="w-full rounded-2xl bg-sky-600 px-4 py-3 text-left text-sm font-extrabold text-white disabled:opacity-50"
-                >
-                  {choice.label}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+        {active && unlockedIds.has(active.id) && (routePicked || !next || Boolean(cleared[active.id])) ? (
+          <section className="space-y-3 rounded-[1.5rem] bg-[var(--jose-surface-elevated)] p-4 ring-1 ring-[var(--jose-rule)]">
+            <p className="text-xs font-extrabold uppercase tracking-wide text-sky-800">
+              Read the dispatch
+            </p>
+            <h3 className="font-display text-xl font-semibold text-[var(--jose-text)]">
+              {active.name}
+            </h3>
+            <blockquote className="rounded-2xl bg-[var(--jose-surface-control)] px-3 py-3 text-sm font-semibold text-[var(--jose-text)]">
+              <p>{active.sourceExcerpt}</p>
+              <footer className="mt-2 text-xs font-bold text-[var(--jose-text-muted)]">
+                {active.sourceCitation}
+              </footer>
+            </blockquote>
+            <p className="text-sm font-extrabold text-sky-900">{active.prompt}</p>
+            <ul className="space-y-2">
+              {active.dispatchChoices.map((choice) => (
+                <li key={choice.id}>
+                  <button
+                    type="button"
+                    disabled={disabled || Boolean(cleared[active.id])}
+                    onClick={() => void choose(choice.id)}
+                    className="w-full rounded-2xl bg-sky-800 px-4 py-3 text-left text-sm font-extrabold text-white disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
+                  >
+                    {choice.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {cleared[active.id] && !allDone ? (
+              <p className="text-sm font-extrabold text-teal-800">Continue the route</p>
+            ) : null}
+          </section>
+        ) : null}
 
-      {allDone ? (
-        <p className="rounded-2xl bg-emerald-50 px-3 py-3 text-sm font-semibold text-emerald-950 ring-1 ring-emerald-200">
-          {game.debrief}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      onClick={onClick}
-      className={`rounded-full px-4 py-2 text-sm font-extrabold ${
-        active ? "bg-sky-700 text-white" : "bg-slate-100 text-slate-600"
-      }`}
-    >
-      {children}
-    </button>
+        {allDone ? (
+          <p className="rounded-2xl bg-emerald-50 px-3 py-3 text-sm font-semibold text-emerald-950 ring-1 ring-emerald-200">
+            {game.debrief}
+          </p>
+        ) : null}
+      </div>
+    </GameBoard>
   );
 }
 

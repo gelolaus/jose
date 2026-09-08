@@ -5,6 +5,7 @@ import { Heart, Star } from "lucide-react";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { SoundFocusControls, useFocusMode, useMotionSound } from "@/lib/motion-sound";
 import { useFocusTrap } from "@/lib/use-focus-trap";
+import type { GameContent } from "@jose/shared";
 import type { WhyPayload } from "./play-types";
 
 export function HeartsHud({ hearts, max = 5 }: { hearts: number; max?: number }) {
@@ -77,19 +78,19 @@ export function WhySheet({
         aria-describedby={bodyId}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className="why-pop motion-screen w-full max-w-md rounded-[1.75rem] bg-white p-5 shadow-xl outline-none ring-2 ring-amber-200 sm:p-6"
+        className="why-pop motion-screen w-full max-w-md rounded-[1.75rem] bg-[var(--jose-surface-elevated)] p-5 text-[var(--jose-text)] shadow-xl outline-none ring-2 ring-amber-400 sm:p-6"
       >
         <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-600">
           {eyebrow}
         </p>
-        <h2 id={titleId} className="mt-2 font-display text-2xl font-semibold text-slate-800">
+        <h2 id={titleId} className="mt-2 font-display text-2xl font-semibold text-[var(--jose-text)]">
           {why.title}
         </h2>
-        <p id={bodyId} className="mt-2 whitespace-pre-line text-base font-semibold leading-relaxed text-slate-600">
+        <p id={bodyId} className="mt-2 whitespace-pre-line text-base font-semibold leading-relaxed text-[var(--jose-text)]">
           {why.body}
         </p>
         {why.sourceLabel ? (
-          <p className="mt-3 text-sm font-bold text-slate-500">
+          <p className="mt-3 text-sm font-bold text-[var(--jose-text-muted)]">
             Source:{" "}
             {why.sourceHref ? (
               <a href={why.sourceHref} className="text-violet-700 underline" target="_blank" rel="noreferrer">
@@ -104,7 +105,7 @@ export function WhySheet({
           type="button"
           disabled={!ready}
           onClick={onDismiss}
-          className="mt-5 min-h-11 w-full rounded-full bg-violet-600 px-5 py-3.5 text-base font-extrabold text-white shadow-md disabled:opacity-50"
+          className="mt-5 min-h-11 w-full rounded-full bg-violet-700 px-5 py-3.5 text-base font-extrabold text-white shadow-md disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
         >
           {ready ? "Got it" : "…"}
         </button>
@@ -169,13 +170,13 @@ export function StarCelebration({
       <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-violet-500">
         {stars === 3 ? "Perfect" : stars === 2 ? "Nice work" : "You finished"}
       </p>
-      <p className="font-display text-5xl font-semibold text-slate-800">
+      <p className="font-display text-5xl font-semibold text-[var(--jose-text)]">
         {score}
-        <span className="text-2xl text-slate-400">/{maxScore}</span>
+        <span className="text-2xl text-[var(--jose-text-muted)]">/{maxScore}</span>
       </p>
-      <p className="text-base font-semibold text-slate-600">{title}</p>
+      <p className="text-base font-semibold text-[var(--jose-text)]">{title}</p>
       {statusLabel ? (
-        <p className="text-sm font-extrabold text-slate-500" aria-live="polite">
+        <p className="text-sm font-extrabold text-[var(--jose-text-muted)]" aria-live="polite">
           {statusLabel}
         </p>
       ) : null}
@@ -194,7 +195,7 @@ export function StarCelebration({
           <button
             type="button"
             onClick={playAgain}
-            className="flex-1 rounded-full bg-slate-100 px-5 py-3 text-sm font-extrabold text-slate-700"
+            className="flex-1 rounded-full bg-[var(--jose-surface-control)] px-5 py-3 text-sm font-extrabold text-[var(--jose-text)]"
           >
             {onPlayAgain ? playAgainLabel : retryLabel}
           </button>
@@ -220,8 +221,8 @@ export function HeartsBreak({
   return (
     <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center gap-4 px-6 py-12 text-center">
       <Heart className="size-16 fill-rose-200 text-rose-300" strokeWidth={2} aria-hidden />
-      <p className="font-display text-3xl font-semibold text-slate-800">Take a break</p>
-      <p className="text-base font-semibold text-slate-600">
+      <p className="font-display text-3xl font-semibold text-[var(--jose-text)]">Take a break</p>
+      <p className="text-base font-semibold text-[var(--jose-text)]">
         Out of arcade challenge lives. Core learning and required coursework stay
         open — continue a lesson, use Practice, or wait for challenge lives to refill.
       </p>
@@ -233,7 +234,7 @@ export function HeartsBreak({
       </Link>
       <Link
         href="/learn"
-        className="w-full rounded-full bg-slate-100 px-5 py-3 text-center text-sm font-extrabold text-slate-700"
+        className="w-full rounded-full bg-[var(--jose-surface-control)] px-5 py-3 text-center text-sm font-extrabold text-[var(--jose-text)]"
       >
         All modules
       </Link>
@@ -248,6 +249,7 @@ export function GameFrame({
   progress,
   showHearts,
   wide,
+  scene,
   children,
 }: {
   title: string;
@@ -256,28 +258,30 @@ export function GameFrame({
   progress?: string;
   showHearts?: boolean;
   wide?: boolean;
+  scene?: GameContent["type"];
   children: ReactNode;
 }) {
   const [focus] = useFocusMode();
   return (
     <div
-      className={`mx-auto w-full px-4 py-3 sm:px-6 sm:py-8 ${wide ? "max-w-5xl" : "max-w-3xl"} ${
-        focus ? "jose-focus" : ""
-      }`}
+      data-game-stage={scene}
+      className={`game-stage mx-auto w-full px-4 py-3 sm:px-6 sm:py-8 ${wide ? "max-w-5xl" : "max-w-3xl"} ${
+        scene ? `game-stage--${scene}` : ""
+      } ${focus ? "jose-focus" : ""}`}
     >
       <div className="mb-2.5 flex items-start justify-between gap-3 sm:mb-5">
         <div className="min-w-0">
-          <h1 className="font-display text-xl font-semibold tracking-tight text-slate-800 sm:text-4xl">
+          <h1 className="font-display text-xl font-semibold tracking-tight text-[var(--jose-text)] sm:text-4xl">
             {title}
           </h1>
-          <p className="mt-0.5 text-xs font-semibold leading-snug text-slate-500 sm:mt-1 sm:text-sm">
+          <p className="mt-0.5 text-sm font-semibold leading-snug text-[var(--jose-text)] sm:mt-1 sm:text-base">
             {hint}
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           {showHearts && hearts !== undefined ? <HeartsHud hearts={hearts} /> : null}
           {progress ? (
-            <p className="hidden text-xs font-extrabold uppercase tracking-wide text-violet-500 sm:block">
+            <p className="hidden text-xs font-extrabold uppercase tracking-wide text-[var(--jose-accent)] sm:block">
               {progress}
             </p>
           ) : null}

@@ -13,11 +13,15 @@ import {
 import {
   AUTH_DENIAL_MESSAGES,
   DEFAULT_AVATAR_ID,
+  LOCAL_DEV_TEST_EMAIL,
   MAX_HEARTS,
   isAvatarId,
+  isLocalDevTestEmail,
+  localDevRoleBodySchema,
   normalizeDisplayName,
   type AuthDenialReason,
   type AuthLearnerProfile,
+  type AuthMeResponse,
   type AuthStatus,
   type AvatarId,
   type PendingAdmissionStatus,
@@ -27,6 +31,7 @@ import {
   requestMailboxBodySchema,
   verifyMailboxBodySchema,
 } from "@jose/shared";
+import type { Request } from "express";
 import { and, desc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { DatabaseService } from "../db/database.service";
@@ -60,7 +65,9 @@ import type {
   MockCompleteClaims,
   ValidatedMicrosoftIdentity,
 } from "./microsoft-oidc.types";
+import { localDevAccessFromRequest } from "./local-request";
 import { SessionService } from "./session.service";
+import { UsersService } from "./users.service";
 
 const PROVIDER = "microsoft";
 
@@ -79,6 +86,7 @@ export class AuthService {
   constructor(
     private readonly database: DatabaseService,
     private readonly sessions: SessionService,
+    private readonly users: UsersService,
   ) {
     try {
       this.config = loadAuthConfig();
@@ -134,8 +142,77 @@ export class AuthService {
     return this.config;
   }
 
-  getStatus(): AuthStatus & { configError: string | null } {
-    return { ...toAuthStatus(this.config), configError: this.configError };
+  getStatus(req?: Request): AuthStatus & { configError: string | null } {
+    return {
+      ...toAuthStatus(this.config),
+      localDevAccess: this.hasLocalDevAccess(req),
+      configError: this.configError,
+    };
+  }
+
+  hasLocalDevAccess(req?: Request): boolean {
+    if (!req) return false;
+    return localDevAccessFromRequest(
+      req,
+      this.config.isProduction,
+      process.env.JOSE_AUTH_DEV_LOGIN,
+    );
+  }
+
+  private assertLocalDevAccess(req: Request): void {
+    if (!this.hasLocalDevAccess(req)) {
+      throw new ForbiddenException(
+        "Local development login is only available on localhost.",
+      );
+    }
+  }
+
+  /**
+   * Localhost-only shortcut that signs in the Arlaus test mailbox.
+   * Production and non-loopback peers never reach a session.
+   */
+  async localDevLogin(req: Request): Promise<{ token: string; me: AuthMeResponse }> {
+    this.assertLocalDevAccess(req);
+    let user = await this.users.findByAdmissionEmail(LOCAL_DEV_TEST_EMAIL);
+    if (!user) {
+      user = await this.users.createUser({
+        admissionEmail: LOCAL_DEV_TEST_EMAIL,
+        displayName: "Arlaus",
+        role: "student",
+      });
+    }
+    if (user.suspended) {
+      throw new ForbiddenException(AUTH_DENIAL_MESSAGES.suspended);
+    }
+    const session = await this.sessions.createSession(user.id, this.config);
+    const me = await this.me(session.token);
+    return { token: session.token, me };
+  }
+
+  async localDevSwitchRole(
+    req: Request,
+    token: string | undefined,
+    body: unknown,
+  ): Promise<AuthMeResponse> {
+    this.assertLocalDevAccess(req);
+    const user = await this.requireUser(token);
+    if (!isLocalDevTestEmail(user.admissionEmail)) {
+      throw new ForbiddenException(
+        "This switch exists only for the local test account.",
+      );
+    }
+    const parsed = localDevRoleBodySchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        parsed.error.issues.map((issue) => issue.message).join("; ") ||
+          "Role must be student, teacher, or admin.",
+      );
+    }
+    await this.users.setLocalDevTestRole({
+      email: user.admissionEmail,
+      role: parsed.data.role,
+    });
+    return this.me(token);
   }
 
   isDemoMode(): boolean {

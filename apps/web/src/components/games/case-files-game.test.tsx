@@ -7,7 +7,7 @@ import { CaseFilesGame } from "./case-files-game";
 describe("CaseFilesGame", () => {
   afterEach(() => cleanup());
 
-  it("supports tagging evidence and submitting a case", async () => {
+  it("supports tagging evidence and submitting a case after the first proof", async () => {
     const onMiss = vi.fn(async () => "ok" as const);
     const onFinish = vi.fn();
     render(
@@ -18,7 +18,10 @@ describe("CaseFilesGame", () => {
       />,
     );
 
-    expect(screen.getByText(/case question/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/read the claim/i).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: /draft source a/i }));
+    fireEvent.click(screen.getByRole("button", { name: /next file/i }));
+
     const tagButtons = screen.getAllByRole("button", { name: /tag|in tray/i });
     fireEvent.click(tagButtons[0]!);
     fireEvent.click(tagButtons[1]!);

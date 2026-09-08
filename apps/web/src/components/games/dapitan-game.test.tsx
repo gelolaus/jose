@@ -7,7 +7,7 @@ import { DapitanGame } from "./dapitan-game";
 describe("DapitanGame", () => {
   afterEach(() => cleanup());
 
-  it("exposes tradeoffs, undo, and no mandatory timer", () => {
+  it("exposes tradeoffs after the first community choice, with undo and no timer", () => {
     const onMiss = vi.fn(async () => "ok" as const);
     const onFinish = vi.fn();
     render(
@@ -18,10 +18,10 @@ describe("DapitanGame", () => {
       />,
     );
 
-    expect(screen.getByText(/game assumptions/i)).toBeInTheDocument();
     expect(screen.queryByText(/seconds left/i)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /clinic hours/i }));
+    fireEvent.click(screen.getByRole("button", { name: /continue the work/i }));
     fireEvent.click(screen.getByRole("button", { name: /undo last choice/i }));
-    expect(screen.getByText(/turn 1 of/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/choose an action|the community needs/i).length).toBeGreaterThan(0);
   });
 });

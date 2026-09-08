@@ -14,6 +14,7 @@ import {
   formatClock,
   roundPhase,
 } from "./memory-round";
+import { GameBoard } from "./game-board";
 import type { PlayBoardProps } from "./play-types";
 
 type Card = {
@@ -343,6 +344,7 @@ function MemoryPlay({
       : artifact;
 
   return (
+    <GameBoard scene="memory" step="Tap two cards to match">
     <div>
       <div
         className={`rounded-[1.75rem] p-3 shadow-[inset_0_0_0_3px_#245538,0_8px_0_#1a3d28] sm:p-5 ${
@@ -465,6 +467,7 @@ function MemoryPlay({
         </div>
       ) : null}
     </div>
+    </GameBoard>
   );
 }
 

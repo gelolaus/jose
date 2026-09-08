@@ -8,6 +8,8 @@ import {
 } from "@jose/shared";
 import { useState } from "react";
 import type { PlayBoardProps } from "./play-types";
+import { GameBoard } from "./game-board";
+import { firstDapitanProjects } from "./advanced-play";
 
 export function DapitanGame({
   game,
@@ -48,19 +50,36 @@ function DapitanPlay({
   const [turn, setTurn] = useState(1);
   const [reflection, setReflection] = useState("");
   const [done, setDone] = useState(false);
+  const [introComplete, setIntroComplete] = useState(false);
+  const [lastNote, setLastNote] = useState<string | null>(null);
   const [history, setHistory] = useState<
-    { resources: DapitanResources; plan: string[]; turn: number }[]
+    { resources: DapitanResources; plan: string[]; turn: number; introComplete: boolean }[]
   >([]);
+  const introProjects = firstDapitanProjects(game);
 
-  function choose(projectId: string) {
+  function choose(projectId: string, fromIntro = false) {
     if (disabled || done) return;
     const project = game.projects.find((item) => item.id === projectId);
     if (!project || !canAfford(resources, project.cost)) return;
-    setHistory((prev) => [...prev, { resources, plan, turn }]);
+    setHistory((prev) => [...prev, { resources, plan, turn, introComplete }]);
     const nextResources = applyDapitanProject(resources, project);
     const nextPlan = [...plan, projectId];
     setResources(nextResources);
     setPlan(nextPlan);
+    setLastNote(project.tradeoffNote);
+    if (fromIntro) {
+      return;
+    }
+    if (turn >= game.turns) {
+      setDone(true);
+      return;
+    }
+    setTurn((value) => value + 1);
+  }
+
+  function continueIntro() {
+    if (!lastNote) return;
+    setIntroComplete(true);
     if (turn >= game.turns) {
       setDone(true);
       return;
@@ -76,6 +95,8 @@ function DapitanPlay({
     setResources(previous.resources);
     setPlan(previous.plan);
     setTurn(previous.turn);
+    setIntroComplete(previous.introComplete);
+    setLastNote(null);
   }
 
   function finish() {
@@ -88,7 +109,74 @@ function DapitanPlay({
     });
   }
 
+  if (!introComplete) {
+    return (
+      <GameBoard scene="dapitan" step="Choose an action">
+        <div className="space-y-4">
+          {game.approvalStatus === "draft" ? (
+            <p className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950 ring-1 ring-amber-200">
+              Draft workshop — approve scenario and sourced debrief before publish.
+            </p>
+          ) : null}
+          <section className="rounded-[1.5rem] bg-teal-950 px-4 py-4 text-teal-50">
+            <p className="text-xs font-extrabold uppercase tracking-wide text-teal-200">
+              The community needs…
+            </p>
+            <p className="mt-1 font-display text-xl font-semibold">{game.scenario}</p>
+            <p className="mt-2 text-sm font-semibold text-teal-100">
+              Choose the action that best helps the community.
+            </p>
+          </section>
+          <div className="grid grid-cols-3 gap-2" aria-label="Visible resources">
+            <ResourceChip label="Time" value={resources.time} />
+            <ResourceChip label="Materials" value={resources.materials} />
+            <ResourceChip label="Goodwill" value={resources.goodwill} />
+          </div>
+          {!lastNote ? (
+            <ul className="space-y-2" aria-label="Choose an action">
+              {introProjects.map((project) => (
+                <li key={project.id}>
+                  <button
+                    type="button"
+                    disabled={disabled || !canAfford(resources, project.cost)}
+                    onClick={() => choose(project.id, true)}
+                    className="w-full rounded-[1.3rem] bg-[var(--jose-surface-elevated)] px-4 py-4 text-left ring-1 ring-[var(--jose-rule)] disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
+                  >
+                    <span className="block text-base font-extrabold text-[var(--jose-text)]">
+                      {project.title}
+                    </span>
+                    <span className="mt-1 block text-sm font-semibold text-[var(--jose-text-muted)]">
+                      What will this help? {project.tradeoffNote}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="space-y-3 rounded-[1.3rem] bg-[var(--jose-surface-elevated)] px-4 py-4 ring-1 ring-[var(--jose-rule)]">
+              <p className="text-xs font-extrabold uppercase tracking-wide text-teal-800">
+                What will this help?
+              </p>
+              <p className="text-sm font-semibold text-[var(--jose-text)]">{lastNote}</p>
+              <p className="text-sm font-semibold text-[var(--jose-text-muted)]">
+                What will we give up? Time, materials, or goodwill spent on this work.
+              </p>
+              <button
+                type="button"
+                onClick={continueIntro}
+                className="min-h-11 w-full rounded-full bg-teal-800 px-4 py-3 text-sm font-extrabold text-white"
+              >
+                Continue the work
+              </button>
+            </div>
+          )}
+        </div>
+      </GameBoard>
+    );
+  }
+
   return (
+    <GameBoard scene="dapitan" step={`Turn ${Math.min(turn, game.turns)} of ${game.turns}`}>
     <div className="space-y-4">
       {game.approvalStatus === "draft" ? (
         <p className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950 ring-1 ring-amber-200">
@@ -104,7 +192,7 @@ function DapitanPlay({
         </p>
         <p className="mt-1 text-sm font-semibold">{game.assumptionsNotice}</p>
       </div>
-      <p className="text-sm font-bold text-slate-800">{game.scenario}</p>
+      <p className="text-sm font-bold text-[var(--jose-text)]">{game.scenario}</p>
 
       <div
         className="grid grid-cols-3 gap-2"
@@ -115,7 +203,7 @@ function DapitanPlay({
         <ResourceChip label="Goodwill" value={resources.goodwill} />
       </div>
 
-      <p className="text-sm font-extrabold text-slate-600">
+      <p className="text-sm font-extrabold text-[var(--jose-text-muted)]">
         Turn {Math.min(turn, game.turns)} of {game.turns}
         {done ? " · plan complete" : ""}
       </p>
@@ -130,12 +218,12 @@ function DapitanPlay({
                   type="button"
                   disabled={disabled || !affordable}
                   onClick={() => choose(project.id)}
-                  className="w-full rounded-[1.3rem] bg-white px-4 py-3 text-left ring-1 ring-black/10 disabled:opacity-45"
+                  className="w-full rounded-[1.3rem] bg-[var(--jose-surface-elevated)] px-4 py-3 text-left ring-1 ring-[var(--jose-rule)] disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
                 >
-                  <span className="block text-sm font-extrabold text-slate-900">
+                  <span className="block text-sm font-extrabold text-[var(--jose-text)]">
                     {project.title}
                   </span>
-                  <span className="mt-1 block text-xs font-bold text-slate-500">
+                  <span className="mt-1 block text-xs font-bold text-[var(--jose-text-muted)]">
                     Cost T{project.cost.time} · M{project.cost.materials} · G
                     {project.cost.goodwill}
                   </span>
@@ -165,7 +253,7 @@ function DapitanPlay({
               value={reflection}
               onChange={(e) => setReflection(e.target.value)}
               rows={3}
-              className="w-full rounded-2xl bg-white px-3 py-2 text-sm font-semibold ring-1 ring-teal-200"
+              className="w-full rounded-2xl bg-white px-3 py-2 text-sm font-semibold text-teal-950 ring-1 ring-teal-200"
             />
           </label>
           <ul className="space-y-1 text-xs font-semibold text-teal-900">
@@ -177,7 +265,7 @@ function DapitanPlay({
             type="button"
             disabled={reflection.trim().length < 20}
             onClick={finish}
-            className="w-full rounded-full bg-teal-700 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-50"
+            className="w-full rounded-full bg-teal-800 px-5 py-3 text-sm font-extrabold text-white disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
           >
             Save workshop reflection
           </button>
@@ -189,22 +277,23 @@ function DapitanPlay({
           type="button"
           disabled={disabled || history.length === 0 || done}
           onClick={undo}
-          className="rounded-full bg-slate-200 px-4 py-2 text-sm font-extrabold text-slate-700 disabled:opacity-40"
+          className="rounded-full bg-[var(--jose-surface-control)] px-4 py-2 text-sm font-extrabold text-[var(--jose-text)] disabled:text-[var(--jose-text-disabled)]"
         >
           Undo last choice
         </button>
       </div>
     </div>
+    </GameBoard>
   );
 }
 
 function ResourceChip({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl bg-white px-3 py-3 text-center ring-1 ring-black/10">
-      <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+    <div className="rounded-2xl bg-[var(--jose-surface-elevated)] px-3 py-3 text-center ring-1 ring-[var(--jose-rule)]">
+      <p className="text-[10px] font-extrabold uppercase tracking-wide text-[var(--jose-text-muted)]">
         {label}
       </p>
-      <p className="font-display text-2xl font-semibold text-slate-900">{value}</p>
+      <p className="font-display text-2xl font-semibold text-[var(--jose-text)]">{value}</p>
     </div>
   );
 }
