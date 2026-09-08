@@ -1,28 +1,24 @@
 "use client";
 
-import {
-  usePresentationMode,
-  writePresentationMode,
-  type PresentationMode,
-} from "@/lib/presentation-mode";
+import { useTheme, writeTheme, type Theme } from "@/lib/theme-mode";
 
-export function PresentationToggle({ compact = false }: { compact?: boolean }) {
-  const mode = usePresentationMode();
+export function ThemeToggle({ compact = false }: { compact?: boolean }) {
+  const theme = useTheme();
 
-  function choose(next: PresentationMode) {
-    writePresentationMode(next);
+  function choose(next: Theme) {
+    writeTheme(next);
   }
 
   return (
     <div
       role="group"
-      aria-label="Presentation"
-      className={`inline-flex rounded-xl border border-[var(--jose-rule)] bg-white/80 p-1 ${
+      aria-label="Theme"
+      className={`inline-flex rounded-xl border border-[var(--jose-rule)] bg-[var(--jose-paper)]/80 p-1 ${
         compact ? "text-xs" : "text-sm"
       }`}
     >
-      {(["adventure", "focus"] as const).map((option) => {
-        const active = mode === option;
+      {(["light", "dark"] as const).map((option) => {
+        const active = theme === option;
         return (
           <button
             key={option}

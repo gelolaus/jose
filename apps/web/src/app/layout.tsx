@@ -41,7 +41,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      data-presentation="adventure"
+      data-theme="light"
       className={`${sans.variable} ${display.variable} h-full`}
     >
       <body className="min-h-full antialiased">

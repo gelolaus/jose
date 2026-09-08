@@ -617,7 +617,7 @@ function ArtifactAccent({ sectionId }: { sectionId: string }) {
     sectionId.length % 2 === 0 ? "left-4 sm:left-8" : "right-4 sm:right-8";
   return (
     <div
-      className={`float-soft pointer-events-none absolute bottom-8 ${side} hidden size-14 items-center justify-center rounded-xl bg-white/90 text-teal-800 shadow-md presentation-adventure:flex md:size-16`}
+      className={`float-soft pointer-events-none absolute bottom-8 ${side} flex size-14 items-center justify-center rounded-xl bg-white/90 text-teal-800 shadow-md md:size-16`}
       aria-hidden
     >
       <Compass className="size-7 md:size-8" strokeWidth={2} />

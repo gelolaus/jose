@@ -1,8 +1,8 @@
 "use client";
 
-import { PresentationToggle } from "@/components/presentation-toggle";
+import { ThemeToggle } from "@/components/presentation-toggle";
 import { SkipLink } from "@/components/skip-link";
-import { PresentationDocumentSync } from "@/lib/presentation-mode";
+import { ThemeDocumentSync } from "@/lib/theme-mode";
 import { t } from "@/lib/reading-preferences";
 import { useReadingPreferences } from "@/lib/use-reading-preferences";
 import Link from "next/link";
@@ -35,7 +35,7 @@ export function AppShell({
   return (
     <div className="flex h-dvh overflow-hidden bg-transparent lg:grid lg:grid-cols-[18rem_minmax(0,1fr)]">
       <SkipLink />
-      <PresentationDocumentSync />
+      <ThemeDocumentSync />
       <SideNav />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {topBar ? <div className="shrink-0">{topBar}</div> : null}
@@ -89,7 +89,7 @@ function SideNav() {
         })}
       </nav>
       <div className="space-y-3 px-2">
-        <PresentationToggle compact />
+        <ThemeToggle compact />
         <p className="text-sm text-stone-500">Field journal for APC RIZLIFE</p>
       </div>
     </aside>
