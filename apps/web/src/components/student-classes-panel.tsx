@@ -30,6 +30,10 @@ export function StudentClassesPanel({
     setAssignments(nextAssignments);
   }
 
+  const visibleAssignments = assignments.filter((assignment) =>
+    classes.some((klass) => klass.classId === assignment.classId),
+  );
+
   return (
     <section
       id="classes"
@@ -109,9 +113,9 @@ export function StudentClassesPanel({
         </ul>
       )}
 
-      {assignments.length > 0 ? (
+      {visibleAssignments.length > 0 ? (
         <ul className="mt-4 space-y-3">
-          {assignments.map((assignment) => (
+          {visibleAssignments.map((assignment) => (
             <li
               key={assignment.id}
               className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-white p-4 ring-1 ring-black/5"

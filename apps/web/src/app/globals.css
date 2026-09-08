@@ -27,6 +27,8 @@
   --jose-gold-deep: #d59e00;
   --jose-sky: #087eaf;
   --jose-coral: #d63649;
+  --jose-teach: #7c3aed;
+  --jose-teach-soft: #ede9fe;
   --jose-surface: #ffffff;
   --jose-surface-elevated: #ffffff;
   --jose-surface-control: #edf1f5;
@@ -51,6 +53,8 @@ html[data-theme="dark"] {
   --jose-wash: #20392f;
   --jose-rule: #3c5262;
   --jose-cream: #1c303e;
+  --jose-teach: #c4b5fd;
+  --jose-teach-soft: #3b2a63;
   --jose-accent: #a4e777;
   --jose-accent-soft: #2c4c29;
   --jose-sky: #68cefa;
@@ -831,6 +835,11 @@ html[data-theme="dark"] .game-board__how-text {
   background: var(--jose-accent-soft);
   color: var(--jose-accent);
   box-shadow: inset 0 0 0 2px var(--jose-green);
+}
+.jose-nav-active-teach {
+  background: var(--jose-teach-soft);
+  color: var(--jose-teach);
+  box-shadow: inset 0 0 0 2px var(--jose-teach);
 }
 .quiz-prompt {
   padding: 1rem 0 0.5rem;

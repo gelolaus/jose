@@ -1,5 +1,6 @@
 "use client";
 
+import { OverflowItem, OverflowMenu } from "@/components/teach-overflow-menu";
 import { FieldLabel } from "@/components/teach-shell";
 import { createTeachAsset, fetchTeachAssets } from "@/lib/path-api";
 import { newBlockId, type LessonBlock, type LessonBlocks, type TeachAsset } from "@jose/shared";
@@ -59,24 +60,41 @@ export function LessonBlocksEditor({
   onChange: (blocks: LessonBlocks) => void;
   disabled?: boolean;
 }) {
+  const [addOpen, setAddOpen] = useState(false);
+
   function updateAt(index: number, next: LessonBlock) {
     onChange(blocks.map((block, i) => (i === index ? next : block)));
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {BLOCK_TYPES.map((item) => (
-          <button
-            key={item.type}
-            type="button"
-            disabled={disabled}
-            onClick={() => onChange([...blocks, emptyBlock(item.type)])}
-            className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-700 disabled:opacity-50"
-          >
-            Add {item.label}
-          </button>
-        ))}
+      <div className="relative">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setAddOpen((open) => !open)}
+          className="jose-button jose-button--secondary min-h-11 px-4 py-2 text-sm"
+        >
+          Add
+        </button>
+        {addOpen ? (
+          <div className="absolute left-0 z-20 mt-1 min-w-52 rounded-2xl bg-[var(--jose-paper)] p-1 shadow-lg ring-1 ring-[var(--jose-rule)]">
+            {BLOCK_TYPES.map((item) => (
+              <button
+                key={item.type}
+                type="button"
+                disabled={disabled}
+                onClick={() => {
+                  onChange([...blocks, emptyBlock(item.type)]);
+                  setAddOpen(false);
+                }}
+                className="flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-extrabold text-[var(--jose-ink)] disabled:opacity-50"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
       {blocks.length === 0 ? (
         <p className="text-sm font-semibold text-slate-500">
@@ -90,12 +108,11 @@ export function LessonBlocksEditor({
             className="rounded-2xl bg-white p-4 ring-1 ring-black/10"
           >
             <div className="mb-3 flex items-center justify-between gap-2">
-              <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
+              <p className="text-xs font-extrabold uppercase tracking-wide text-[var(--jose-ink-muted)]">
                 {block.type}
               </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
+              <OverflowMenu label={`${block.type} actions`}>
+                <OverflowItem
                   disabled={disabled || index === 0}
                   onClick={() => {
                     const next = [...blocks];
@@ -103,12 +120,10 @@ export function LessonBlocksEditor({
                     next.splice(index - 1, 0, item!);
                     onChange(next);
                   }}
-                  className="text-xs font-extrabold text-slate-600 disabled:opacity-40"
                 >
-                  Up
-                </button>
-                <button
-                  type="button"
+                  Move up
+                </OverflowItem>
+                <OverflowItem
                   disabled={disabled || index === blocks.length - 1}
                   onClick={() => {
                     const next = [...blocks];
@@ -116,19 +131,17 @@ export function LessonBlocksEditor({
                     next.splice(index + 1, 0, item!);
                     onChange(next);
                   }}
-                  className="text-xs font-extrabold text-slate-600 disabled:opacity-40"
                 >
-                  Down
-                </button>
-                <button
-                  type="button"
+                  Move down
+                </OverflowItem>
+                <OverflowItem
+                  danger
                   disabled={disabled}
                   onClick={() => onChange(blocks.filter((_, i) => i !== index))}
-                  className="text-xs font-extrabold text-rose-600"
                 >
                   Remove
-                </button>
-              </div>
+                </OverflowItem>
+              </OverflowMenu>
             </div>
             <BlockFields
               moduleId={moduleId}

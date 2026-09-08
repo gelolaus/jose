@@ -121,6 +121,18 @@ describe("CurriculumService", () => {
     await expect(service.deleteModule("rizal")).rejects.toThrow(/cannot be archived/i);
   });
 
+  it("omits archived modules from the teacher studio list", async () => {
+    const created = await service.createModule(
+      { title: "Hide after archive", subtitle: "Draft", coverColor: "#A855F7" },
+      teacherUser(teacher),
+    );
+    const before = await service.listTeachModules(teacherUser(teacher));
+    expect(before.some((row) => row.id === created.id)).toBe(true);
+    await service.deleteModule(created.id, teacherUser(teacher));
+    const after = await service.listTeachModules(teacherUser(teacher));
+    expect(after.some((row) => row.id === created.id)).toBe(false);
+  });
+
   it("records path misses for practice without spending hearts or locking the game", async () => {
     await service.completeLevel("ateneo-welcome", student.learnerId);
     await database.db

@@ -120,10 +120,7 @@ Seed lessons are structural placeholders. See `docs/CONTENT_GAPS.md` for syllabu
 
 ## Docs
 
+- Design language (current student UI): `docs/superpowers/specs/2026-09-08-jose-design-language.md`
+- Teacher chrome and module maker: `docs/superpowers/specs/2026-09-08-teacher-area-design.md`
 - Application review / handoff: `docs/reviews/2026-09-05-application-review.md`
-- Modules / lessons / games: `docs/superpowers/specs/2026-08-15-rizal-modules-lessons-games-design.md`
-- Game stage (playable boards): `docs/superpowers/specs/2026-08-23-game-stage-design.md`
-- Future work (accounts, Turso, monitoring): `docs/superpowers/specs/2026-08-15-jose-future-work.md`
-- Original path: `docs/superpowers/specs/2026-08-07-rizal-levels-path-design.md`
-- Profile: `docs/superpowers/specs/2026-08-11-fun-profile-page-design.md`
 - Microsoft / APC login setup: `docs/auth/microsoft-entra-setup.md`

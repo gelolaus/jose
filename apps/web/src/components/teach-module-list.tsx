@@ -10,12 +10,12 @@ import Link from "next/link";
 import { useState } from "react";
 
 export function TeachModuleList({ initial }: { initial: TeachModule[] }) {
-  const [modules, setModules] = useState(initial);
+  const [modules, setModules] = useState(initial.filter(isActiveModule));
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   async function reload() {
-    setModules(await fetchTeachModules());
+    setModules((await fetchTeachModules()).filter(isActiveModule));
   }
 
   return (
@@ -25,7 +25,7 @@ export function TeachModuleList({ initial }: { initial: TeachModule[] }) {
         {modules.map((mod) => (
           <li
             key={mod.id}
-            className="flex flex-col gap-4 rounded-[1.75rem] bg-white p-4 ring-1 ring-black/10"
+            className="learning-card flex flex-col gap-4 rounded-[1.75rem] p-4"
           >
             <div className="flex min-w-0 items-start gap-3">
               <span
@@ -33,10 +33,10 @@ export function TeachModuleList({ initial }: { initial: TeachModule[] }) {
                 style={{ backgroundColor: mod.coverColor }}
               />
               <div className="min-w-0 flex-1">
-                <p className="truncate font-display text-xl font-semibold text-slate-800">
+                <p className="truncate font-display text-xl font-semibold text-[var(--jose-ink)]">
                   {mod.title}
                 </p>
-                <p className="text-sm font-semibold text-slate-500">
+                <p className="text-sm font-semibold text-[var(--jose-ink-muted)]">
                   {mod.published ? "Published" : "Draft"} · {mod.levelCount}{" "}
                   {mod.levelCount === 1 ? "item" : "items"}
                 </p>
@@ -51,8 +51,8 @@ export function TeachModuleList({ initial }: { initial: TeachModule[] }) {
               </Link>
               {mod.featured ? null : (
                 <details className="relative">
-                  <summary className="flex min-h-11 cursor-pointer list-none items-center rounded-full bg-slate-100 px-4 py-2 text-sm font-extrabold text-slate-700">
-                    More actions
+                  <summary className="jose-button jose-button--secondary flex min-h-11 cursor-pointer list-none items-center px-4 py-2 text-sm">
+                    More
                   </summary>
                   <div className="absolute left-0 z-10 mt-2 min-w-48 rounded-2xl bg-white p-2 shadow-lg ring-1 ring-black/10">
                     <button
@@ -78,7 +78,7 @@ export function TeachModuleList({ initial }: { initial: TeachModule[] }) {
                       onClick={() => {
                         if (
                           !window.confirm(
-                            `Archive “${mod.title}”? Past student submissions stay.`,
+                            `Delete “${mod.title}”? It leaves your module list and you cannot undo that here. Student submissions stay.`,
                           )
                         ) {
                           return;
@@ -87,12 +87,12 @@ export function TeachModuleList({ initial }: { initial: TeachModule[] }) {
                         void deleteTeachModule(mod.id)
                           .then(() => reload())
                           .catch((err) =>
-                            setError(err instanceof Error ? err.message : "Archive failed"),
+                            setError(err instanceof Error ? err.message : "Delete failed"),
                           )
                           .finally(() => setBusyId(null));
                       }}
                     >
-                      Archive
+                      Delete
                     </button>
                   </div>
                 </details>
@@ -103,4 +103,8 @@ export function TeachModuleList({ initial }: { initial: TeachModule[] }) {
       </ul>
     </>
   );
+}
+
+function isActiveModule(mod: TeachModule) {
+  return !mod.archivedAt && !mod.trashedAt;
 }

@@ -126,6 +126,7 @@ import {
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { DatabaseService, type JoseDb } from "../db/database.service";
 import {
+  assignments,
   attempts,
   contentAudit,
   gameContent,
@@ -1046,6 +1047,7 @@ export class CurriculumService {
             ).map((row) => row.moduleId),
           );
     const visible = rows.filter((row) => {
+      if (row.archivedAt || row.trashedAt) return false;
       if (user.role === "admin") return true;
       const isOwner = row.ownerUserId != null && row.ownerUserId === user.id;
       return isOwner || Boolean(collaboratorModuleIds?.has(row.id));
@@ -1493,6 +1495,10 @@ export class CurriculumService {
       .update(modules)
       .set({ archivedAt: t, trashedAt: t, updatedAt: t, published: false, status: "archived" })
       .where(eq(modules.id, moduleId));
+    await this.db
+      .update(assignments)
+      .set({ archivedAt: t })
+      .where(and(eq(assignments.moduleId, moduleId), isNull(assignments.archivedAt)));
     await this.audit(moduleId, actor?.id, "module.archive", { trashedAt: t });
     return { ok: true, archivedAt: t, trashedAt: t };
   }

@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
-import { ArrowLeft, Layers, Users } from "lucide-react";
+import { JoseShell } from "@/components/jose-shell";
 import { ConnectedLocalDevPanel } from "@/components/local-dev-panel";
 import { JoseSessionProvider, useJoseSession } from "@/lib/use-jose-session";
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { Layers, Map, Settings, UserRound, Users } from "lucide-react";
 
 export function TeachShell({ children }: { children: ReactNode }) {
   return (
@@ -16,42 +16,32 @@ export function TeachShell({ children }: { children: ReactNode }) {
 }
 
 function TeachShellBody({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-  const modulesActive = pathname === "/teach" || pathname.startsWith("/teach/modules");
-  const classesActive = pathname.startsWith("/teach/classes");
   const { canTeach, loading } = useJoseSession();
 
   if (loading) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-[var(--jose-cream)] px-6">
-        <p className="font-semibold text-slate-600">Checking teacher access…</p>
+        <p className="font-semibold text-[var(--jose-ink-muted)]">Checking teacher access…</p>
       </div>
     );
   }
 
-  // Cosmetic gate only; the API re-checks the role and module ownership per request.
   if (!canTeach) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-[var(--jose-cream)] px-6 text-center">
         <div className="max-w-md space-y-3">
-          <p className="font-display text-3xl font-semibold text-slate-800">
+          <p className="font-display text-3xl font-semibold text-[var(--jose-ink)]">
             Teachers only
           </p>
-          <p className="font-semibold text-slate-600">
+          <p className="font-semibold text-[var(--jose-ink-muted)]">
             Teacher area needs a teacher or admin session. Students cannot open these
             tools, and an APC email alone does not grant access.
           </p>
           <div className="flex flex-wrap justify-center gap-2">
-            <Link
-              href="/login"
-              className="inline-flex rounded-full bg-violet-600 px-5 py-2.5 text-sm font-extrabold text-white"
-            >
+            <Link href="/login" className="jose-button">
               School sign-in
             </Link>
-            <Link
-              href="/learn"
-              className="inline-flex rounded-full bg-slate-800 px-5 py-2.5 text-sm font-extrabold text-white"
-            >
+            <Link href="/learn" className="jose-button jose-button--secondary">
               Back to learning
             </Link>
           </div>
@@ -64,69 +54,40 @@ function TeachShellBody({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-[var(--jose-cream)] lg:grid lg:grid-cols-[16.5rem_minmax(0,1fr)]">
-      <aside className="hidden h-dvh flex-col border-r border-black/8 bg-white/95 px-5 py-7 lg:flex">
-        <div className="mb-10 px-2">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-violet-500">
-            Jose
-          </p>
-          <p className="font-display text-3xl font-semibold tracking-tight text-slate-800">
-            Teach
-          </p>
-        </div>
-        <nav className="flex flex-1 flex-col gap-2.5" aria-label="Teacher">
+    <JoseShell
+      accent="teach"
+      navLabel="Teacher"
+      brandSubtitle="Teach"
+      tabs={[
+        {
+          href: "/teach",
+          label: "Modules",
+          icon: Layers,
+          isActive: (path) => path === "/teach" || path.startsWith("/teach/modules"),
+        },
+        {
+          href: "/teach/classes",
+          label: "Classes",
+          icon: Users,
+          isActive: (path) => path.startsWith("/teach/classes"),
+        },
+        { href: "/learn", label: "Learn", icon: Map },
+        { href: "/profile", label: "Profile", icon: UserRound },
+      ]}
+      footer={
+        <div className="space-y-3">
           <Link
-            href="/teach"
-            aria-current={modulesActive ? "page" : undefined}
-            className={`flex min-h-11 items-center gap-3.5 rounded-3xl px-4 py-3.5 text-lg font-extrabold ${
-              modulesActive
-                ? "bg-violet-100 text-violet-700 shadow-sm"
-                : "text-slate-600 hover:bg-slate-50"
-            }`}
+            href="/profile/preferences"
+            className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-[var(--jose-text-muted)]"
           >
-            <Layers className="size-6 shrink-0" strokeWidth={2.4} aria-hidden />
-            Modules
+            <Settings className="size-5" aria-hidden /> Settings
           </Link>
-          <Link
-            href="/teach/classes"
-            className={`flex items-center gap-3.5 rounded-3xl px-4 py-3.5 text-lg font-extrabold ${
-              classesActive
-                ? "bg-violet-100 text-violet-700 shadow-sm"
-                : "text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <Users className="size-6 shrink-0" strokeWidth={2.4} aria-hidden />
-            Classes
-          </Link>
-          <Link
-            href="/learn"
-            className="mt-auto flex items-center gap-3.5 rounded-3xl px-4 py-3.5 text-lg font-extrabold text-slate-600 hover:bg-slate-50"
-          >
-            <ArrowLeft className="size-6 shrink-0" strokeWidth={2.4} aria-hidden />
-            Student view
-          </Link>
-        </nav>
-        <div className="mt-4 px-2">
           <ConnectedLocalDevPanel compact />
         </div>
-      </aside>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="shrink-0 border-b border-black/5 bg-white/95 px-4 py-3 lg:hidden">
-          <div className="flex items-center justify-between gap-3">
-            <p className="font-display text-xl font-semibold text-slate-800">
-              Teacher area
-            </p>
-            <Link
-              href="/learn"
-              className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-700"
-            >
-              Student view
-            </Link>
-          </div>
-        </header>
-        <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
-      </div>
-    </div>
+      }
+    >
+      {children}
+    </JoseShell>
   );
 }
 
@@ -143,11 +104,11 @@ export function TeachTitle({
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
         {kicker ? (
-          <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-violet-500">
+          <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-[var(--jose-teach)]">
             {kicker}
           </p>
         ) : null}
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-800 sm:text-4xl">
+        <h1 className="font-display text-3xl font-semibold tracking-tight text-[var(--jose-ink)] sm:text-4xl">
           {title}
         </h1>
       </div>
@@ -164,7 +125,7 @@ export function FieldLabel({
   htmlFor?: string;
 }) {
   return (
-    <label htmlFor={htmlFor} className="block text-sm font-extrabold text-slate-600">
+    <label htmlFor={htmlFor} className="block text-sm font-extrabold text-[var(--jose-ink-muted)]">
       {children}
     </label>
   );

@@ -1,331 +1,390 @@
 "use client";
 
 import { GameEditor } from "@/components/teach-game-editor";
-import { FieldLabel, TeachTitle } from "@/components/teach-shell";
+import { FieldLabel } from "@/components/teach-shell";
+import { LessonBlocksEditor } from "@/components/lesson-blocks-editor";
+import { fetchTeachLevel, fetchTeachModule, importTeachQuestions, patchTeachLevel, putTeachGame, putTeachLesson } from "@/lib/path-api";
 import {
-  patchTeachLevel,
-  putTeachChest,
-  putTeachGame,
-  putTeachLesson,
-} from "@/lib/path-api";
-import type { ChestContent, GameContent, TeachLevelDetail } from "@jose/shared";
-import Link from "next/link";
-import { useState } from "react";
+  describeLessonBlocksIssue,
+  markdownToStarterBlocks,
+  type GameContent,
+  type LessonBlocks,
+  type TeachLevelDetail,
+  type TeachModuleDetail,
+} from "@jose/shared";
+import { useCallback, useEffect, useState } from "react";
+
+export type LevelDraft = {
+  id: string;
+  title: string;
+  blocks: LessonBlocks;
+  game: GameContent | null;
+};
 
 export function TeachLevelEditor({
   moduleId,
-  initial,
+  level,
+  onLevelChange,
+  onModuleChange,
+  onDraftChange,
+  onGuardChange,
 }: {
   moduleId: string;
-  initial: TeachLevelDetail;
+  level: TeachLevelDetail;
+  onLevelChange: (level: TeachLevelDetail) => Promise<void>;
+  onModuleChange: (mod: TeachModuleDetail) => void;
+  onDraftChange: (draft: LevelDraft) => void;
+  onGuardChange: (guard: { dirty: boolean; save: () => Promise<boolean> } | null) => void;
 }) {
-  const [level, setLevel] = useState(initial);
+  const [title, setTitle] = useState(level.title);
+  const [blocks, setBlocks] = useState<LessonBlocks>(
+    level.lesson?.blocks ?? markdownToStarterBlocks(level.lesson?.markdown ?? ""),
+  );
+  const [game, setGame] = useState<GameContent | null>(level.game);
+  const [revision, setRevision] = useState(level.revision);
+  const [status, setStatus] = useState<"idle" | "dirty" | "saving" | "saved" | "failed">("idle");
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [conflict, setConflict] = useState<string | null>(null);
+  const [baseline, setBaseline] = useState(() =>
+    JSON.stringify({
+      title: level.title,
+      blocks: level.lesson?.blocks ?? markdownToStarterBlocks(level.lesson?.markdown ?? ""),
+      game: level.game,
+    }),
+  );
+
+  const serialize = useCallback(
+    () => JSON.stringify({ title, blocks, game }),
+    [title, blocks, game],
+  );
+
+  const dirty = serialize() !== baseline;
+
+  useEffect(() => {
+    onDraftChange({ id: level.id, title, blocks, game });
+  }, [blocks, game, level.id, onDraftChange, title]);
+
+  useEffect(() => {
+    setError(null);
+    setConflict(null);
+  }, [blocks, game, title]);
+
+  const save = useCallback(async () => {
+    setError(null);
+    setConflict(null);
+    if (level.kind === "lesson") {
+      const issue = describeLessonBlocksIssue(blocks);
+      if (issue) {
+        setError(issue);
+        setStatus("failed");
+        return false;
+      }
+    }
+    if (level.kind === "game" && !game) {
+      setError("This game has no content yet.");
+      setStatus("failed");
+      return false;
+    }
+    setStatus("saving");
+    let nextRevision = revision;
+    try {
+      if (title.trim() !== level.title) {
+        const titled = await patchTeachLevel(level.id, {
+          title: title.trim(),
+          expectedRevision: nextRevision,
+        });
+        nextRevision = titled.revision;
+        setRevision(titled.revision);
+      }
+      const saved =
+        level.kind === "lesson"
+          ? await putTeachLesson(level.id, {
+              blocks,
+              expectedRevision: nextRevision,
+            })
+          : await putTeachGame(level.id, {
+              ...game!,
+              expectedRevision: nextRevision,
+            });
+      setBaseline(JSON.stringify({
+        title: saved.title,
+        blocks: saved.lesson?.blocks ?? blocks,
+        game: saved.game,
+      }));
+      setTitle(saved.title);
+      if (saved.lesson?.blocks) setBlocks(saved.lesson.blocks);
+      if (saved.game) setGame(saved.game);
+      setRevision(saved.revision);
+      setStatus("saved");
+      await onLevelChange(saved);
+      onModuleChange(await fetchTeachModule(moduleId));
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not save";
+      const code =
+        err && typeof err === "object" && "code" in err
+          ? (err as { code?: string }).code
+          : undefined;
+      if (code === "CONTENT_CONFLICT") {
+        setConflict(message);
+        setStatus("failed");
+      } else {
+        setError(message);
+        setStatus("failed");
+      }
+      return false;
+    }
+  }, [
+    blocks,
+    game,
+    level.id,
+    level.kind,
+    level.title,
+    moduleId,
+    onLevelChange,
+    onModuleChange,
+    revision,
+    title,
+  ]);
+
+  useEffect(() => {
+    onGuardChange({ dirty, save });
+    return () => onGuardChange(null);
+  }, [dirty, onGuardChange, save]);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void save();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [save]);
+
+  useEffect(() => {
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      if (!dirty) return;
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
-      <TeachTitle
-        kicker={level.kind}
-        title="Edit level"
-        action={
-          <Link
-            href={`/teach/modules/${moduleId}`}
-            className="text-sm font-extrabold text-violet-700"
-          >
-            Back to module
-          </Link>
-        }
-      />
-      {error ? <p className="mb-3 text-sm font-bold text-rose-600">{error}</p> : null}
-      {saved ? (
-        <p className="mb-3 text-sm font-bold text-emerald-700">Saved.</p>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          disabled={status === "saving" || !dirty}
+          onClick={() => void save()}
+          className="jose-button disabled:opacity-50"
+        >
+          {status === "saving" ? "Saving…" : "Save"}
+        </button>
+        <p className="text-sm font-bold text-[var(--jose-ink-muted)]">
+          {status === "saved" && !dirty
+            ? "Saved"
+            : dirty
+              ? "Unsaved"
+              : "No changes"}
+        </p>
+      </div>
+      {error ? (
+        <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-800">
+          {error}
+        </p>
       ) : null}
-      <TitleForm
-        title={level.title}
-        onSave={async (title) => {
-          setError(null);
-          try {
-            setLevel(await patchTeachLevel(level.id, { title }));
-            setSaved(true);
-          } catch (err) {
-            setError(err instanceof Error ? err.message : "Save failed");
-          }
+      {conflict ? (
+        <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
+          {conflict}
+          <button
+            type="button"
+            className="ml-3 underline"
+            onClick={async () => {
+              const fresh = await fetchTeachLevel(level.id);
+              await onLevelChange(fresh);
+              setConflict(null);
+            }}
+          >
+            Reload server version
+          </button>
+        </div>
+      ) : null}
+      <FieldLabel>Level title</FieldLabel>
+      <input
+        value={title}
+        onChange={(e) => {
+          setTitle(e.target.value);
+          setStatus("dirty");
         }}
+        className="w-full rounded-2xl bg-[var(--jose-paper)] px-4 py-3 font-bold ring-1 ring-[var(--jose-rule)]"
       />
       {level.kind === "lesson" ? (
-        <LessonForm
-          markdown={level.lesson?.markdown ?? ""}
-          youtubeVideoId={level.lesson?.youtubeVideoId ?? null}
-          onSave={async (body) => {
-            setError(null);
-            try {
-              setLevel(await putTeachLesson(level.id, body));
-              setSaved(true);
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "Save failed");
-            }
+        <LessonBlocksEditor
+          moduleId={moduleId}
+          blocks={blocks}
+          onChange={(next) => {
+            setBlocks(next);
+            setStatus("dirty");
           }}
+          disabled={status === "saving"}
         />
       ) : null}
-      {level.kind === "game" && level.game ? (
-        <GameEditor
-          game={level.game}
-          onSave={async (game: GameContent) => {
-            setError(null);
-            try {
-              setLevel(await putTeachGame(level.id, game));
-              setSaved(true);
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "Save failed");
-            }
-          }}
-        />
-      ) : null}
-      {level.kind === "chest" && level.chest ? (
-        <ChestEditor
-          chest={level.chest}
-          onSave={async (chest: ChestContent) => {
-            setError(null);
-            try {
-              setLevel(await putTeachChest(level.id, chest));
-              setSaved(true);
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "Save failed");
-            }
-          }}
-        />
+      {level.kind === "game" && game ? (
+        <>
+          <GameEditor
+            game={game}
+            onChange={(next) => {
+              setGame(next);
+              setStatus("dirty");
+            }}
+          />
+          {game.type === "quiz" && !dirty ? (
+            <details className="rounded-2xl bg-[var(--jose-surface-control)] p-3">
+              <summary className="cursor-pointer text-sm font-extrabold text-[var(--jose-ink)]">
+                More tools
+              </summary>
+              <div className="mt-3">
+                <QuestionImportPanel
+                  levelId={level.id}
+                  onImported={async (next) => {
+                    await onLevelChange(next);
+                    setGame(next.game);
+                    setRevision(next.revision);
+                    setBaseline(JSON.stringify({
+                      title: next.title,
+                      blocks,
+                      game: next.game,
+                    }));
+                    setStatus("saved");
+                  }}
+                />
+              </div>
+            </details>
+          ) : null}
+        </>
       ) : null}
     </div>
   );
 }
 
-function TitleForm({
-  title,
-  onSave,
+function QuestionImportPanel({
+  levelId,
+  onImported,
 }: {
-  title: string;
-  onSave: (title: string) => Promise<void>;
+  levelId: string;
+  onImported: (level: TeachLevelDetail) => Promise<void>;
 }) {
-  const [value, setValue] = useState(title);
+  const [raw, setRaw] = useState("");
+  const [format, setFormat] = useState<"csv" | "json">("csv");
+  const [mode, setMode] = useState<"all-or-nothing" | "partial">("all-or-nothing");
+  const [preview, setPreview] = useState<Awaited<
+    ReturnType<typeof importTeachQuestions>
+  > | null>(null);
+  const [busy, setBusy] = useState(false);
+
   return (
-    <form
-      className="mb-5 space-y-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void onSave(value);
-      }}
-    >
-      <FieldLabel htmlFor="level-title">Level title</FieldLabel>
-      <div className="flex gap-2">
-        <input
-          id="level-title"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          className="flex-1 rounded-2xl bg-white px-4 py-3 font-bold ring-1 ring-black/10"
-        />
-        <button
-          type="submit"
-          className="rounded-full bg-slate-800 px-4 py-2 text-sm font-extrabold text-white"
+    <div className="rounded-2xl bg-[var(--jose-paper)] p-4 ring-1 ring-[var(--jose-rule)]">
+      <p className="text-sm font-extrabold text-[var(--jose-ink)]">Bulk question import</p>
+      <p className="mt-1 text-xs font-semibold text-[var(--jose-ink-muted)]">
+        Preview validates every row before commit. Save the game first if you have other edits.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <select
+          value={format}
+          onChange={(e) => setFormat(e.target.value as "csv" | "json")}
+          className="rounded-xl bg-[var(--jose-paper)] px-3 py-2 text-sm font-bold"
         >
-          Save title
+          <option value="csv">CSV</option>
+          <option value="json">JSON</option>
+        </select>
+        <select
+          value={mode}
+          onChange={(e) =>
+            setMode(e.target.value as "all-or-nothing" | "partial")
+          }
+          className="rounded-xl bg-[var(--jose-paper)] px-3 py-2 text-sm font-bold"
+        >
+          <option value="all-or-nothing">All or nothing</option>
+          <option value="partial">Partial import</option>
+        </select>
+      </div>
+      <textarea
+        value={raw}
+        onChange={(e) => setRaw(e.target.value)}
+        rows={6}
+        placeholder={
+          format === "csv"
+            ? "prompt,choiceA,choiceB,choiceC,choiceD,correct,why"
+            : '[{"prompt":"...","choiceA":"...","choiceB":"...","correct":"A"}]'
+        }
+        className="mt-3 w-full rounded-2xl bg-[var(--jose-surface-control)] px-3 py-2 font-mono text-xs ring-1 ring-[var(--jose-rule)]"
+      />
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              setPreview(
+                await importTeachQuestions(levelId, {
+                  mode,
+                  format,
+                  raw,
+                  commit: false,
+                }),
+              );
+            } finally {
+              setBusy(false);
+            }
+          }}
+          className="jose-button jose-button--secondary min-h-11 px-4 py-2 text-xs"
+        >
+          Preview
+        </button>
+        <button
+          type="button"
+          disabled={busy || !preview || (mode === "all-or-nothing" && preview.errorCount > 0)}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              const result = await importTeachQuestions(levelId, {
+                mode,
+                format,
+                raw,
+                commit: true,
+              });
+              setPreview(result);
+              if (result.applied && result.level) {
+                await onImported(result.level as TeachLevelDetail);
+              }
+            } finally {
+              setBusy(false);
+            }
+          }}
+          className="jose-button min-h-11 px-4 py-2 text-xs"
+        >
+          Commit import
         </button>
       </div>
-    </form>
-  );
-}
-
-function LessonForm({
-  markdown,
-  youtubeVideoId,
-  onSave,
-}: {
-  markdown: string;
-  youtubeVideoId: string | null;
-  onSave: (body: { markdown: string; youtubeUrl?: string }) => Promise<void>;
-}) {
-  const [md, setMd] = useState(markdown);
-  const [youtubeUrl, setYoutubeUrl] = useState(youtubeVideoId ?? "");
-  return (
-    <form
-      className="space-y-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void onSave({ markdown: md, youtubeUrl });
-      }}
-    >
-      <FieldLabel htmlFor="lesson-markdown">Markdown</FieldLabel>
-      <textarea
-        id="lesson-markdown"
-        value={md}
-        onChange={(e) => setMd(e.target.value)}
-        rows={16}
-        className="w-full rounded-2xl bg-white px-4 py-3 font-mono text-sm ring-1 ring-black/10"
-      />
-      <FieldLabel htmlFor="lesson-youtube">YouTube URL (optional)</FieldLabel>
-      <input
-        id="lesson-youtube"
-        value={youtubeUrl}
-        onChange={(e) => setYoutubeUrl(e.target.value)}
-        placeholder="https://www.youtube.com/watch?v=…"
-        className="w-full rounded-2xl bg-white px-4 py-3 font-bold ring-1 ring-black/10"
-      />
-      <button
-        type="submit"
-        className="rounded-full bg-violet-600 px-5 py-2.5 text-sm font-extrabold text-white"
-      >
-        Save lesson
-      </button>
-    </form>
-  );
-}
-
-function ChestEditor({
-  chest,
-  onSave,
-}: {
-  chest: ChestContent;
-  onSave: (chest: ChestContent) => Promise<void>;
-}) {
-  const [draft, setDraft] = useState(chest);
-  return (
-    <form
-      className="space-y-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void onSave(draft);
-      }}
-    >
-      <p className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950">
-        {draft.artifact.teacherInstructions ??
-          "Replace draft artifact fields with approved provenance before publishing."}
-      </p>
-      <FieldLabel>Chest message</FieldLabel>
-      <input
-        value={draft.message}
-        onChange={(e) => setDraft({ ...draft, message: e.target.value })}
-        className="w-full rounded-2xl bg-white px-4 py-3 font-bold ring-1 ring-black/10"
-      />
-      <FieldLabel>Achievement criteria</FieldLabel>
-      <input
-        value={draft.achievementCriteria}
-        onChange={(e) =>
-          setDraft({ ...draft, achievementCriteria: e.target.value })
-        }
-        className="w-full rounded-2xl bg-white px-4 py-3 font-bold ring-1 ring-black/10"
-      />
-      <FieldLabel>Artifact title</FieldLabel>
-      <input
-        value={draft.artifact.title}
-        onChange={(e) =>
-          setDraft({
-            ...draft,
-            artifact: { ...draft.artifact, title: e.target.value },
-          })
-        }
-        className="w-full rounded-2xl bg-white px-4 py-3 font-bold ring-1 ring-black/10"
-      />
-      <FieldLabel>Artifact id (stable; prevents duplicates)</FieldLabel>
-      <input
-        value={draft.artifact.id}
-        onChange={(e) =>
-          setDraft({
-            ...draft,
-            artifact: { ...draft.artifact, id: e.target.value },
-          })
-        }
-        className="w-full rounded-2xl bg-white px-4 py-3 font-bold ring-1 ring-black/10"
-      />
-      <FieldLabel>Kind</FieldLabel>
-      <select
-        value={draft.artifact.kind}
-        onChange={(e) =>
-          setDraft({
-            ...draft,
-            artifact: {
-              ...draft.artifact,
-              kind: e.target.value as ChestContent["artifact"]["kind"],
-            },
-          })
-        }
-        className="w-full rounded-2xl bg-white px-4 py-3 font-bold ring-1 ring-black/10"
-      >
-        <option value="map">Map</option>
-        <option value="excerpt">Source excerpt</option>
-        <option value="cover">Work cover</option>
-        <option value="illustration">Illustration</option>
-      </select>
-      <FieldLabel>Summary</FieldLabel>
-      <textarea
-        value={draft.artifact.summary}
-        onChange={(e) =>
-          setDraft({
-            ...draft,
-            artifact: { ...draft.artifact, summary: e.target.value },
-          })
-        }
-        rows={3}
-        className="w-full rounded-2xl bg-white px-4 py-3 font-semibold ring-1 ring-black/10"
-      />
-      <FieldLabel>Provenance</FieldLabel>
-      <textarea
-        value={draft.artifact.provenance}
-        onChange={(e) =>
-          setDraft({
-            ...draft,
-            artifact: { ...draft.artifact, provenance: e.target.value },
-          })
-        }
-        rows={2}
-        className="w-full rounded-2xl bg-white px-4 py-3 font-semibold ring-1 ring-black/10"
-      />
-      <FieldLabel>Body / excerpt (optional)</FieldLabel>
-      <textarea
-        value={draft.artifact.body ?? ""}
-        onChange={(e) =>
-          setDraft({
-            ...draft,
-            artifact: { ...draft.artifact, body: e.target.value },
-          })
-        }
-        rows={4}
-        className="w-full rounded-2xl bg-white px-4 py-3 font-semibold ring-1 ring-black/10"
-      />
-      <FieldLabel>Journal cover id (optional cosmetic unlock)</FieldLabel>
-      <input
-        value={draft.journalCoverId ?? ""}
-        onChange={(e) =>
-          setDraft({
-            ...draft,
-            journalCoverId: e.target.value.trim() ? e.target.value : null,
-          })
-        }
-        className="w-full rounded-2xl bg-white px-4 py-3 font-bold ring-1 ring-black/10"
-      />
-      <FieldLabel>Approval status</FieldLabel>
-      <select
-        value={draft.artifact.approvalStatus}
-        onChange={(e) =>
-          setDraft({
-            ...draft,
-            artifact: {
-              ...draft.artifact,
-              approvalStatus:
-                e.target.value === "approved" ? "approved" : "draft",
-            },
-          })
-        }
-        className="w-full rounded-2xl bg-white px-4 py-3 font-bold ring-1 ring-black/10"
-      >
-        <option value="draft">Draft — awaiting your approval</option>
-        <option value="approved">Approved</option>
-      </select>
-      <button
-        type="submit"
-        className="rounded-full bg-violet-600 px-5 py-2.5 text-sm font-extrabold text-white"
-      >
-        Save artifact reward
-      </button>
-    </form>
+      {preview ? (
+        <div className="mt-3 space-y-2 text-sm">
+          <p className="font-bold text-[var(--jose-ink)]">
+            {preview.validCount}/{preview.totalRows} valid · {preview.errorCount} errors · mode{" "}
+            {preview.mode}
+          </p>
+          {preview.errors.map((err) => (
+            <p key={`${err.row}-${err.message}`} className="font-semibold text-[var(--jose-coral)]">
+              Row {err.row}
+              {err.field ? ` · ${err.field}` : ""}: {err.message}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }

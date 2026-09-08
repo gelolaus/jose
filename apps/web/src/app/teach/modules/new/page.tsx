@@ -74,7 +74,7 @@ export default function NewModulePage() {
             type="button"
             disabled={!title.trim() || !intendedLearners.trim()}
             onClick={() => setStep(2)}
-            className="rounded-full bg-teal-700 px-6 py-3 text-sm font-extrabold text-white disabled:opacity-50"
+            className="jose-button disabled:opacity-50"
           >
             Next
           </button>
@@ -116,7 +116,7 @@ export default function NewModulePage() {
             <button
               type="button"
               onClick={() => setStep(1)}
-              className="rounded-full bg-slate-100 px-5 py-3 text-sm font-extrabold text-slate-700"
+              className="jose-button jose-button--secondary"
             >
               Back
             </button>
@@ -124,7 +124,7 @@ export default function NewModulePage() {
               type="button"
               disabled={!objective.trim()}
               onClick={() => setStep(3)}
-              className="rounded-full bg-teal-700 px-6 py-3 text-sm font-extrabold text-white disabled:opacity-50"
+              className="jose-button disabled:opacity-50"
             >
               Next
             </button>
@@ -176,7 +176,7 @@ export default function NewModulePage() {
             <button
               type="button"
               onClick={() => setStep(2)}
-              className="rounded-full bg-slate-100 px-5 py-3 text-sm font-extrabold text-slate-700"
+              className="jose-button jose-button--secondary"
             >
               Back
             </button>
@@ -184,7 +184,7 @@ export default function NewModulePage() {
               type="button"
               disabled={busy}
               onClick={() => void onCreate()}
-              className="rounded-full bg-teal-700 px-6 py-3 text-sm font-extrabold text-white disabled:opacity-60"
+              className="jose-button disabled:opacity-60"
             >
               {busy ? "Creating…" : "Open workspace"}
             </button>

@@ -126,10 +126,12 @@ export class ClassroomService {
 
   async archiveClass(user: SessionUser, classId: string) {
     await this.requireOwnedClass(user, classId);
+    const archivedAt = Date.now();
+    await this.db.update(classes).set({ archivedAt }).where(eq(classes.id, classId));
     await this.db
-      .update(classes)
-      .set({ archivedAt: Date.now() })
-      .where(eq(classes.id, classId));
+      .update(assignments)
+      .set({ archivedAt })
+      .where(and(eq(assignments.classId, classId), isNull(assignments.archivedAt)));
     return { ok: true };
   }
 
@@ -220,11 +222,15 @@ export class ClassroomService {
         .select()
         .from(assignments)
         .where(and(eq(assignments.classId, klass.id), isNull(assignments.archivedAt)));
+      let assignmentCount = 0;
+      for (const row of assignmentRows) {
+        if (await this.isLiveAssignment(row)) assignmentCount += 1;
+      }
       result.push({
         classId: klass.id,
         name: klass.name,
         joinedAt: membership.joinedAt,
-        assignmentCount: assignmentRows.length,
+        assignmentCount,
       });
     }
     return result;
@@ -270,6 +276,7 @@ export class ClassroomService {
       .orderBy(asc(assignments.assignedAt));
     const result = [];
     for (const row of rows) {
+      if (!(await this.isLiveAssignment(row))) continue;
       result.push(await this.getAssignment(user, row.id));
     }
     return result;
@@ -303,13 +310,18 @@ export class ClassroomService {
       .where(and(eq(classMembers.learnerId, user.id), isNull(classMembers.archivedAt)));
     const result: StudentAssignment[] = [];
     for (const membership of memberships) {
+      const [klass] = await this.db
+        .select()
+        .from(classes)
+        .where(and(eq(classes.id, membership.classId), isNull(classes.archivedAt)));
+      if (!klass) continue;
       const rows = await this.db
         .select()
         .from(assignments)
-        .where(and(eq(assignments.classId, membership.classId), isNull(assignments.archivedAt)));
+        .where(and(eq(assignments.classId, klass.id), isNull(assignments.archivedAt)));
       for (const row of rows) {
-        const detail = await this.assignmentProgress(user.id, row);
-        result.push(detail);
+        if (!(await this.isLiveAssignment(row))) continue;
+        result.push(await this.assignmentProgress(user.id, row));
       }
     }
     return result;
@@ -562,6 +574,15 @@ export class ClassroomService {
       throw new ForbiddenException("Not your class");
     }
     return row;
+  }
+
+  private async isLiveAssignment(row: typeof assignments.$inferSelect) {
+    if (row.archivedAt) return false;
+    const [klass] = await this.db.select().from(classes).where(eq(classes.id, row.classId));
+    if (!klass || klass.archivedAt) return false;
+    const [mod] = await this.db.select().from(modules).where(eq(modules.id, row.moduleId));
+    if (!mod || mod.archivedAt || mod.trashedAt) return false;
+    return true;
   }
 
   private async requireAssignment(assignmentId: string) {

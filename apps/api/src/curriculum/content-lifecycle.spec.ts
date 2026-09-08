@@ -466,6 +466,102 @@ describe("content lifecycle + classroom", () => {
     expect(reportAfterArchive.members.some((member) => member.archivedAt !== null)).toBe(true);
   });
 
+  it("hides student class work after the assigned module or class is archived", async () => {
+    const created = await service.createModule(
+      {
+        title: "Ghost Lab",
+        subtitle: "Should vanish",
+        coverColor: "#22C55E",
+      },
+      teacher,
+    );
+    const sectionId = created.sections[0]!.id;
+    const lesson = await service.createLevel(sectionId, { title: "Start", kind: "lesson" });
+    await service.putLesson(lesson.id, {
+      markdown: "## Ghost lesson\n\nEnough material for a published assigned revision.",
+    });
+    await service.patchModule(
+      created.id,
+      { objectives: "Vanish after archive.", authorReviewed: true },
+      teacher,
+    );
+    const published = await service.publishModule(created.id, { authorReviewed: true }, teacher);
+    const klass = await classroom.createClass(teacher, { name: "GHOST-1" });
+    await classroom.joinClass(student, { inviteCode: klass.inviteCode! });
+    const assignment = await classroom.createAssignment(teacher, klass.id, {
+      moduleId: created.id,
+      contentRevisionId: published.revision.id,
+    });
+
+    expect(
+      (await classroom.listStudentAssignments(student)).some((row) => row.id === assignment.id),
+    ).toBe(true);
+
+    await service.archiveModule(created.id, teacher);
+    expect(
+      (await classroom.listStudentAssignments(student)).some((row) => row.id === assignment.id),
+    ).toBe(false);
+    expect(
+      (await classroom.listStudentClasses(student)).find((row) => row.classId === klass.id)
+        ?.assignmentCount,
+    ).toBe(0);
+    expect(
+      (await classroom.listClassAssignments(teacher, klass.id)).some(
+        (row) => row.id === assignment.id,
+      ),
+    ).toBe(false);
+    expect(
+      (await service.listPublishedModules(studentAccount.learnerId)).modules.some(
+        (row) => row.id === created.id,
+      ),
+    ).toBe(false);
+
+    const other = await service.createModule(
+      {
+        title: "Class Ghost",
+        subtitle: "Class archive",
+        coverColor: "#38BDF8",
+      },
+      teacher,
+    );
+    const otherLesson = await service.createLevel(other.sections[0]!.id, {
+      title: "Start",
+      kind: "lesson",
+    });
+    await service.putLesson(otherLesson.id, {
+      markdown: "## Class ghost lesson\n\nEnough material for a published assigned revision.",
+    });
+    await service.patchModule(
+      other.id,
+      { objectives: "Vanish when the class is archived.", authorReviewed: true },
+      teacher,
+    );
+    const otherPublished = await service.publishModule(
+      other.id,
+      { authorReviewed: true },
+      teacher,
+    );
+    const otherClass = await classroom.createClass(teacher, { name: "GHOST-2" });
+    await classroom.joinClass(student, { inviteCode: otherClass.inviteCode! });
+    const otherAssignment = await classroom.createAssignment(teacher, otherClass.id, {
+      moduleId: other.id,
+      contentRevisionId: otherPublished.revision.id,
+    });
+    await classroom.archiveClass(teacher, otherClass.id);
+
+    expect(
+      (await classroom.listStudentClasses(student)).some((row) => row.classId === otherClass.id),
+    ).toBe(false);
+    expect(
+      (await classroom.listStudentAssignments(student)).some(
+        (row) => row.id === otherAssignment.id,
+      ),
+    ).toBe(false);
+    expect(
+      (await classroom.listClasses(teacher)).some((row) => row.id === otherClass.id),
+    ).toBe(false);
+  });
+
   it("refuses to archive the featured module", async () => {
     await expect(service.deleteModule("rizal")).rejects.toThrow(/cannot be archived/i);
   });

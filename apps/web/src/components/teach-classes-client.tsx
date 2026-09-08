@@ -10,7 +10,6 @@ import {
   type ClassSummary,
   type TeachModule,
 } from "@jose/shared";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 
 async function teachFetch(path: string, init?: RequestInit) {
@@ -80,15 +79,7 @@ export function TeachClassesClient({
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
-      <TeachTitle
-        kicker="Classroom"
-        title="Classes"
-        action={
-          <Link href="/teach" className="text-sm font-extrabold text-violet-700">
-            Modules
-          </Link>
-        }
-      />
+      <TeachTitle kicker="Classroom" title="Classes" />
       {error ? <p className="mb-4 text-sm font-bold text-rose-600">{error}</p> : null}
       <form
         className="mb-6 flex flex-col gap-2 sm:flex-row"
@@ -134,7 +125,7 @@ export function TeachClassesClient({
         {classes.map((klass) => {
           const invite = inviteByClass[klass.id];
           return (
-            <li key={klass.id} className="rounded-[1.5rem] bg-white p-4 ring-1 ring-black/10">
+            <li key={klass.id} className="learning-card rounded-[1.5rem] p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="font-display text-xl font-semibold text-slate-800">
@@ -261,7 +252,7 @@ export function TeachClassesClient({
                 <button
                   type="submit"
                   disabled={assigningId === klass.id || !moduleByClass[klass.id]}
-                  className="min-h-11 rounded-full bg-slate-800 px-4 py-2 text-xs font-extrabold text-white disabled:opacity-60"
+                  className="jose-button min-h-11 px-4 py-2 text-xs disabled:opacity-60"
                 >
                   {assigningId === klass.id ? "Assigning…" : "Assign"}
                 </button>
