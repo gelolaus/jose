@@ -110,6 +110,9 @@ export const authLearnerProfileSchema = z.object({
   streak: z.number().int().nonnegative(),
   hearts: z.number().int().nonnegative(),
   xp: z.number().int().nonnegative(),
+  heartsUpdatedAt: z.number().int().nonnegative().optional(),
+  nextHeartAt: z.number().int().nonnegative().nullable().optional(),
+  serverNow: z.number().int().nonnegative().optional(),
 });
 export type AuthLearnerProfile = z.infer<typeof authLearnerProfileSchema>;
 
@@ -141,11 +144,24 @@ export const verifyMailboxBodySchema = z.object({
 });
 export type VerifyMailboxBody = z.infer<typeof verifyMailboxBodySchema>;
 
-export const profilePatchBodySchema = z.object({
-  displayName: z.string().min(1).max(20).optional(),
-  avatarId: avatarIdSchema.optional(),
-});
+export const profilePatchBodySchema = z
+  .object({
+    avatarId: avatarIdSchema,
+  })
+  .strict();
 export type ProfilePatchBody = z.infer<typeof profilePatchBodySchema>;
+
+/** Admin-only audited display-name correction (never via self-service profile). */
+export const adminNameCorrectionBodySchema = z
+  .object({
+    userId: z.string().min(1).optional(),
+    email: z.string().email().optional(),
+    displayName: z.string().trim().min(1).max(80),
+  })
+  .refine((v) => Boolean(v.userId ?? v.email), {
+    message: "userId or email is required",
+  });
+export type AdminNameCorrectionBody = z.infer<typeof adminNameCorrectionBodySchema>;
 
 /** One-time first-admin creation, gated by operator-only environment secrets. */
 export const adminBootstrapBodySchema = z.object({
@@ -161,19 +177,33 @@ export const grantRoleBodySchema = z.object({
 });
 export type GrantRoleBody = z.infer<typeof grantRoleBodySchema>;
 
-/** Exact mailbox allowed to use the localhost-only development login. */
-export const LOCAL_DEV_TEST_EMAIL = "arlaus@student.apc.edu.ph";
+export const adminUserQuerySchema = z.object({
+  q: z.string().trim().max(120).optional(),
+  role: z.enum(["student", "teacher"]).optional(),
+  cursor: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+export type AdminUserQuery = z.infer<typeof adminUserQuerySchema>;
 
-export const localDevRoleSchema = z.enum(["student", "teacher", "admin"]);
-export type LocalDevRole = z.infer<typeof localDevRoleSchema>;
+export const adminUserSummarySchema = z.object({
+  id: z.string().min(1),
+  admissionEmail: z.string().email(),
+  displayName: z.string().min(1),
+  role: userRoleSchema,
+  staffEligible: z.boolean(),
+});
+export type AdminUserSummary = z.infer<typeof adminUserSummarySchema>;
 
-/** Local role switch body. Only the Arlaus localhost shortcut may send admin. */
-export const localDevRoleBodySchema = z
-  .object({
-    role: localDevRoleSchema,
-  })
-  .strict();
-export type LocalDevRoleBody = z.infer<typeof localDevRoleBodySchema>;
+export const adminUsersResponseSchema = z.object({
+  users: z.array(adminUserSummarySchema),
+  nextCursor: z.string().nullable(),
+});
+export type AdminUsersResponse = z.infer<typeof adminUsersResponseSchema>;
+
+/** Account pinned for the one-time server-only admin promotion (persisted admin role). */
+export const ARLAUS_ADMIN_EMAIL = "arlaus@student.apc.edu.ph";
+
+export const APC_STAFF_TEACHER_DOMAIN = "apc.edu.ph";
 
 export function normalizeAdmissionEmail(email: string): string {
   const trimmed = email.trim();
@@ -182,8 +212,17 @@ export function normalizeAdmissionEmail(email: string): string {
   return `${trimmed.slice(0, at).toLowerCase()}@${trimmed.slice(at + 1).toLowerCase()}`;
 }
 
-export function isLocalDevTestEmail(email: string): boolean {
-  return normalizeAdmissionEmail(email) === LOCAL_DEV_TEST_EMAIL;
+/** Exact mailbox domain after the last `@`. Never a suffix or includes match. */
+export function admissionMailboxDomain(email: string): string {
+  const normalized = normalizeAdmissionEmail(email);
+  const at = normalized.lastIndexOf("@");
+  if (at < 0 || at === normalized.length - 1) return "";
+  return normalized.slice(at + 1);
+}
+
+/** Staff teacher grants require the verified admission mailbox's exact domain. */
+export function isExactStaffTeacherDomain(email: string): boolean {
+  return admissionMailboxDomain(email) === APC_STAFF_TEACHER_DOMAIN;
 }
 
 export const grantCollaboratorBodySchema = z.object({

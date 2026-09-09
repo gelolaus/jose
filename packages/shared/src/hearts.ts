@@ -1,10 +1,11 @@
 /**
- * Hearts are **arcade challenge lives** only.
- * Core path learning and teacher assignments never spend or require hearts.
+ * Lives (internal name: hearts) refill on a ten-minute timer.
+ * Required path learning and teacher assignments never spend or require lives.
  * HEARTS_EMPTY applies only to optional arcade challenge sessions.
  */
 export const MAX_HEARTS = 5;
-export const HEART_DRIP_MS = 15 * 60 * 1000;
+export const HEART_DRIP_MS = 10 * 60 * 1000;
+export const LESSON_CREDIT_MS = 2 * 60 * 1000;
 export const HEARTS_EMPTY_CODE = "HEARTS_EMPTY";
 
 export type PlayEconomyMode = "learning" | "arcade_challenge";
@@ -35,6 +36,66 @@ export function applyHeartDrip(
     hearts: capped + gained,
     heartsUpdatedAt: updatedAt + gained * HEART_DRIP_MS,
     changed: true,
+  };
+}
+
+export function nextHeartAt(
+  hearts: number,
+  heartsUpdatedAt: number,
+  now: number,
+): number | null {
+  const dripped = applyHeartDrip(hearts, heartsUpdatedAt, now);
+  if (dripped.hearts >= MAX_HEARTS) return null;
+  return dripped.heartsUpdatedAt + HEART_DRIP_MS;
+}
+
+export function applyLessonCredit(
+  hearts: number,
+  heartsUpdatedAt: number,
+  now: number,
+): { hearts: number; heartsUpdatedAt: number; creditApplied: boolean } {
+  const afterDrip = applyHeartDrip(hearts, heartsUpdatedAt, now);
+  if (afterDrip.hearts >= MAX_HEARTS) {
+    return {
+      hearts: MAX_HEARTS,
+      heartsUpdatedAt: afterDrip.heartsUpdatedAt,
+      creditApplied: false,
+    };
+  }
+  const creditedAt = afterDrip.heartsUpdatedAt - LESSON_CREDIT_MS;
+  const afterCredit = applyHeartDrip(afterDrip.hearts, creditedAt, now);
+  if (afterCredit.hearts >= MAX_HEARTS) {
+    return {
+      hearts: MAX_HEARTS,
+      heartsUpdatedAt: now,
+      creditApplied: true,
+    };
+  }
+  return {
+    hearts: afterCredit.hearts,
+    heartsUpdatedAt: afterCredit.heartsUpdatedAt,
+    creditApplied: true,
+  };
+}
+
+export function learnerLivesFields(
+  hearts: number,
+  heartsUpdatedAt: number,
+  now: number,
+): {
+  hearts: number;
+  heartsUpdatedAt: number;
+  nextHeartAt: number | null;
+  serverNow: number;
+  dripChanged: boolean;
+} {
+  const dripped = applyHeartDrip(hearts, heartsUpdatedAt, now);
+  return {
+    hearts: dripped.hearts,
+    heartsUpdatedAt: dripped.heartsUpdatedAt,
+    nextHeartAt: nextHeartAt(dripped.hearts, dripped.heartsUpdatedAt, now),
+    serverNow: now,
+    dripChanged: dripped.changed,
   };
 }
 

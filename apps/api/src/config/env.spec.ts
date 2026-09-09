@@ -72,4 +72,17 @@ describe("loadJoseEnv", () => {
     };
     expect(loadJoseEnv(process.env).trustProxy).toBe(1);
   });
+
+  it("defaults body limit to safely carry the documented JMM maximum", async () => {
+    process.env = {
+      ...base,
+      NODE_ENV: "development",
+      JOSE_DATABASE_URL: "file:./data/jose.sqlite",
+    };
+    delete process.env.JOSE_MAX_BODY_BYTES;
+    const env = loadJoseEnv(process.env);
+    const { JMM_MAX_SOURCE_BYTES } = await import("@jose/shared");
+    // 200k source + JSON envelope/escaping overhead.
+    expect(env.maxBodyBytes).toBeGreaterThanOrEqual(JMM_MAX_SOURCE_BYTES + 50_000);
+  });
 });

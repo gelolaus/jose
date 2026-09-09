@@ -5,7 +5,6 @@ import { AVATAR_CATALOG } from "@/lib/avatar-catalog";
 import {
   DEFAULT_DISPLAY_NAME,
   isAvatarId,
-  normalizeDisplayName,
   writeExplorerIdentity,
   type AvatarId,
 } from "@/lib/explorer-identity";
@@ -20,24 +19,28 @@ import { useState, type FormEvent } from "react";
 
 export function ProfileEditForm() {
   const identity = useExplorerIdentity(DEFAULT_DISPLAY_NAME);
-  const { authenticated, learner, loading } = useJoseSession();
+  const { authenticated, learner, loading, user } = useJoseSession();
   if (loading) {
     return (
       <p className="mx-auto max-w-lg px-5 py-10 font-semibold text-slate-600">
-        Loading your explorer…
+        Loading your profile…
       </p>
     );
   }
-  // A signed-in learner edits the server profile; anonymous demo play stays local.
+  // A signed-in learner edits avatar only; display name is immutable (admin correction only).
   const initial =
     authenticated && learner
       ? { displayName: learner.displayName, avatarId: learner.avatarId }
       : identity;
+  const accountName = authenticated ? (user?.displayName ?? initial.displayName) : null;
+  const accountEmail = authenticated ? (user?.admissionEmail ?? null) : null;
   return (
     <ProfileEditFields
       key={`${initial.displayName}:${initial.avatarId}`}
       initial={initial}
       authenticated={authenticated}
+      accountName={accountName}
+      accountEmail={accountEmail}
     />
   );
 }
@@ -45,23 +48,21 @@ export function ProfileEditForm() {
 function ProfileEditFields({
   initial,
   authenticated,
+  accountName,
+  accountEmail,
 }: {
   initial: { displayName: string; avatarId: AvatarId };
   authenticated: boolean;
+  accountName: string | null;
+  accountEmail: string | null;
 }) {
   const router = useRouter();
-  const [displayName, setDisplayName] = useState(initial.displayName);
   const [avatarId, setAvatarId] = useState<AvatarId>(initial.avatarId);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function onSave(event: FormEvent) {
     event.preventDefault();
-    const name = normalizeDisplayName(displayName);
-    if (!name) {
-      setError("Pick a name between 1 and 20 characters.");
-      return;
-    }
     if (!isAvatarId(avatarId)) {
       setError("Pick an avatar to continue.");
       return;
@@ -69,7 +70,7 @@ function ProfileEditFields({
     if (authenticated) {
       setSaving(true);
       try {
-        await updateProfile({ displayName: name, avatarId });
+        await updateProfile({ avatarId });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not save your profile");
         setSaving(false);
@@ -77,7 +78,7 @@ function ProfileEditFields({
       }
       setSaving(false);
     }
-    writeExplorerIdentity({ displayName: name, avatarId });
+    writeExplorerIdentity({ displayName: initial.displayName, avatarId });
     notifyExplorerIdentityChanged();
     router.push("/profile");
     router.refresh();
@@ -92,7 +93,7 @@ function ProfileEditFields({
         <ExplorerAvatar avatarId={avatarId} floating />
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-800 md:text-4xl">
-            Edit explorer
+            Edit profile
           </h1>
           <p className="mt-1 text-sm font-semibold text-slate-500 md:text-base">
             {authenticated
@@ -102,24 +103,20 @@ function ProfileEditFields({
         </div>
       </div>
 
-      <label className="flex flex-col gap-2 text-left">
-        <span className="text-sm font-extrabold text-slate-700">
-          Display name
-        </span>
-        <input
-          type="text"
-          value={displayName}
-          onChange={(event) => {
-            setDisplayName(event.target.value);
-            setError(null);
-          }}
-          maxLength={20}
-          className="rounded-2xl border border-black/10 bg-white px-4 py-3 text-base font-bold text-slate-800 outline-none ring-rose-300 focus:ring-2"
-          autoComplete="nickname"
-          aria-invalid={Boolean(error)}
-          aria-describedby={error ? "name-error" : undefined}
-        />
-      </label>
+      {authenticated && (accountName || accountEmail) ? (
+        <div className="rounded-2xl bg-white/70 px-4 py-3 text-left ring-1 ring-black/5">
+          <p className="text-sm font-extrabold text-slate-700">Account</p>
+          {accountName ? (
+            <p className="mt-1 text-base font-bold text-slate-800">{accountName}</p>
+          ) : null}
+          {accountEmail ? (
+            <p className="text-sm font-semibold text-slate-500">{accountEmail}</p>
+          ) : null}
+          <p className="mt-1 text-xs font-semibold text-slate-500">
+            Names come from your admitted APC account. Contact an administrator for corrections.
+          </p>
+        </div>
+      ) : null}
 
       <fieldset className="space-y-3">
         <legend className="text-sm font-extrabold text-slate-700">
@@ -132,7 +129,10 @@ function ProfileEditFields({
               <button
                 key={option.id}
                 type="button"
-                onClick={() => setAvatarId(option.id)}
+                onClick={() => {
+                  setAvatarId(option.id);
+                  setError(null);
+                }}
                 className={`flex flex-col items-center gap-2 rounded-3xl px-2 py-3 transition active:translate-y-0.5 ${
                   selected
                     ? "bg-white shadow-md ring-2 ring-rose-400"
@@ -155,7 +155,7 @@ function ProfileEditFields({
       </fieldset>
 
       {error ? (
-        <p id="name-error" className="text-sm font-bold text-rose-600" role="alert">
+        <p id="avatar-error" className="text-sm font-bold text-rose-600" role="alert">
           {error}
         </p>
       ) : null}

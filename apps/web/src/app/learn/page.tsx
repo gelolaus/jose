@@ -1,10 +1,11 @@
 import { AppShell } from "@/components/learning-shell";
 import { ModuleGrid } from "@/components/module-grid";
-import { ThemeToggle } from "@/components/presentation-toggle";
 import { RecoveryState } from "@/components/recovery-state";
+import { StudentClassesPanel } from "@/components/student-classes-panel";
 import { TopBar } from "@/components/top-bar";
 import { SignInRequired } from "@/components/sign-in-required";
-import { fetchModules } from "@/lib/server-api";
+import { fetchModules, fetchMyAssignments, fetchMyClasses } from "@/lib/server-api";
+import type { StudentAssignment, StudentClassMembership } from "@jose/shared";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,26 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Modules",
 };
+
+async function loadClasses(): Promise<{
+  classes: StudentClassMembership[];
+  assignments: StudentAssignment[];
+  error: string | null;
+}> {
+  try {
+    const [classes, assignments] = await Promise.all([
+      fetchMyClasses(),
+      fetchMyAssignments(),
+    ]);
+    return { classes, assignments, error: null };
+  } catch (error) {
+    return {
+      classes: [],
+      assignments: [],
+      error: error instanceof Error ? error.message : "Could not load classes",
+    };
+  }
+}
 
 export default async function LearnPage() {
   const result = await fetchModules();
@@ -37,13 +58,21 @@ export default async function LearnPage() {
   }
 
   const { data } = result;
+  const classState = await loadClasses();
+  const classesPanel = (
+    <StudentClassesPanel
+      initialClasses={classState.classes}
+      initialAssignments={classState.assignments}
+      initialError={classState.error}
+    />
+  );
 
   if (data.modules.length === 0) {
     return (
       <AppShell
         topBar={
           <TopBar
-            courseTitle="Work and Life of Rizal"
+            courseTitle="Jose"
             streak={data.learner.streak}
             hearts={data.learner.hearts}
             xp={data.learner.xp}
@@ -56,6 +85,7 @@ export default async function LearnPage() {
           href="/learn"
           emptyAction={{ href: "/practice", label: "Try Practice" }}
         />
+        {classesPanel}
       </AppShell>
     );
   }
@@ -63,23 +93,19 @@ export default async function LearnPage() {
   return (
     <AppShell
       topBar={
-        <div>
-          <TopBar
-            courseTitle="Work and Life of Rizal"
-            streak={data.learner.streak}
-            hearts={data.learner.hearts}
-            xp={data.learner.xp}
-          />
-          <div className="flex justify-end border-b border-[var(--jose-rule)] bg-[var(--jose-paper)]/80 px-4 py-2 lg:hidden">
-            <ThemeToggle compact />
-          </div>
-        </div>
+        <TopBar
+          courseTitle="Jose"
+          streak={data.learner.streak}
+          hearts={data.learner.hearts}
+          xp={data.learner.xp}
+        />
       }
     >
       <ModuleGrid
         modules={data.modules}
         continueLearning={data.continueLearning}
       />
+      {classesPanel}
     </AppShell>
   );
 }

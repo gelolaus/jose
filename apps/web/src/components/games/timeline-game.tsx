@@ -13,7 +13,6 @@ import type { PlayBoardProps } from "./play-types";
 import {
   allStopsFilled,
   formatTimelineWhy,
-  gradeCausalChoice,
   gradeTimelineCheck,
 } from "./timeline-grade";
 import { PlaceGhost, usePlaceDrag } from "./use-place-drag";
@@ -80,8 +79,8 @@ function StopBead({
     tone === "locked"
       ? "border-emerald-700 bg-emerald-600 text-white"
       : tone === "empty"
-        ? "border-violet-700 bg-white text-violet-700"
-        : "border-violet-800 bg-violet-700 text-white";
+        ? "border-[#1cb0f6] bg-[#dcf3ff] text-[#096d9b]"
+        : "border-[#1596d2] bg-[#1cb0f6] text-[#083b54]";
   const beadClass = `relative z-[1] flex size-7 shrink-0 items-center justify-center rounded-full border-[3px] text-[11px] font-extrabold shadow-[0_2px_0_#4c1d95] ${toneClass}`;
   return (
     <div className="relative z-[1] col-start-1 row-start-1 row-span-3 mt-5 flex justify-center self-start sm:mt-0 sm:w-full">
@@ -101,7 +100,7 @@ function StopBead({
 }
 
 const YEAR_PILL =
-  "col-start-2 row-start-1 mb-1 flex min-h-[2.35rem] w-full items-center justify-center rounded-full bg-[#f5c518] px-2.5 py-1 text-center text-[11px] font-extrabold leading-snug text-slate-800 shadow-[0_3px_0_#d97706] sm:mb-2";
+  "col-start-2 row-start-1 mb-1 flex min-h-[2.35rem] w-full items-center justify-center rounded-full bg-[#f5c518] px-2.5 py-1 text-center text-[11px] font-extrabold leading-snug text-[#5f4300] shadow-[0_3px_0_#d97706] sm:mb-2";
 
 function StopStem() {
   return <span aria-hidden className="col-start-2 row-start-2 mx-auto mb-1 block h-3 w-0.5 rounded-full bg-amber-700" />;
@@ -127,7 +126,7 @@ export function TimelineGame({
   disabled?: boolean;
   onChange?: (game: TimelineContent) => void;
 } & Partial<PlayBoardProps>) {
-  if (mode === "build" && onChange && "causalLink" in game) {
+  if (mode === "build" && onChange) {
     return <TimelineBuild game={game as TimelineContent} onChange={onChange} />;
   }
   if (!onMiss || !onFinish) return null;
@@ -153,12 +152,10 @@ function TimelinePlay({
   const [locked, setLocked] = useState<Record<string, true>>({});
   const [shake, setShake] = useState(false);
   const [bank, setBank] = useState(game.items);
-  const [phase, setPhase] = useState<"timeline" | "causal" | "causal-explanation">("timeline");
   const [hintsRevealed, setHintsRevealed] = useState(false);
   const missesRef = useRef(0);
-  const causalChoiceRef = useRef<string | undefined>(undefined);
-  const maxPieces = game.items.length + (game.causalLink ? 1 : 0);
-  const { feedbackHoldMs, playCue } = useMotionSound();
+  const maxPieces = game.items.length;
+  const { playCue } = useMotionSound();
   const wide = useWideScreen();
   const drag = usePlaceDrag({
     disabled,
@@ -176,12 +173,11 @@ function TimelinePlay({
       setBank(dealTimelineItems(game.items as TimelineItem[]));
       setPlaced({});
       setLocked({});
-      setPhase("timeline");
       setHintsRevealed(false);
       missesRef.current = 0;
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [game.items, game.causalLink, game.dateHints]);
+  }, [game.items, game.dateHints]);
 
   const currentOrder = useCallback(
     () => game.items.map((_, index) => placed[index]!).filter(Boolean),
@@ -192,17 +188,8 @@ function TimelinePlay({
     onFinish(maxPieces - missesRef.current, maxPieces, missesRef.current, {
       type: "timeline",
       order: currentOrder(),
-      causalChoiceId: causalChoiceRef.current,
     });
   }, [currentOrder, maxPieces, onFinish]);
-
-  useEffect(() => {
-    if (phase !== "causal-explanation") return;
-    const timer = window.setTimeout(() => {
-      finishTimeline();
-    }, feedbackHoldMs);
-    return () => window.clearTimeout(timer);
-  }, [feedbackHoldMs, finishTimeline, phase]);
 
   function putOn(slot: number, itemId = drag.selectedRef.current) {
     if (!itemId || disabled || locked[itemId]) return;
@@ -240,10 +227,6 @@ function TimelinePlay({
         for (const item of game.items) all[item.id] = true;
         setLocked(all);
         playCue("accept");
-        if (game.causalLink) {
-          setPhase("causal");
-          return;
-        }
         finishTimeline();
         return;
       }
@@ -271,10 +254,6 @@ function TimelinePlay({
       for (const item of game.items) all[item.id] = true;
       setLocked(all);
       playCue("accept");
-      if (game.causalLink) {
-        setPhase("causal");
-        return;
-      }
       finishTimeline();
       return;
     }
@@ -295,40 +274,6 @@ function TimelinePlay({
     await onMiss(formatTimelineWhy(result.wrongItems));
   }
 
-  async function answerCausal(choiceId: string) {
-    if (disabled || !game.causalLink) return;
-    causalChoiceRef.current = choiceId;
-    if (onEvaluate) {
-      const result = await onEvaluate({ type: "timeline_causal", choiceId });
-      if (!result.correct) {
-        missesRef.current += 1;
-        playCue("reject");
-        await onMiss(
-          result.feedback
-            ? { title: result.feedback.title, body: result.feedback.body, tone: "miss" }
-            : { title: "Not quite", body: "Try the causal connection again.", tone: "miss" },
-        );
-        return;
-      }
-      playCue("accept");
-      setPhase("causal-explanation");
-      return;
-    }
-    const result = gradeCausalChoice(game as TimelineContent, choiceId);
-    if (!result.perfect) {
-      missesRef.current += 1;
-      playCue("reject");
-      await onMiss({
-        title: "Not quite",
-        body: result.explanation ?? "Try the causal connection again.",
-        tone: "miss",
-      });
-      return;
-    }
-    playCue("accept");
-    setPhase("causal-explanation");
-  }
-
   const leftover = bank.filter((item) => !Object.values(placed).includes(item.id));
   const hoverSlot =
     drag.overEl?.dataset.timelineSlot !== undefined
@@ -336,22 +281,10 @@ function TimelinePlay({
       : null;
   const canCheck = allStopsFilled(playItems(game), placed);
 
-  if (phase !== "timeline" && game.causalLink) {
-    return (
-      <GameBoard scene="timeline" step="Explain the connection">
-        <CausalChallenge
-          link={game.causalLink as NonNullable<TimelineContent["causalLink"]>}
-          showingExplanation={phase === "causal-explanation"}
-          disabled={disabled}
-          onChoose={answerCausal}
-        />
-      </GameBoard>
-    );
-  }
-
   return (
-    <GameBoard scene="timeline" step="Place the events">
+    <GameBoard scene="timeline" step={`${Object.keys(placed).length} of ${game.items.length} events placed`}>
     <div className={`flex flex-col gap-4 pb-28 sm:gap-5 sm:pb-0 ${shake ? "snap-back" : ""}`}>
+      <p className="text-base font-bold text-[var(--jose-text)]">Put the events in order, earliest first. Tap an event, then an empty stop.</p>
       <PlaceGhost ghost={drag.ghost} />
       <TimelineRail
         items={game.items}
@@ -428,53 +361,13 @@ function TimelinePlay({
           type="button"
           disabled={disabled || !canCheck}
           onClick={() => void check()}
-          className="w-full rounded-full bg-violet-600 px-5 py-3 text-base font-extrabold text-white shadow-md disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)] sm:ml-auto sm:block sm:w-auto sm:px-8"
+          className="jose-button w-full"
         >
           Check
         </button>
       </div>
     </div>
     </GameBoard>
-  );
-}
-
-function CausalChallenge({
-  link,
-  showingExplanation,
-  disabled,
-  onChoose,
-}: {
-  link: NonNullable<TimelineContent["causalLink"]>;
-  showingExplanation: boolean;
-  disabled: boolean;
-  onChoose: (choiceId: string) => void;
-}) {
-  return (
-    <section className="mx-auto w-full max-w-xl rounded-[1.5rem] border-2 border-amber-200 bg-amber-50 p-5 shadow-[0_4px_0_#fde68a]">
-      <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-700">
-        Cause and consequence
-      </p>
-      <h2 className="mt-2 font-display text-2xl font-semibold text-slate-800">{link.prompt}</h2>
-      {showingExplanation ? (
-        <div className="mt-4 rounded-2xl bg-emerald-50 p-4 text-sm font-semibold leading-relaxed text-emerald-900">
-          {link.explanation}
-        </div>
-      ) : (
-        <div className="mt-4 grid gap-2">
-          {link.choices.map((choice) => (
-            <button
-              key={choice.id}
-              type="button"
-              disabled={disabled}
-              onClick={() => void onChoose(choice.id)}
-              className="rounded-2xl bg-white px-4 py-3 text-left text-sm font-extrabold text-slate-800 ring-2 ring-amber-200 transition hover:ring-violet-400 disabled:opacity-50"
-            >
-              {choice.text}
-            </button>
-          ))}
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -585,7 +478,7 @@ function EmptyWell({
           : "border-[2.5px] border-dashed border-violet-300 bg-violet-50 text-violet-500"
       }`}
     >
-      Drop
+      Place here
     </div>
   );
 }
@@ -604,11 +497,6 @@ function TimelineBuild({
       ...game,
       items: game.items.map((item, i) => (i === index ? { ...item, ...next } : item)),
     });
-  }
-
-  function patchCausal(next: Partial<NonNullable<TimelineContent["causalLink"]>>) {
-    if (!game.causalLink) return;
-    onChange({ ...game, causalLink: { ...game.causalLink, ...next } });
   }
 
   function move(index: number, dir: -1 | 1) {
@@ -744,104 +632,7 @@ function TimelineBuild({
           Add event
         </button>
       </div>
-      {game.causalLink ? (
-        <section className="space-y-3 rounded-2xl border-2 border-amber-200 bg-amber-50 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="font-display text-lg font-semibold text-slate-800">Cause and consequence</h3>
-            <button
-              type="button"
-              onClick={() => onChange({ ...game, causalLink: undefined })}
-              className="text-xs font-extrabold text-rose-700"
-            >
-              Remove question
-            </button>
-          </div>
-          <textarea
-            aria-label="Causal prompt"
-            rows={2}
-            value={game.causalLink.prompt}
-            onChange={(e) => patchCausal({ prompt: e.target.value })}
-            className="w-full resize-none rounded-xl bg-white px-3 py-2 text-sm font-semibold ring-1 ring-amber-200"
-          />
-          <div className="grid gap-2">
-            {game.causalLink.choices.map((choice) => (
-              <input
-                key={choice.id}
-                aria-label={`Causal choice ${choice.id}`}
-                value={choice.text}
-                onChange={(e) =>
-                  patchCausal({
-                    choices: game.causalLink!.choices.map((entry) =>
-                      entry.id === choice.id ? { ...entry, text: e.target.value } : entry,
-                    ),
-                  })
-                }
-                className="w-full rounded-full bg-white px-3 py-2 text-sm font-semibold ring-1 ring-amber-200"
-              />
-            ))}
-          </div>
-          {game.causalLink.choices.length < 6 ? (
-            <button
-              type="button"
-              onClick={() =>
-                patchCausal({
-                  choices: [
-                    ...game.causalLink!.choices,
-                    { id: `cause-${Date.now()}`, text: "New choice" },
-                  ],
-                })
-              }
-              className="text-xs font-extrabold text-violet-700"
-            >
-              + Add choice
-            </button>
-          ) : null}
-          <label className="block text-xs font-bold text-slate-700">
-            Correct choice
-            <select
-              value={game.causalLink.correctChoiceId}
-              onChange={(e) => patchCausal({ correctChoiceId: e.target.value })}
-              className="mt-1 block w-full rounded-full bg-white px-3 py-2 text-sm font-semibold ring-1 ring-amber-200"
-            >
-              {game.causalLink.choices.map((choice) => (
-                <option key={choice.id} value={choice.id}>
-                  {choice.text || "Untitled choice"}
-                </option>
-              ))}
-            </select>
-          </label>
-          <textarea
-            aria-label="Causal explanation"
-            rows={3}
-            value={game.causalLink.explanation}
-            onChange={(e) => patchCausal({ explanation: e.target.value })}
-            placeholder="Why this connection is correct"
-            className="w-full resize-none rounded-xl bg-white px-3 py-2 text-sm font-semibold ring-1 ring-amber-200"
-          />
-        </section>
-      ) : (
-        <button
-          type="button"
-          onClick={() => {
-            const firstChoiceId = `cause-${Date.now()}-1`;
-            onChange({
-              ...game,
-              causalLink: {
-                prompt: "What connects these events?",
-                choices: [
-                  { id: firstChoiceId, text: "The earlier event enabled the later one" },
-                  { id: `${firstChoiceId}-alt`, text: "They are unrelated" },
-                ],
-                correctChoiceId: firstChoiceId,
-                explanation: "Explain how one event shaped the next.",
-              },
-            });
-          }}
-          className="rounded-full bg-amber-100 px-3 py-1.5 text-xs font-extrabold text-amber-900"
-        >
-          Add cause and consequence question
-        </button>
-      )}
+
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_READING_PREFERENCES,
+  migrateReadingPreferences,
   readingPreferencesSchema,
 } from "./preferences";
 import { lessonPackManifestSchema } from "./lesson-packs";
@@ -14,6 +15,33 @@ describe("reading preferences", () => {
       soundEnabled: false,
     });
     expect(DEFAULT_READING_PREFERENCES.narrationEnabled).toBe(false);
+  });
+
+  it("migrates a stored Filipino locale to English without dropping other settings", () => {
+    const prefs = migrateReadingPreferences({
+      version: 1,
+      locale: "fil",
+      textSize: "xl",
+      reduceMotion: true,
+      soundEnabled: true,
+      narrationEnabled: true,
+    });
+    expect(prefs).toEqual({
+      version: 1,
+      locale: "en",
+      textSize: "xl",
+      reduceMotion: true,
+      soundEnabled: true,
+      narrationEnabled: false,
+    });
+  });
+
+  it("uses defaults for missing or malformed storage", () => {
+    expect(migrateReadingPreferences(null)).toEqual(DEFAULT_READING_PREFERENCES);
+    expect(migrateReadingPreferences("nope")).toEqual(DEFAULT_READING_PREFERENCES);
+    expect(migrateReadingPreferences({ version: 1, textSize: "huge" }).textSize).toBe(
+      "md",
+    );
   });
 });
 

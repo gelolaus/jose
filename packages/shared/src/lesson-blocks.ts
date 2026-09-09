@@ -90,6 +90,36 @@ export const lessonBlocksSchema = z
 export type LessonBlock = z.infer<typeof lessonBlockSchema>;
 export type LessonBlocks = z.infer<typeof lessonBlocksSchema>;
 
+export function describeLessonBlocksIssue(blocks: unknown): string | null {
+  const parsed = lessonBlocksSchema.safeParse(blocks);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    if (!issue) return "This lesson is not ready to save yet.";
+    const index = typeof issue.path[0] === "number" ? issue.path[0] : null;
+    const type =
+      index != null && Array.isArray(blocks)
+        ? (blocks[index] as { type?: string } | undefined)?.type
+        : undefined;
+    if (type === "image") {
+      return "Add a picture and alt text before saving this image.";
+    }
+    if (type === "quote") {
+      return "Add the quoted text and a source before saving.";
+    }
+    if (type === "glossary") {
+      return "Each glossary row needs a term and a definition.";
+    }
+    if (type === "video" || issue.path.includes("youtubeUrl")) {
+      return "Add a valid YouTube URL before saving this video.";
+    }
+    if (type === "checkpoint") {
+      return "Write the checkpoint question before saving.";
+    }
+    return issue.message;
+  }
+  return rejectUnsafeLessonEmbeds(parsed.data);
+}
+
 const UNSAFE_EMBED =
   /<(?:iframe|script|object|embed)\b|javascript:|data:text\/html/i;
 

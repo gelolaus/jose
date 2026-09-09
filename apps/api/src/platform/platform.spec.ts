@@ -1,4 +1,4 @@
-import { INestApplication } from "@nestjs/common";
+﻿import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
@@ -57,7 +57,6 @@ describe("platform reliability HTTP", () => {
       JOSE_DATABASE_URL: `file:${databasePath.replace(/\\/g, "/")}`,
       ...AUTH_ENV,
     };
-    delete process.env.JOSE_AUTH_STUB;
     delete process.env.JOSE_DEMO_MODE;
 
     const moduleRef = await Test.createTestingModule({

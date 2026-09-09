@@ -1,7 +1,8 @@
 # Content the product owner / instructors must supply
 
-The student-learning batch (#25–#31) ships **editorial structures** only.
-Do **not** treat seeded Markdown as a complete APC RIZLIFE course.
+Teacher-created modules ship **editorial structures** only.
+Do **not** treat any starter Markdown as a complete APC RIZLIFE course. There is
+no production seed course; instructors author via Teacher studio or JMM import.
 
 ## Required before claiming historical completeness
 
@@ -14,11 +15,11 @@ Use the shared checklist in `@jose/shared` (`CONTENT_OWNER_CHECKLIST`):
 5. Label disputed or uncertain interpretations; do not present them as settled fact.
 6. Write optional deeper-analysis prompts beyond recall.
 7. Record instructor historical-accuracy review before publishing a chapter.
-8. Replace placeholder seed summaries.
+8. Replace placeholder summaries.
 
-## Seed lessons already flagged with `contentGaps`
+## Lessons already flagged with `contentGaps`
 
-Every seeded lesson stores `editorial.contentGaps` in `lesson_content.editorial_json`.
+Every lesson stores `editorial.contentGaps` in `lesson_content.editorial_json`.
 `arrest` and `edu-madrid` were also rewritten to remove imprecise wording and call out missing sourcing.
 
 ## Where content lands in the product

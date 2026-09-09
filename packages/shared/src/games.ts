@@ -585,7 +585,7 @@ export function memoryScore(pairs: number, mismatches: number): {
   maxScore: number;
 } {
   const maxScore = Math.max(0, pairs) * 100;
-  const score = Math.max(0, maxScore - mismatches * 10);
+  const score = Math.max(0, maxScore);
   return { score, maxScore };
 }
 
@@ -611,7 +611,7 @@ export function pieceCount(game: GameContent): number {
     case "memory":
       return game.pairs.length;
     case "timeline":
-      return game.items.length + (game.causalLink ? 1 : 0);
+      return game.items.length;
     case "blank":
       return game.items.length;
     case "sort":
@@ -656,3 +656,25 @@ export const lessonContentSchema = z.object({
 });
 
 export type LessonContent = z.infer<typeof lessonContentSchema>;
+
+/** Adapt legacy authored content at play time without rewriting historical records. */
+export function simplifyGameContent(game: GameContent): GameContent {
+  switch (game.type) {
+    case "quiz": return { ...game, questions: game.questions.map(({ rationales, correctRationaleId, ...question }) => question) };
+    case "timeline": { const { causalLink, ...ordering } = game; return ordering; }
+    case "memory": return { ...game, playMode: "timed", timing: { secondsPerPair: 15, mismatchPenaltyMs: 0 } };
+    case "sort": {
+      const buckets = game.buckets.filter((bucket) => bucket.role !== "insufficient-evidence");
+      const ids = new Set(buckets.map((bucket) => bucket.id));
+      return { ...game, buckets, items: game.items.filter((item) => item.scoring !== "discussion" && item.bucketId != null && ids.has(item.bucketId)) };
+    }
+    default: return game;
+  }
+}
+export function isPlayableGameContent(game: GameContent): boolean {
+  const simple = simplifyGameContent(game);
+  return simple.type !== "sort" || (simple.buckets.length >= 2 && simple.items.length >= 2);
+}
+export function memoryDurationMs(pairCount: number): number {
+  return Math.max(60_000, pairCount * 15_000);
+}

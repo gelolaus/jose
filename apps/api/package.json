@@ -9,7 +9,8 @@
     "db:migrate": "ts-node --transpile-only src/db/migrate-cli.ts",
     "db:backup": "ts-node --transpile-only src/db/backup-cli.ts",
     "db:restore": "ts-node --transpile-only src/db/restore-cli.ts",
-    "db:seed": "ts-node --transpile-only src/db/seed-cli.ts",
+    "db:empty": "ts-node --transpile-only src/db/empty-cli.ts",
+    "db:promote-arlaus": "ts-node --transpile-only src/auth/promote-arlaus-cli.ts",
     "test": "jest --config ./jest.config.ts",
     "lint": "tsc -p tsconfig.json --noEmit"
   },

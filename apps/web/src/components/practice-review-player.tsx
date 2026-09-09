@@ -67,6 +67,7 @@ export function PracticeReviewPlayer({
   if (result) {
     return (
       <StarCelebration
+        timedOut={game.type === "memory" && result.score === 0}
         title={title}
         score={result.score}
         maxScore={result.maxScore}

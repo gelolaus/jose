@@ -56,6 +56,9 @@ export const learnerSchema = z.object({
   streak: z.number().int().nonnegative(),
   hearts: z.number().int().nonnegative(),
   xp: z.number().int().nonnegative(),
+  heartsUpdatedAt: z.number().int().nonnegative().optional(),
+  nextHeartAt: z.number().int().nonnegative().nullable().optional(),
+  serverNow: z.number().int().nonnegative().optional(),
 });
 
 export const pathResponseSchema = z.object({
@@ -87,4 +90,9 @@ export function nodeIconFor(kind: NodeKind, status: NodeStatus): NodeIcon {
   if (kind === "chest") return "chest";
   if (kind === "game") return "game";
   return "book";
+}
+
+export const ACTIVE_GAME_TYPES = ["quiz", "memory", "timeline", "sort", "blank"] as const;
+export function isActiveGameType(type: unknown): type is (typeof ACTIVE_GAME_TYPES)[number] {
+  return ACTIVE_GAME_TYPES.some((active) => active === type);
 }

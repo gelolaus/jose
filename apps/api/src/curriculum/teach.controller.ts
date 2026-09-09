@@ -5,6 +5,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   NotFoundException,
   Param,
   Patch,
@@ -54,6 +55,17 @@ export class TeachController {
   @Post("modules/wizard")
   createWizard(@CurrentUser() user: SessionUser, @Body() body: unknown) {
     return this.curriculum.createModuleFromWizard(body, user);
+  }
+
+  @Post("modules/import/preview")
+  @HttpCode(200)
+  previewImport(@Body() body: unknown) {
+    return this.curriculum.previewModuleImport(body);
+  }
+
+  @Post("modules/import/commit")
+  commitImport(@CurrentUser() user: SessionUser, @Body() body: unknown) {
+    return this.curriculum.commitModuleImport(body, user);
   }
 
   @Get("modules/:id")
@@ -289,7 +301,7 @@ export class TeachController {
   ) {
     const moduleId = await this.curriculum.moduleIdForLevel(id);
     await this.authorization.assertCanAccessModule(user, moduleId);
-    return this.curriculum.patchLevel(id, body);
+    return this.curriculum.patchLevel(id, body, user);
   }
 
   @Delete("levels/:id")
@@ -341,7 +353,7 @@ export class TeachController {
   ) {
     const moduleId = await this.curriculum.moduleIdForLevel(id);
     await this.authorization.assertCanAccessModule(user, moduleId);
-    return this.curriculum.putLesson(id, body);
+    return this.curriculum.putLesson(id, body, user);
   }
 
   @Put("levels/:id/game")
@@ -352,7 +364,7 @@ export class TeachController {
   ) {
     const moduleId = await this.curriculum.moduleIdForLevel(id);
     await this.authorization.assertCanAccessModule(user, moduleId);
-    return this.curriculum.putGame(id, body);
+    return this.curriculum.putGame(id, body, user);
   }
 
   @Put("levels/:id/chest")
@@ -363,7 +375,7 @@ export class TeachController {
   ) {
     const moduleId = await this.curriculum.moduleIdForLevel(id);
     await this.authorization.assertCanAccessModule(user, moduleId);
-    return this.curriculum.putChest(id, body);
+    return this.curriculum.putChest(id, body, user);
   }
 
   @Post("levels/:id/import-questions")

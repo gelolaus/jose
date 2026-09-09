@@ -80,19 +80,9 @@ function assertProductionSafe(env: NodeJS.ProcessEnv, mode: AuthMode) {
       "JOSE_AUTH_MODE=mock is a test-only login bypass and cannot run in production. Set JOSE_AUTH_MODE=microsoft.",
     );
   }
-  if (isTruthy(env.JOSE_AUTH_STUB)) {
-    throw new AuthConfigError(
-      "JOSE_AUTH_STUB is a test-only identity header and cannot run in production. Remove JOSE_AUTH_STUB.",
-    );
-  }
   if (isTruthy(env.JOSE_DEMO_MODE)) {
     throw new AuthConfigError(
       "JOSE_DEMO_MODE grants anonymous access to the shared demo learner and cannot run in production. Remove JOSE_DEMO_MODE.",
-    );
-  }
-  if (isTruthy(env.JOSE_AUTH_DEV_LOGIN)) {
-    throw new AuthConfigError(
-      "JOSE_AUTH_DEV_LOGIN is a test-only login shortcut and cannot run in production. Remove JOSE_AUTH_DEV_LOGIN.",
     );
   }
   if (mode === "microsoft" && env.JOSE_MAIL_TRANSPORT?.trim().toLowerCase() === "memory") {

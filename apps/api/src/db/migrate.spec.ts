@@ -6,7 +6,11 @@ import { copyFileSync, existsSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runMigrations, listAppliedMigrations } from "./migrate";
+import {
+  configureMigrationConnection,
+  runMigrations,
+  listAppliedMigrations,
+} from "./migrate";
 import {
   backupFileDatabase,
   exportLogicalBackup,
@@ -98,6 +102,20 @@ describe("migrations and backup/restore", () => {
     await removeFixtureDir(rootDir);
   });
 
+  it("does not send local journal tuning pragmas to a hosted libSQL connection", async () => {
+    const executed: string[] = [];
+    const client = {
+      execute: async (sql: string) => {
+        executed.push(sql);
+        return { rows: [] };
+      },
+    } as unknown as Client;
+
+    await configureMigrationConnection(client, { remoteLibsql: true });
+
+    expect(executed).toEqual(["PRAGMA foreign_keys = ON"]);
+  });
+
   it("upgrades an older representative database without losing attempts", async () => {
     const dir = mkdtempSync(join(rootDir, "migrate-"));
     const path = join(dir, "legacy.sqlite");
@@ -139,6 +157,8 @@ describe("migrations and backup/restore", () => {
     expect(applied).toContain("004_assessment_attempts");
     expect(applied).toContain("005_authoring_studio");
     expect(applied).toContain("006_content_classroom");
+    expect(applied).toContain("010_bookmarks_lives_roles");
+    expect(applied).toContain("013_empty_start");
 
     const [attempt] = await db
       .select()
@@ -203,6 +223,22 @@ describe("migrations and backup/restore", () => {
     await writeLogicalBackup(source.client, source.url, backupJson);
     const manifest = await exportLogicalBackup(source.client, source.url);
     expect(manifest.tables.attempts?.length).toBe(1);
+    for (const table of [
+      "module_revisions",
+      "content_audit",
+      "assignments",
+      "practice_attempts",
+      "practice_reviews",
+      "learner_achievements",
+      "learner_artifacts",
+      "learning_misses",
+      "teach_assets",
+      "role_audit",
+      "user_name_audit",
+      "invite_attempts",
+    ]) {
+      expect(Object.keys(manifest.tables)).toContain(table);
+    }
     source.client.close();
 
     const target = open(restorePath);
@@ -222,6 +258,33 @@ describe("migrations and backup/restore", () => {
     const [attempt] = await target.db.select().from(attempts);
     expect(attempt?.id).toBe("att-r");
     target.client.close();
+  });
+
+  it("applies the empty-start release without erasing student records", async () => {
+    const dir = mkdtempSync(join(rootDir, "emptystart-"));
+    const path = join(dir, "s.sqlite");
+    const { client, db } = open(path);
+    await createLegacyDatabase(client);
+    await client.execute({
+      sql: `INSERT INTO learners (id, display_name, streak, hearts, hearts_updated_at, xp) VALUES (?, ?, ?, ?, ?, ?)`,
+      args: ["learner-keep", "Ana", 2, 3, 1, 40],
+    });
+    await client.execute({
+      sql: `INSERT INTO modules (id, title, subtitle, cover_color, sort_order, published, featured, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: ["mod-keep", "M", "S", "#112233", 0, 1, 1, 1, 1],
+    });
+    await runMigrations(client);
+    const applied = await listAppliedMigrations(client);
+    expect(applied).toContain("013_empty_start");
+    const [learner] = await db
+      .select()
+      .from(learners)
+      .where(eq(learners.id, "learner-keep"));
+    expect(learner?.xp).toBe(40);
+    const status = await client.execute("SELECT status FROM modules WHERE id = 'mod-keep'");
+    expect(String(status.rows[0]?.status ?? "")).toBe("published");
+    client.close();
   });
 
   it("file backup copies sqlite onto durable path (survives ephemeral restart simulation)", async () => {

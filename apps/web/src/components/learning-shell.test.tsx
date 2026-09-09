@@ -22,6 +22,7 @@ const session = vi.hoisted(() => ({
     authenticated: false,
     demoMode: false,
     canTeach: false,
+    canAdmin: false,
     localDevAccess: false,
     refresh: async () => {},
   },
@@ -58,6 +59,7 @@ function signedIn(role: "student" | "teacher" | "admin") {
     user,
     authenticated: true,
     canTeach: role === "teacher" || role === "admin",
+    canAdmin: role === "admin",
     localDevAccess: true,
   };
 }
@@ -66,6 +68,7 @@ describe("AppShell teacher navigation", () => {
   afterEach(() => {
     cleanup();
     session.value.canTeach = false;
+    session.value.canAdmin = false;
     session.value.localDevAccess = false;
     session.value.authenticated = false;
     session.value.user = null;
@@ -80,7 +83,7 @@ describe("AppShell teacher navigation", () => {
     );
     expect(screen.getAllByRole("link", { name: /learn/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /practice/i }).length).toBeGreaterThan(0);
-    expect(screen.queryByRole("link", { name: /teacher tools/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /teacher area/i })).toBeNull();
     expect(screen.queryByRole("link", { name: /^teach$/i })).toBeNull();
   });
 
@@ -93,7 +96,7 @@ describe("AppShell teacher navigation", () => {
     );
     expect(screen.getAllByRole("link", { name: /learn/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /practice/i }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: /teacher tools/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /teacher area/i }).length).toBeGreaterThan(0);
   });
 
   it("shows teacher navigation for an admin while keeping student pages", () => {
@@ -105,6 +108,6 @@ describe("AppShell teacher navigation", () => {
     );
     expect(screen.getAllByRole("link", { name: /learn/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /practice/i }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: /teacher tools/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /teacher area/i }).length).toBeGreaterThan(0);
   });
 });

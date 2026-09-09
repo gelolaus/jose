@@ -1,4 +1,4 @@
-import { Test, type TestingModule } from "@nestjs/testing";
+﻿import { Test, type TestingModule } from "@nestjs/testing";
 import type { INestApplication } from "@nestjs/common";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -35,7 +35,6 @@ describe("Per-account learner isolation (issue #3)", () => {
     process.env.JOSE_WEB_ORIGIN = "http://localhost:3000";
     process.env.JOSE_API_PUBLIC_URL = "http://localhost:3001";
     process.env.JOSE_DEMO_MODE = "true";
-    delete process.env.JOSE_AUTH_DEV_LOGIN;
 
     moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
@@ -171,8 +170,14 @@ describe("Per-account learner isolation (issue #3)", () => {
     await request(app.getHttpServer())
       .patch("/auth/profile")
       .set("Cookie", nova.cookie)
-      .send({ displayName: "Nova Prime", avatarId: "leaf" })
+      .send({ avatarId: "leaf" })
       .expect(200);
+
+    await request(app.getHttpServer())
+      .patch("/auth/profile")
+      .set("Cookie", nova.cookie)
+      .send({ displayName: "Nova Prime" })
+      .expect(400);
 
     await request(app.getHttpServer())
       .post("/auth/logout")
@@ -190,9 +195,28 @@ describe("Per-account learner isolation (issue #3)", () => {
 
     expect(me.body.authenticated).toBe(true);
     expect(me.body.learner.id).toBe(nova.learnerId);
-    expect(me.body.learner.displayName).toBe("Nova Prime");
+    expect(me.body.learner.displayName).toBe("Nova");
     expect(me.body.learner.avatarId).toBe("leaf");
-    expect(me.body.user.displayName).toBe("Nova Prime");
+    expect(me.body.user.displayName).toBe("Nova");
+  });
+
+  it("rejects self-service displayName edits with a clear admin-contact error", async () => {
+    const sam = await createTestAccount(database, {
+      admissionEmail: "sam@student.apc.edu.ph",
+      displayName: "Sam",
+    });
+    const res = await request(app.getHttpServer())
+      .patch("/auth/profile")
+      .set("Cookie", sam.cookie)
+      .send({ displayName: "Samuel" })
+      .expect(400);
+    expect(String(res.body.message ?? "")).toMatch(/administrator/i);
+    const me = await request(app.getHttpServer())
+      .get("/auth/me")
+      .set("Cookie", sam.cookie)
+      .expect(200);
+    expect(me.body.learner.displayName).toBe("Sam");
+    expect(me.body.user.displayName).toBe("Sam");
   });
 
   it("refuses anonymous profile edits so demo state never absorbs an identity", async () => {

@@ -1,15 +1,5 @@
-import { AppShell } from "@/components/learning-shell";
-import { JournalView } from "@/components/journal-view";
-import type { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: "Journal",
-};
+import { redirect } from "next/navigation";
 
 export default function JournalPage() {
-  return (
-    <AppShell>
-      <JournalView />
-    </AppShell>
-  );
+  redirect("/bookmarks");
 }

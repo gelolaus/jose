@@ -25,5 +25,7 @@ export * from "./editorial";
 export * from "./practice";
 export * from "./profile-stats";
 export * from "./journal";
+export * from "./bookmarks";
 export * from "./preferences";
 export * from "./lesson-packs";
+export * from "./jose-module-markup";

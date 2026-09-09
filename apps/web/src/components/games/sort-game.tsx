@@ -1,14 +1,13 @@
 "use client";
 
+import { simplifyGameContent } from "@jose/shared";
 import type { AssessmentSort, SortGame as SortContent, SortItem } from "@jose/shared";
 import { Plus } from "lucide-react";
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useMotionSound } from "@/lib/motion-sound";
 import type { PlayBoardProps } from "./play-types";
 import {
   allChipsPlaced,
-  discussionSortItems,
-  formatSortExplanations,
   formatSortWhy,
   gradeSortCheck,
   scoredSortItems,
@@ -16,8 +15,8 @@ import {
 import { PlaceGhost, usePlaceDrag } from "./use-place-drag";
 import { GameBoard } from "./game-board";
 
-const CHEST_BODY = ["#f59e0b", "#f97316", "#eab308"] as const;
-const CHEST_SHADOW = ["#d97706", "#c2410c", "#a16207"] as const;
+const CHEST_BODY = ["#dcf3ff", "#dff5ce", "#fff2be", "#ffe1e7"] as const;
+const CHEST_SHADOW = ["#1cb0f6", "#83ce54", "#ebc653", "#ed97aa"] as const;
 
 function useWideScreen() {
   const [wide, setWide] = useState(false);
@@ -43,7 +42,7 @@ function isAuthorSort(game: SortPlayContent): game is SortContent {
 }
 
 export function SortGame({
-  game,
+  game: sourceGame,
   mode = "play",
   disabled = false,
   onMiss,
@@ -56,6 +55,7 @@ export function SortGame({
   disabled?: boolean;
   onChange?: (game: SortContent) => void;
 } & Partial<PlayBoardProps>) {
+  const game = useMemo(() => isAuthorSort(sourceGame) ? simplifyGameContent(sourceGame) as SortContent : sourceGame, [sourceGame]);
   if (mode === "build" && onChange && isAuthorSort(game)) {
     return <SortBuild game={game} onChange={onChange} />;
   }
@@ -81,10 +81,6 @@ function SortPlay({
   const [placed, setPlaced] = useState<Record<string, string>>({});
   const [locked, setLocked] = useState<Record<string, true>>({});
   const [shake, setShake] = useState(false);
-  const [phase, setPhase] = useState<"sort" | "discussion" | "success">("sort");
-  const [discussionIds, setDiscussionIds] = useState<string[]>([]);
-  const [selectedJustifications, setSelectedJustifications] = useState<Record<string, string>>({});
-  const [curatorNotes, setCuratorNotes] = useState<ReturnType<typeof formatSortExplanations>>(null);
   const missesRef = useRef(0);
   const { playCue } = useMotionSound();
   const wide = useWideScreen();
@@ -152,17 +148,7 @@ function SortPlay({
       const all: Record<string, true> = {};
       for (const item of game.items) all[item.id] = true;
       setLocked(all);
-      setDiscussionIds(result.discussionIds);
-      setCuratorNotes(
-        isAuthorSort(game)
-          ? formatSortExplanations(game, [...result.correctIds, ...result.discussionIds])
-          : null,
-      );
       playCue("accept");
-      if (result.discussionIds.length > 0) {
-        setPhase("discussion");
-        return;
-      }
       onFinish(autoCount - missesRef.current, autoCount, missesRef.current, {
         type: "sort",
         placements: placed,
@@ -190,37 +176,13 @@ function SortPlay({
   const canCheck = allChipsPlaced(game.items, placed);
   const autoCount = scoredSortItems(game.items).length || game.items.length;
 
-  function finish() {
-    onFinish(autoCount - missesRef.current, autoCount, missesRef.current, {
-      type: "sort",
-      placements: placed,
-    });
-  }
-
-  if (phase === "discussion") {
-    return (
-      <GameBoard scene="sort" step="Explain a placement">
-        <DiscussionReview
-          items={discussionSortItems(game.items).filter((item) => discussionIds.includes(item.id))}
-          selectedJustifications={selectedJustifications}
-          curatorNotes={curatorNotes}
-          disabled={disabled}
-          onChoose={(itemId, choiceId) =>
-            setSelectedJustifications((current) => ({ ...current, [itemId]: choiceId }))
-          }
-          onFinish={finish}
-        />
-      </GameBoard>
-    );
-  }
-
   return (
-    <GameBoard scene="sort" step="Sort into the chests">
+    <GameBoard scene="sort" step={`${Object.keys(placed).length} of ${game.items.length} cards placed`}>
     <div className={`flex flex-col gap-3 pb-28 sm:gap-5 sm:pb-0 ${shake ? "snap-back" : ""}`}>
       <PlaceGhost ghost={drag.ghost} />
       <div
         className={`grid gap-3 sm:gap-5 ${
-          three ? "grid-cols-1 min-[520px]:grid-cols-3" : "grid-cols-2"
+          three ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2"
         }`}
       >
         {game.buckets.map((bucket, index) => {
@@ -231,7 +193,6 @@ function SortPlay({
               key={bucket.id}
               bucketId={bucket.id}
               label={bucket.label}
-              role={bucket.role}
               palette={index}
               active={hovering === bucket.id}
               inviting={active}
@@ -269,9 +230,9 @@ function SortPlay({
                             }
                             drag.select(item.id);
                           }}
-                          className={`w-full rounded-full px-3 py-1.5 text-left text-xs font-extrabold ring-2 sm:text-sm ${
+                          className={`w-full rounded-xl px-3 py-2.5 text-left text-xs font-extrabold ring-2 sm:text-sm ${
                             on
-                              ? "bg-violet-700 text-white ring-violet-900"
+                              ? "bg-[#dcf3ff] text-[#096d9b] ring-[#1cb0f6]"
                               : "bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)]"
                           }`}
                         >
@@ -283,7 +244,7 @@ function SortPlay({
                 </ul>
               ) : (
                 <p className="px-1 py-3 text-center text-[10px] font-extrabold uppercase tracking-wide text-amber-800/70">
-                  In here
+                  Tap to place
                 </p>
               )}
             </SortChest>
@@ -294,7 +255,7 @@ function SortPlay({
         {leftover.length > 0 ? (
           <>
             <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-amber-800 sm:hidden">
-              Your chips
+              Your cards
             </p>
             <div className="mb-2 flex gap-2 overflow-x-auto pb-1 sm:mb-3 sm:flex-wrap sm:overflow-visible">
               {leftover.map((item) => {
@@ -313,11 +274,11 @@ function SortPlay({
                       if (drag.consumeClick()) return;
                       drag.select(on ? null : item.id);
                     }}
-                    className={`min-h-12 shrink-0 whitespace-nowrap touch-manipulation select-none rounded-full px-4 text-sm font-extrabold ring-2 ${
+                    className={`min-h-12 shrink-0 whitespace-nowrap touch-manipulation select-none rounded-xl px-4 text-sm font-extrabold ring-2 ${
                       lifting
                         ? "cursor-grabbing bg-violet-100 text-violet-400 opacity-40 ring-violet-200"
                         : on
-                          ? "cursor-grab bg-violet-700 text-white ring-violet-900"
+                          ? "cursor-grab bg-[#dcf3ff] text-[#096d9b] ring-[#1cb0f6]"
                           : "cursor-grab bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)]"
                     }`}
                   >
@@ -332,103 +293,13 @@ function SortPlay({
           type="button"
           disabled={disabled || !canCheck}
           onClick={() => void check()}
-          className="w-full rounded-full bg-violet-600 px-5 py-3 text-base font-extrabold text-white shadow-md disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
+          className="jose-button w-full"
         >
           Check
         </button>
       </div>
     </div>
     </GameBoard>
-  );
-}
-
-function CuratorNotes({ notes }: { notes: ReturnType<typeof formatSortExplanations> }) {
-  if (!notes) return null;
-  return (
-    <div className="rounded-2xl bg-white/80 p-4">
-      <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-emerald-700">
-        {notes.title}
-      </p>
-      <p className="mt-2 whitespace-pre-line text-sm font-semibold leading-relaxed text-slate-700">
-        {notes.body}
-      </p>
-    </div>
-  );
-}
-
-function DiscussionReview({
-  items,
-  selectedJustifications,
-  curatorNotes,
-  disabled,
-  onChoose,
-  onFinish,
-}: {
-  items: SortPlayContent["items"];
-  selectedJustifications: Record<string, string>;
-  curatorNotes: ReturnType<typeof formatSortExplanations>;
-  disabled: boolean;
-  onChoose: (itemId: string, choiceId: string) => void;
-  onFinish: () => void;
-}) {
-  return (
-    <section className="space-y-4 rounded-[1.5rem] border-2 border-amber-200 bg-amber-50 p-5">
-      <div>
-        <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-700">
-          Discussion — not auto-scored
-        </p>
-        <h2 className="mt-1 font-display text-2xl font-semibold text-slate-800">
-          Consider the evidence
-        </h2>
-      </div>
-      {items.map((item) => {
-        const choices = "justificationChoices" in item ? item.justificationChoices : undefined;
-        const why = "why" in item ? item.why : undefined;
-        return (
-        <article key={item.id} className="rounded-2xl bg-white p-4 ring-1 ring-amber-200">
-          <p className="text-sm font-extrabold text-slate-800">{item.label}</p>
-          {chipSource(item)?.citation || chipSource(item)?.label ? (
-            <p className="mt-1 text-xs font-bold text-slate-500">
-              Source: {chipSource(item)?.citation || chipSource(item)?.label}
-            </p>
-          ) : null}
-          {choices?.length ? (
-            <div className="mt-3 grid gap-2">
-              {choices.map((choice) => (
-                <button
-                  key={choice.id}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => onChoose(item.id, choice.id)}
-                  className={`rounded-xl px-3 py-2 text-left text-sm font-semibold ring-1 ${
-                    selectedJustifications[item.id] === choice.id
-                      ? "bg-violet-100 text-violet-900 ring-violet-400"
-                      : "bg-white text-slate-700 ring-slate-200"
-                  }`}
-                >
-                  {choice.text}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          {(selectedJustifications[item.id] || !choices?.length) && why ? (
-            <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm font-semibold leading-relaxed text-emerald-900">
-              {why}
-            </p>
-          ) : null}
-        </article>
-        );
-      })}
-      <CuratorNotes notes={curatorNotes} />
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={onFinish}
-        className="rounded-full bg-violet-600 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-50"
-      >
-        Continue
-      </button>
-    </section>
   );
 }
 
@@ -463,11 +334,11 @@ function SortBuild({
   return (
     <div className="space-y-4">
       <p className="text-sm font-semibold text-slate-500">
-        Name the chests, then put each chip in the correct one. That’s the answer key.
+        Name the categories, then add cards to the correct category.
       </p>
       <div
         className={`grid gap-3 sm:gap-5 ${
-          three ? "grid-cols-1 min-[520px]:grid-cols-3" : "grid-cols-2"
+          three ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2"
         }`}
       >
         {game.buckets.map((bucket, i) => (
@@ -475,13 +346,12 @@ function SortBuild({
             <SortChest
               bucketId={bucket.id}
               label={bucket.label}
-              role={bucket.role}
               palette={i}
               inviting
               labelSlot={
                 <input
                   value={bucket.label}
-                  aria-label="Chest name"
+                  aria-label="Category name"
                   onChange={(e) => {
                     const buckets = [...game.buckets];
                     buckets[i] = { ...bucket, label: e.target.value };
@@ -491,25 +361,6 @@ function SortBuild({
                 />
               }
             >
-              <label className="mt-2 flex items-center justify-center gap-1 text-[10px] font-bold text-amber-950">
-                Bucket role
-                <select
-                  aria-label={`${bucket.label} bucket role`}
-                  value={bucket.role ?? "category"}
-                  onChange={(e) => {
-                    const buckets = [...game.buckets];
-                    buckets[i] = {
-                      ...bucket,
-                      role: e.target.value as NonNullable<typeof bucket.role>,
-                    };
-                    onChange({ ...game, buckets });
-                  }}
-                  className="rounded-full bg-white/80 px-2 py-1"
-                >
-                  <option value="category">Category</option>
-                  <option value="insufficient-evidence">Insufficient evidence</option>
-                </select>
-              </label>
               <ul className="space-y-2">
                 {game.items
                   .filter((item) => item.bucketId === bucket.id)
@@ -520,21 +371,6 @@ function SortBuild({
                         onChange={(e) => patchItem(item.id, { label: e.target.value })}
                         className="w-full rounded-full bg-white px-3 py-1 text-sm font-extrabold ring-1 ring-black/10"
                       />
-                      <label className="mt-1 flex items-center gap-2 px-1 text-xs font-bold text-slate-600">
-                        Scoring
-                        <select
-                          value={item.scoring ?? "auto"}
-                          onChange={(e) =>
-                            patchItem(item.id, {
-                              scoring: e.target.value as NonNullable<typeof item.scoring>,
-                            })
-                          }
-                          className="rounded-full bg-white px-2 py-1 ring-1 ring-black/10"
-                        >
-                          <option value="auto">Auto-score</option>
-                          <option value="discussion">Discussion</option>
-                        </select>
-                      </label>
                       <input
                         value={item.why ?? ""}
                         placeholder="Why"
@@ -574,7 +410,7 @@ function SortBuild({
                   })
                 }
               >
-                + Chip in this chest
+                + Add card
               </button>
             </SortChest>
           </div>
@@ -587,11 +423,11 @@ function SortBuild({
           onClick={() =>
             onChange({
               ...game,
-              buckets: [...game.buckets, { id: `b${Date.now()}`, label: "New chest", role: "category" }],
+              buckets: [...game.buckets, { id: `b${Date.now()}`, label: "New category", role: "category" }],
             })
           }
         >
-          <Plus className="size-4" /> Add chest
+          <Plus className="size-4" /> Add category
         </button>
       ) : null}
     </div>
@@ -601,7 +437,6 @@ function SortBuild({
 function SortChest({
   bucketId,
   label,
-  role,
   labelSlot,
   palette = 0,
   active = false,
@@ -611,7 +446,6 @@ function SortChest({
 }: {
   bucketId: string;
   label: string;
-  role?: "category" | "insufficient-evidence";
   labelSlot?: ReactNode;
   palette?: number;
   active?: boolean;
@@ -632,17 +466,8 @@ function SortChest({
 
   return (
     <div className="flex w-full min-w-0 flex-col">
-      <div className="mb-1.5 rounded-2xl bg-white px-2 py-1.5 text-center font-display text-xs font-semibold text-amber-950 shadow-[0_2px_0_rgb(180_83_9/18%)] sm:text-sm">
-        {labelSlot ?? (
-          <>
-            {label}
-            {role === "insufficient-evidence" ? (
-              <span className="ml-1 font-sans text-[10px] font-bold text-amber-700">
-                (insufficient evidence)
-              </span>
-            ) : null}
-          </>
-        )}
+      <div className="mb-3 text-center text-base font-extrabold text-[var(--jose-text)]">
+        {labelSlot ?? label}
       </div>
       <div
         data-sort-bucket={bucketId}
@@ -652,18 +477,12 @@ function SortChest({
         onClick={onChoose}
         onKeyDown={onKeyDown}
         className={`overflow-hidden rounded-[1.15rem] outline-none ${active ? "scale-[1.03]" : ""} ${
-          inviting ? "ring-2 ring-violet-400" : ""
+          inviting ? "ring-4 ring-[#1cb0f6]" : ""
         }`}
         style={{ boxShadow: `0 3px 0 ${shadow}` }}
       >
-        <div className="relative h-4 border-b-[3px] border-amber-600" style={{ background: "#f5c518" }}>
-          <span
-            aria-hidden
-            className="absolute left-1/2 top-full h-2.5 w-2.5 -translate-x-1/2 -translate-y-[40%] rounded-full bg-[#fff8ef] ring-2 ring-amber-800"
-          />
-        </div>
-        <div className="px-2 pb-2 pt-3" style={{ background: body }}>
-          <div className="min-h-[4.5rem] rounded-xl bg-[#fff8ef] p-1.5">{children}</div>
+        <div className="p-3" style={{ background: body }}>
+          <div className="min-h-[7rem] rounded-xl bg-[var(--jose-surface)] p-2">{children}</div>
         </div>
       </div>
     </div>

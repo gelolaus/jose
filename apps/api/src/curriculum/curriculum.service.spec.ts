@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
   DEMO_LEARNER_ID,
+  HEART_DRIP_MS,
   modulesResponseSchema,
   pathResponseSchema,
   type SessionUser,
@@ -61,6 +62,26 @@ describe("CurriculumService", () => {
     });
   });
 
+  it("enforces the matching deadline across repeated starts and grades timeout as zero", async () => {
+    const mod = await service.createModule({ title: "Matching timer", subtitle: "Rules", coverColor: "#38BDF8" }, teacherUser(teacher));
+    const level = await service.createLevel(mod.sections[0]!.id, { title: "Matching", kind: "game", gameType: "memory" });
+    await expect(service.createLevel(mod.sections[0]!.id, { title: "Retired", kind: "game", gameType: "case-files" })).rejects.toThrow(/retired/i);
+    await database.db.update(modules).set({ published: true }).where(eq(modules.id, mod.id));
+    const play = await service.getPlayLevel(level.id, student.learnerId);
+    const id = play.attempt!.id;
+    await expect(service.finishAttempt(id, { answers: { type: "memory", matches: [], timedOut: true } }, student.learnerId)).rejects.toThrow(/start/i);
+    const start = await service.evaluateAttempt(id, { type: "memory_start" }, student.learnerId);
+    expect(start.remainingMs).toBeGreaterThan(0);
+    const [attempt] = await database.db.select().from(attempts).where(eq(attempts.id, id));
+    const events = JSON.parse(attempt!.eventsJson!);
+    events[0].at = Date.now() - 61_000;
+    await database.db.update(attempts).set({ eventsJson: JSON.stringify(events) }).where(eq(attempts.id, id));
+    const resumed = await service.evaluateAttempt(id, { type: "memory_start" }, student.learnerId);
+    expect(resumed.remainingMs).toBe(0);
+    const finished = await service.finishAttempt(id, { answers: { type: "memory", matches: [] } }, student.learnerId);
+    expect(finished.score).toBe(0);
+  });
+
   afterAll(async () => {
     await database?.onModuleDestroy();
     await moduleRef?.close();
@@ -98,6 +119,18 @@ describe("CurriculumService", () => {
 
   it("refuses to archive the featured module", async () => {
     await expect(service.deleteModule("rizal")).rejects.toThrow(/cannot be archived/i);
+  });
+
+  it("omits archived modules from the teacher studio list", async () => {
+    const created = await service.createModule(
+      { title: "Hide after archive", subtitle: "Draft", coverColor: "#A855F7" },
+      teacherUser(teacher),
+    );
+    const before = await service.listTeachModules(teacherUser(teacher));
+    expect(before.some((row) => row.id === created.id)).toBe(true);
+    await service.deleteModule(created.id, teacherUser(teacher));
+    const after = await service.listTeachModules(teacherUser(teacher));
+    expect(after.some((row) => row.id === created.id)).toBe(false);
   });
 
   it("records path misses for practice without spending hearts or locking the game", async () => {
@@ -770,5 +803,34 @@ describe("authoritative assessment", () => {
         (a) => a.artifactId === play.chest!.artifact.id,
       ),
     ).toHaveLength(1);
+  });
+
+  it("applies a two-minute lesson credit once and ignores replays", async () => {
+    const reader = await createTestAccount(database, {
+      admissionEmail: `reader-${randomUUID()}@student.apc.edu.ph`,
+      displayName: "Reader",
+    });
+    const now = Date.now();
+    await database.db
+      .update(learners)
+      .set({ hearts: 3, heartsUpdatedAt: now })
+      .where(eq(learners.id, reader.learnerId));
+    const first = await service.completeLevel("ateneo-welcome", reader.learnerId);
+    expect(first.lessonCreditApplied).toBe(true);
+    expect(first.learner.hearts).toBe(3);
+    expect(first.learner.nextHeartAt).toBe(
+      (first.learner.heartsUpdatedAt ?? 0) + HEART_DRIP_MS,
+    );
+    expect((first.learner.nextHeartAt ?? 0) - (first.learner.serverNow ?? 0)).toBeGreaterThan(
+      7.9 * 60 * 1000,
+    );
+    expect((first.learner.nextHeartAt ?? 0) - (first.learner.serverNow ?? 0)).toBeLessThanOrEqual(
+      8 * 60 * 1000,
+    );
+
+    const replay = await service.completeLevel("ateneo-welcome", reader.learnerId);
+    expect(replay.lessonCreditApplied).toBe(false);
+    expect(replay.firstTime).toBe(false);
+    expect(replay.learner.nextHeartAt).toBe(first.learner.nextHeartAt);
   });
 });

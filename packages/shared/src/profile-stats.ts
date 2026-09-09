@@ -47,7 +47,7 @@ export type Achievement = z.infer<typeof achievementSchema>;
 export type ProfileStatsResponse = z.infer<typeof profileStatsResponseSchema>;
 
 export const HEARTS_RULES_COPY =
-  "Hearts are optional challenge lives for arcade Try-games sessions only. Core path learning and required coursework stay unlimited after mistakes. Hearts never change grades or block explanations.";
+  "Lives refill one every 10 minutes, up to five. Finishing a new lesson shortens the wait by 2 minutes. Required lessons, class assignments, and revisiting never spend them.";
 
 export const PROFILE_RULES = {
   xp: XP_RULES_COPY,

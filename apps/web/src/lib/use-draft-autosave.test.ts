@@ -68,4 +68,29 @@ describe("useDraftAutosave", () => {
     const stored = window.localStorage.getItem("fail-draft");
     expect(stored).toContain("draft-2");
   });
+
+  it("flushes the in-progress draft when the editor unmounts", async () => {
+    const save = vi.fn(async () => ({ revision: 1 }));
+    const { rerender, unmount } = renderHook(
+      ({ value }) =>
+        useDraftAutosave({
+          storageKey: "unmount-draft",
+          value,
+          revision: 0,
+          debounceMs: 5_000,
+          save,
+        }),
+      { initialProps: { value: { title: "A" } } },
+    );
+
+    rerender({ value: { title: "Keep me" } });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(save).toHaveBeenCalledWith({ title: "Keep me" }, 0);
+  });
 });

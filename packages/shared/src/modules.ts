@@ -111,6 +111,7 @@ export const attemptResultSchema = z.object({
   continueHref: z.string().min(1).optional(),
   contentRevisionId: z.string().min(1).nullable().optional(),
   artifactAwarded: z.boolean().optional(),
+  lessonCreditApplied: z.boolean().optional(),
 });
 
 export type ModuleCard = z.infer<typeof moduleCardSchema>;

@@ -1,0 +1,71 @@
+<<<JoseModule version="1">>>
+title: The Scientific Method in Everyday Life
+subtitle: Ask, test, and revise with evidence
+coverColor: #059669
+objectives:
+  - Design a fair test with one changed variable.
+  - Distinguish observation from inference.
+
+<<<Section>>>
+title: Asking testable questions
+subtitle: From wonder to hypothesis
+themeColor: #F59E0B
+
+<<<Lesson>>>
+title: What makes a question testable
+
+<<<Text markdown>>>
+## Testable vs. interesting
+
+"Why is the sky beautiful?" is interesting but not testable. "Does light color
+change monggo growth in 7 days?" names variables, time, and a measure.
+<<<Text/>>>
+
+<<<Glossary>>>
+- term: Variable
+  definition: Anything that can change in an investigation.
+- term: Control
+  definition: The setup kept unchanged for comparison.
+<<<Glossary/>>>
+
+<<<Video>>>
+youtubeUrl: https://www.youtube.com/watch?v=abcdefghijk
+title: Fair tests in 3 minutes
+transcript: A narrator explains variables, controls, and one-change-at-a-time testing with a plant example.
+<<<Video/>>>
+<<<Lesson/>>>
+
+<<<Game type="blank">>>
+title: Fill the blanks
+{
+  "type": "blank",
+  "items": [
+    {
+      "id": "blank-1",
+      "sentence": "A fair test changes ___ while keeping everything else the same.",
+      "answer": "one variable",
+      "decoys": ["many variables", "the conclusion"],
+      "why": "Changing one thing isolates cause."
+    }
+  ]
+}
+<<<Game/>>>
+<<<Section/>>>
+
+<<<Section>>>
+title: Evidence
+subtitle: Observe and conclude
+themeColor: #0EA5E9
+
+<<<Lesson>>>
+title: Observations and inferences
+
+<<<Text markdown>>>
+## See vs. conclude
+
+Observation: "The leaves turned yellow." Inference: "The plant lacks light."
+Record both, then test the inference.
+<<<Text/>>>
+<<<Lesson/>>>
+<<<Section/>>>
+<<<JoseModule/>>>

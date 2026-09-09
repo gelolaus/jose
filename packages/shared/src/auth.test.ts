@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   APC_ADMISSION_DOMAINS,
+  ARLAUS_ADMIN_EMAIL,
   AUTH_DENIAL_MESSAGES,
   AVATAR_IDS,
-  LOCAL_DEV_TEST_EMAIL,
   SESSION_COOKIE_NAME,
   adminBootstrapBodySchema,
+  adminNameCorrectionBodySchema,
   authMeResponseSchema,
   authStatusSchema,
   canAccessTeacherStudio,
   grantCollaboratorBodySchema,
   grantRoleBodySchema,
-  isLocalDevTestEmail,
-  localDevRoleBodySchema,
+  isExactStaffTeacherDomain,
   profilePatchBodySchema,
   roleFromAdmissionEmail,
   sessionUserSchema,
@@ -91,6 +91,21 @@ describe("roleFromAdmissionEmail", () => {
   });
 });
 
+describe("isExactStaffTeacherDomain", () => {
+  it("accepts only the exact apc.edu.ph mailbox domain", () => {
+    expect(isExactStaffTeacherDomain("dean@apc.edu.ph")).toBe(true);
+    expect(isExactStaffTeacherDomain("  Faculty@APC.edu.ph ")).toBe(true);
+  });
+
+  it("rejects student domains, lookalikes, and suffix matches", () => {
+    expect(isExactStaffTeacherDomain("kid@student.apc.edu.ph")).toBe(false);
+    expect(isExactStaffTeacherDomain("kid@students.apc.edu.ph")).toBe(false);
+    expect(isExactStaffTeacherDomain("person@apc.edu.ph.example.com")).toBe(false);
+    expect(isExactStaffTeacherDomain("not-mail")).toBe(false);
+    expect(isExactStaffTeacherDomain("user@mail.apc.edu.ph")).toBe(false);
+  });
+});
+
 describe("canAccessTeacherStudio", () => {
   it("allows teachers and admins only", () => {
     expect(canAccessTeacherStudio("teacher")).toBe(true);
@@ -104,24 +119,25 @@ describe("canAccessTeacherStudio", () => {
   });
 });
 
-describe("local development test account", () => {
-  it("names the exact Arlaus mailbox", () => {
-    expect(LOCAL_DEV_TEST_EMAIL).toBe("arlaus@student.apc.edu.ph");
+describe("pinned admin promotion account", () => {
+  it("names the exact Arlaus mailbox for the one-time promote command", () => {
+    expect(ARLAUS_ADMIN_EMAIL).toBe("arlaus@student.apc.edu.ph");
   });
 
-  it("accepts only the normalized Arlaus email", () => {
-    expect(isLocalDevTestEmail("arlaus@student.apc.edu.ph")).toBe(true);
-    expect(isLocalDevTestEmail("  ARLAUS@Student.APC.edu.ph ")).toBe(true);
-    expect(isLocalDevTestEmail("faculty@apc.edu.ph")).toBe(false);
-    expect(isLocalDevTestEmail("other@student.apc.edu.ph")).toBe(false);
-  });
-
-  it("accepts student, teacher, or admin and refuses unknown roles", () => {
-    expect(localDevRoleBodySchema.safeParse({ role: "student" }).success).toBe(true);
-    expect(localDevRoleBodySchema.safeParse({ role: "teacher" }).success).toBe(true);
-    expect(localDevRoleBodySchema.safeParse({ role: "admin" }).success).toBe(true);
-    expect(localDevRoleBodySchema.safeParse({ role: "owner" }).success).toBe(false);
-    expect(localDevRoleBodySchema.safeParse({}).success).toBe(false);
+  it("validates admin name-correction bodies", () => {
+    expect(
+      adminNameCorrectionBodySchema.safeParse({ displayName: "New Name" }).success,
+    ).toBe(false);
+    expect(
+      adminNameCorrectionBodySchema.safeParse({
+        email: "a@student.apc.edu.ph",
+        displayName: "New Name",
+      }).success,
+    ).toBe(true);
+    expect(
+      adminNameCorrectionBodySchema.safeParse({ userId: "u1", displayName: "  " })
+        .success,
+    ).toBe(false);
   });
 });
 
@@ -151,14 +167,20 @@ describe("privileged request bodies", () => {
 });
 
 describe("profile patches", () => {
-  it("accepts known avatars and 1–20 char names", () => {
+  it("accepts avatar-only edits and rejects displayName self-service", () => {
     expect(profilePatchBodySchema.safeParse({ avatarId: AVATAR_IDS[1] }).success).toBe(
       true,
     );
     expect(profilePatchBodySchema.safeParse({ avatarId: "dragon" }).success).toBe(false);
+    // Student display names are immutable via self-service; must be rejected.
+    expect(profilePatchBodySchema.safeParse({ displayName: "Nova" }).success).toBe(
+      false,
+    );
     expect(
-      profilePatchBodySchema.safeParse({ displayName: "x".repeat(21) }).success,
+      profilePatchBodySchema.safeParse({ avatarId: AVATAR_IDS[1], displayName: "Nova" })
+        .success,
     ).toBe(false);
+    expect(profilePatchBodySchema.safeParse({}).success).toBe(false);
   });
 });
 

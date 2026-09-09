@@ -19,10 +19,20 @@ import {
   studentChallengeViewSchema,
   teacherChallengeSummarySchema,
   teacherChallengeViewSchema,
+  assignmentSchema,
+  classReportSchema,
+  classRosterResponseSchema,
   classSummarySchema,
+  gradebookResponseSchema,
+  studentClassMembershipSchema,
+  bookmarksResponseSchema,
+  bookmarkMutationResponseSchema,
+  adminUsersResponseSchema,
   teachAssetSchema,
   teachLevelDetailSchema,
   teachModuleDetailSchema,
+  jmmImportPreviewResponseSchema,
+  jmmImportCommitResponseSchema,
   artifactsResponseSchema,
   teachModuleSchema,
   type ArtifactsResponse,
@@ -43,8 +53,7 @@ import {
   type TeachModule,
   type TeachModuleDetail,
 } from "@jose/shared";
-
-const DEFAULT_API = "http://localhost:3001";
+import { resolveWebApiOrigin } from "./root-env";
 
 /**
  * In the browser everything goes through the same-origin `/api` rewrite so the
@@ -53,11 +62,7 @@ const DEFAULT_API = "http://localhost:3001";
  */
 export function getApiBaseUrl() {
   if (typeof window !== "undefined") return "/api";
-  return (
-    process.env.JOSE_INTERNAL_API_URL?.replace(/\/$/, "") ||
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-    DEFAULT_API
-  );
+  return resolveWebApiOrigin();
 }
 
 /**
@@ -539,14 +544,202 @@ export async function restoreTeachModule(id: string): Promise<TeachModuleDetail>
   return teachModuleDetailSchema.parse(json);
 }
 
-export async function fetchMyAssignments() {
-  const json = await apiFetch("/assignments/mine");
+export async function fetchMyAssignments(options?: ApiCallOptions) {
+  const json = await apiFetch("/assignments/mine", undefined, options);
   return studentAssignmentSchema.array().parse(json);
+}
+
+export async function fetchMyClasses(options?: ApiCallOptions) {
+  const json = await apiFetch("/classes/mine", undefined, options);
+  return studentClassMembershipSchema.array().parse(json);
+}
+
+export async function fetchBookmarks(options?: ApiCallOptions) {
+  const json = await apiFetch("/bookmarks", undefined, options);
+  return bookmarksResponseSchema.parse(json);
+}
+
+export async function putBookmark(levelId: string, options?: ApiCallOptions) {
+  const json = await apiFetch(
+    `/bookmarks/${encodeURIComponent(levelId)}`,
+    { method: "PUT", body: "{}" },
+    options,
+  );
+  return bookmarkMutationResponseSchema.parse(json);
+}
+
+export async function deleteBookmark(levelId: string, options?: ApiCallOptions) {
+  const json = await apiFetch(
+    `/bookmarks/${encodeURIComponent(levelId)}`,
+    { method: "DELETE" },
+    options,
+  );
+  return bookmarkMutationResponseSchema.parse(json);
+}
+
+export async function fetchAdminUsers(
+  query?: { q?: string; role?: "student" | "teacher"; cursor?: string; limit?: number },
+  options?: ApiCallOptions,
+) {
+  const params = new URLSearchParams();
+  if (query?.q) params.set("q", query.q);
+  if (query?.role) params.set("role", query.role);
+  if (query?.cursor) params.set("cursor", query.cursor);
+  if (query?.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const json = await apiFetch(`/admin/users${qs ? `?${qs}` : ""}`, undefined, options);
+  return adminUsersResponseSchema.parse(json);
+}
+
+export async function grantAdminRole(
+  email: string,
+  role: "student" | "teacher",
+  options?: ApiCallOptions,
+) {
+  return apiFetch(
+    "/admin/users/role",
+    {
+      method: "POST",
+      body: JSON.stringify({ email, role }),
+    },
+    options,
+  );
 }
 
 export async function fetchTeachClasses(options?: ApiCallOptions) {
   const json = await apiFetch("/teach/classes", undefined, options);
   return classSummarySchema.array().parse(json);
+}
+
+export async function fetchArchivedTeachClasses(options?: ApiCallOptions) {
+  const json = await apiFetch("/teach/classes/archived", undefined, options);
+  return classSummarySchema.array().parse(json);
+}
+
+export async function patchTeachAssignment(
+  classId: string,
+  assignmentId: string,
+  body: { title?: string; dueAt?: number | null; dueTimezone?: string; gradingPolicy?: "best" | "latest" | "override" },
+) {
+  const json = await apiFetch(`/teach/classes/${classId}/assignments/${assignmentId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+  return assignmentSchema.parse(json);
+}
+
+export async function createTeachAssignment(
+  classId: string,
+  body: { moduleId: string; title: string; dueAt?: number | null; dueTimezone?: string; gradingPolicy?: "best" | "latest" | "override" },
+) {
+  const json = await apiFetch(`/teach/classes/${classId}/assignments`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return assignmentSchema.parse(json);
+}
+
+export async function fetchAssignmentOverrides(
+  classId: string,
+  assignmentId: string,
+  options?: ApiCallOptions,
+) {
+  const json = await apiFetch(
+    `/teach/classes/${classId}/assignments/${assignmentId}/overrides`,
+    undefined,
+    options,
+  );
+  return json as Array<{
+    assignmentId: string;
+    learnerId: string;
+    score: number;
+    maxScore: number;
+    reason: string;
+  }>;
+}
+
+export async function upsertAssignmentOverride(
+  classId: string,
+  assignmentId: string,
+  body: { learnerId: string; score: number; maxScore: number; reason: string },
+) {
+  const json = await apiFetch(
+    `/teach/classes/${classId}/assignments/${assignmentId}/overrides`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+  return json;
+}
+
+export async function removeAssignmentOverride(
+  classId: string,
+  assignmentId: string,
+  learnerId: string,
+) {
+  await apiFetch(
+    `/teach/classes/${classId}/assignments/${assignmentId}/overrides/${encodeURIComponent(learnerId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function fetchTeachClassAssignments(
+  classId: string,
+  options?: ApiCallOptions,
+) {
+  const json = await apiFetch(`/teach/classes/${classId}/assignments`, undefined, options);
+  return assignmentSchema.array().parse(json);
+}
+
+export async function fetchClassReport(
+  classId: string,
+  assignmentId: string,
+  options?: ApiCallOptions,
+) {
+  const json = await apiFetch(
+    `/teach/classes/${classId}/assignments/${assignmentId}/report`,
+    undefined,
+    options,
+  );
+  return classReportSchema.parse(json);
+}
+
+export async function fetchGradebook(
+  classId: string,
+  query?: { includeArchived?: boolean; cursor?: string; limit?: number },
+  options?: ApiCallOptions,
+) {
+  const params = new URLSearchParams();
+  if (query?.includeArchived !== undefined)
+    params.set("includeArchived", String(query.includeArchived));
+  if (query?.cursor) params.set("cursor", query.cursor);
+  if (query?.limit !== undefined) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const json = await apiFetch(
+    `/teach/classes/${classId}/gradebook${qs ? `?${qs}` : ""}`,
+    undefined,
+    options,
+  );
+  return gradebookResponseSchema.parse(json);
+}
+
+export async function fetchClassRoster(
+  classId: string,
+  query?: { cursor?: string; limit?: number },
+  options?: ApiCallOptions,
+) {
+  const params = new URLSearchParams();
+  if (query?.cursor) params.set("cursor", query.cursor);
+  if (query?.limit !== undefined) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const json = await apiFetch(
+    `/teach/classes/${classId}/roster${qs ? `?${qs}` : ""}`,
+    undefined,
+    options,
+  );
+  return classRosterResponseSchema.parse(json);
+}
+
+export function gradebookCsvUrl(classId: string, assignmentId: string) {
+  return `/api/teach/classes/${classId}/assignments/${assignmentId}/export.csv`;
 }
 
 export async function fetchMyChallenges(options?: ApiCallOptions) {
@@ -734,6 +927,24 @@ export async function importTeachQuestions(
 export async function fetchTeachAssets(moduleId: string): Promise<TeachAsset[]> {
   const json = await apiFetch(`/teach/modules/${moduleId}/assets`);
   return teachAssetSchema.array().parse(json);
+}
+
+export async function previewModuleImport(source: string, options?: ApiCallOptions) {
+  const json = await apiFetch(
+    "/teach/modules/import/preview",
+    { method: "POST", body: JSON.stringify({ source }) },
+    options,
+  );
+  return jmmImportPreviewResponseSchema.parse(json);
+}
+
+export async function commitModuleImport(source: string, options?: ApiCallOptions) {
+  const json = await apiFetch(
+    "/teach/modules/import/commit",
+    { method: "POST", body: JSON.stringify({ source }) },
+    options,
+  );
+  return jmmImportCommitResponseSchema.parse(json);
 }
 
 export async function createTeachAsset(

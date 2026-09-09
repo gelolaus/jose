@@ -8,10 +8,9 @@ import Link from "next/link";
 export function PracticeHub({ review }: { review: PracticeReviewResponse }) {
   return (
     <div className="jose-surface mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
-      <div className="mb-8 max-w-3xl rounded-[1.75rem] bg-amber-100 px-5 py-6 ring-1 ring-amber-200 sm:px-7 sm:py-7">
-        <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-800">Practice playground</p>
-        <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-amber-950 sm:text-4xl">Keep the curiosity going.</h1>
-        <p className="mt-2 max-w-2xl text-base leading-relaxed text-amber-900/80">Review what you&apos;ve seen, then jump into a game when you want a change of pace.</p>
+      <div className="mb-8">
+        <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-[var(--jose-text)] sm:text-4xl">A little practice, a lot of discovery.</h1>
+        <p className="mt-2 max-w-2xl text-base leading-relaxed text-[var(--jose-text-muted)]">Review what you&apos;ve seen, then jump into a game when you want a change of pace.</p>
       </div>
 
       <section className="mb-10">
@@ -45,13 +44,11 @@ export function PracticeHub({ review }: { review: PracticeReviewResponse }) {
         <div className="mb-4 flex items-center gap-2">
           <Sparkles className="size-5 text-teal-800" aria-hidden />
           <h2 className="font-display text-2xl font-semibold text-[var(--jose-ink)] sm:text-3xl">
-            Choose your next mini-adventure
+            Let’s play
           </h2>
         </div>
         <p className="mb-4 max-w-2xl text-sm text-[var(--jose-ink-muted)]">
-          Sample boards for exploring mechanics. Optional arcade challenge lives
-          never change grades or block explanations. Nothing here marks a path
-          assignment complete.
+          Play for practice. These rounds don’t affect grades or complete class assignments.
         </p>
         <GameLabHub embedded />
       </section>

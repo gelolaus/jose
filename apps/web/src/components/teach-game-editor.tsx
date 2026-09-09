@@ -1,7 +1,7 @@
 "use client";
 
 import { GameSwitch } from "@/components/game-player";
-import { firstTryScore, pieceCount, type GameContent } from "@jose/shared";
+import { firstTryScore, pieceCount, simplifyGameContent, type GameContent } from "@jose/shared";
 import { useState } from "react";
 import { GameFrame, StarCelebration } from "./games/game-stage";
 import type { WhyPayload } from "./games/play-types";
@@ -12,10 +12,10 @@ export function GameEditor({
   onChange,
 }: {
   game: GameContent;
-  onSave: (game: GameContent) => Promise<void>;
+  onSave?: (game: GameContent) => Promise<void>;
   onChange?: (game: GameContent) => void;
 }) {
-  const [draft, setDraft] = useState<GameContent>(game);
+  const [draft, setDraft] = useState<GameContent>(() => simplifyGameContent(game));
   const [tab, setTab] = useState<"build" | "play">("build");
   const [why, setWhy] = useState<WhyPayload | null>(null);
   const [preview, setPreview] = useState<{
@@ -35,15 +35,17 @@ export function GameEditor({
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
-        void onSave(draft);
+        if (onSave) void onSave(draft);
       }}
     >
       <div className="flex gap-2">
         <button
           type="button"
           onClick={() => setTab("build")}
-          className={`rounded-full px-4 py-2 text-sm font-extrabold ${
-            tab === "build" ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600"
+          className={`min-h-11 rounded-2xl px-4 py-2 text-sm font-extrabold ${
+            tab === "build"
+              ? "jose-nav-active-teach"
+              : "text-[var(--jose-text-muted)] hover:bg-[var(--jose-surface-control)]"
           }`}
         >
           Build
@@ -56,8 +58,10 @@ export function GameEditor({
             setPlayKey((n) => n + 1);
             setTab("play");
           }}
-          className={`rounded-full px-4 py-2 text-sm font-extrabold ${
-            tab === "play" ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600"
+          className={`min-h-11 rounded-2xl px-4 py-2 text-sm font-extrabold ${
+            tab === "play"
+              ? "jose-nav-active-teach"
+              : "text-[var(--jose-text-muted)] hover:bg-[var(--jose-surface-control)]"
           }`}
         >
           Playtest
@@ -67,6 +71,7 @@ export function GameEditor({
         <GameSwitch mode="build" game={draft} onChange={updateDraft} />
       ) : preview ? (
         <StarCelebration
+          timedOut={draft.type === "memory" && preview.score === 0}
           title="Playtest"
           score={preview.score}
           maxScore={preview.maxScore}
@@ -112,12 +117,11 @@ export function GameEditor({
           ) : null}
         </GameFrame>
       )}
-      <button
-        type="submit"
-        className="rounded-full bg-violet-600 px-5 py-2.5 text-sm font-extrabold text-white"
-      >
-        Save game
-      </button>
+      {onSave ? (
+        <button type="submit" className="jose-button">
+          Save game
+        </button>
+      ) : null}
     </form>
   );
 }

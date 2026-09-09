@@ -1,10 +1,10 @@
 import { NestFactory } from "@nestjs/core";
-import { json, urlencoded } from "express";
 import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
 import { AuthConfigError, loadAuthConfig } from "./auth/auth-config";
 import { EnvValidationError, loadJoseEnv } from "./config/env";
 import { loadApiEnvFile } from "./config/load-env-file";
+import { createBodyLimitMiddleware } from "./http/body-limits";
 import { writeStructuredLog } from "./observability/telemetry";
 
 async function bootstrap() {
@@ -29,8 +29,9 @@ async function bootstrap() {
     set: (key: string, value: unknown) => void;
   };
   http.set("trust proxy", env.trustProxy);
-  app.use(json({ limit: env.maxBodyBytes }));
-  app.use(urlencoded({ extended: true, limit: env.maxBodyBytes }));
+  // Restrictive default + roomy JMM import routes (≥512KB) so every valid
+  // 200KB UTF-8 source survives JSON escaping overhead.
+  app.use(createBodyLimitMiddleware({ maxBodyBytes: env.maxBodyBytes }));
   app.use(cookieParser());
 
   app.enableCors({

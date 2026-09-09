@@ -17,7 +17,15 @@ import {
   fetchTeachModule as baseFetchTeachModule,
   fetchTeachModules as baseFetchTeachModules,
   fetchTeachClasses as baseFetchTeachClasses,
+  fetchTeachClassAssignments as baseFetchTeachClassAssignments,
+  fetchClassReport as baseFetchClassReport,
+  fetchGradebook as baseFetchGradebook,
+  fetchClassRoster as baseFetchClassRoster,
   fetchMyChallenges as baseFetchMyChallenges,
+  fetchMyClasses as baseFetchMyClasses,
+  fetchMyAssignments as baseFetchMyAssignments,
+  fetchBookmarks as baseFetchBookmarks,
+  fetchAdminUsers as baseFetchAdminUsers,
 } from "./path-api";
 
 /**
@@ -78,6 +86,54 @@ export async function fetchTeachModules() {
 
 export async function fetchTeachClasses() {
   return baseFetchTeachClasses(await options());
+}
+
+export async function fetchArchivedTeachClasses() {
+  const { fetchArchivedTeachClasses: base } = await import("./path-api");
+  return base(await options());
+}
+
+export async function fetchTeachClassAssignments(classId: string) {
+  return baseFetchTeachClassAssignments(classId, await options());
+}
+
+export async function fetchClassReport(classId: string, assignmentId: string) {
+  return baseFetchClassReport(classId, assignmentId, await options());
+}
+
+export async function fetchGradebook(
+  classId: string,
+  query?: { includeArchived?: boolean; cursor?: string; limit?: number },
+) {
+  return baseFetchGradebook(classId, query, await options());
+}
+
+export async function fetchClassRoster(
+  classId: string,
+  query?: { cursor?: string; limit?: number },
+) {
+  return baseFetchClassRoster(classId, query, await options());
+}
+
+export async function fetchMyClasses() {
+  return baseFetchMyClasses(await options());
+}
+
+export async function fetchMyAssignments() {
+  return baseFetchMyAssignments(await options());
+}
+
+export async function fetchBookmarks() {
+  return baseFetchBookmarks(await options());
+}
+
+export async function fetchAdminUsers(query?: {
+  q?: string;
+  role?: "student" | "teacher";
+  cursor?: string;
+  limit?: number;
+}) {
+  return baseFetchAdminUsers(query, await options());
 }
 
 export async function fetchMyChallenges() {

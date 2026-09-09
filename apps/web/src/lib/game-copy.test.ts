@@ -6,20 +6,21 @@ describe("hintFor", () => {
     expect(hintFor("sort")).toContain("Check");
   });
 
-  it("tells timeline players to explain the connection", () => {
-    expect(hintFor("timeline")).toContain("connection");
+  it("tells timeline players to order events", () => {
+    expect(hintFor("timeline")).toContain("order");
   });
 
-  it("tells memory players the learning mode is untimed", () => {
-    expect(hintFor("memory")).toContain("no timer");
+  it("tells matching players to beat the timer", () => {
+    expect(hintFor("memory")).toContain("timer");
+    expect(hintFor("memory")).not.toContain("no timer");
   });
 });
 
 describe("labelFor", () => {
   it("uses the upgraded activity names", () => {
-    expect(labelFor("quiz")).toBe("Evidence duel");
-    expect(labelFor("memory")).toBe("Archive match");
-    expect(labelFor("blank")).toBe("Restore the passage");
+    expect(labelFor("quiz")).toBe("Quiz");
+    expect(labelFor("memory")).toBe("Matching");
+    expect(labelFor("blank")).toBe("Fill in the Blank");
   });
 
   it("covers advanced investigation boards", () => {

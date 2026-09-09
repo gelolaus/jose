@@ -10,7 +10,6 @@ import {
   logoutJose,
   microsoftStartUrl,
 } from "@/lib/auth-api";
-import { ConnectedLocalDevPanel } from "@/components/local-dev-panel";
 import { JoseSessionProvider } from "@/lib/use-jose-session";
 import { clearSensitiveClientState } from "@/lib/explorer-identity";
 
@@ -140,8 +139,6 @@ function LoginPanelBody({ reason, signedIn }: Props) {
             mock picker; production servers refuse to boot with mock login enabled.
           </p>
         ) : null}
-
-        <ConnectedLocalDevPanel />
 
         <p className="jose-login__meta">Auth mode: {mode}</p>
       </section>

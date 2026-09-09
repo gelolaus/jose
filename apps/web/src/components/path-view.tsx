@@ -69,9 +69,7 @@ function findCurrentNode(path: PathResponse) {
 function initialCollapsed(path: PathResponse): Record<string, boolean> {
   const next: Record<string, boolean> = {};
   for (const section of path.sections) {
-    const done = section.nodes.every((n) => n.status === "completed");
-    const hasCurrent = section.nodes.some((n) => n.status === "current");
-    next[section.id] = done && !hasCurrent;
+    next[section.id] = false;
   }
   return next;
 }
@@ -237,7 +235,7 @@ export function PathView({ path }: { path: PathResponse }) {
           </div>
           {active ? (
             <p className="mt-2 truncate text-sm font-semibold text-[var(--jose-ink-muted)]">
-              Now exploring · {active.title}
+              Current · {active.title}
             </p>
           ) : null}
         </div>
@@ -253,44 +251,30 @@ export function PathView({ path }: { path: PathResponse }) {
                   sectionRefs.current[section.id] = el;
                 }}
                 data-section={section.id}
-                className={`relative w-full scroll-mt-24 px-4 pb-16 sm:px-6 sm:pb-20 lg:px-8 ${
+                className={`path-section relative w-full scroll-mt-24 px-4 pb-16 sm:px-6 sm:pb-20 lg:px-8 ${
                   sectionIndex === 0 ? "pt-5 sm:pt-7" : "pt-10 sm:pt-12"
                 }`}
-                style={{ backgroundColor: section.themeColor }}
               >
-                <div
-                  className="pointer-events-none absolute inset-0 opacity-20"
-                  style={{
-                    backgroundImage:
-                      "radial-gradient(circle at 20% 20%, white 0 2px, transparent 3px), radial-gradient(circle at 80% 40%, white 0 1.5px, transparent 2.5px)",
-                    backgroundSize: "42px 42px, 28px 28px",
-                  }}
-                  aria-hidden
-                />
-                <div className="relative mx-auto mb-6 max-w-3xl text-center md:mb-8">
+                <div className="path-heading relative mx-auto mb-6 max-w-3xl text-left md:mb-8">
                   <div className="flex items-start justify-center gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="font-display text-3xl font-semibold tracking-tight text-white drop-shadow sm:text-4xl md:text-5xl">
+                      <p className="path-title text-2xl font-extrabold tracking-tight sm:text-3xl">
                         {section.title}
                       </p>
-                      <p className="mt-1 text-base font-medium text-white/90 sm:text-lg">
+                      <p className="path-subtitle mt-1 text-base font-semibold">
                         {section.subtitle}
                       </p>
                       {section.objectives.length > 0 ? (
-                        <ul className="mx-auto mt-3 max-w-xl space-y-1 text-left text-sm text-white/95">
+                        <details className="path-subtitle mt-3 text-sm"><summary className="cursor-pointer font-bold">What you’ll learn</summary><ul className="mt-2 space-y-1">
                           {section.objectives.map((objective) => (
                             <li key={objective}>· {objective}</li>
                           ))}
-                        </ul>
-                      ) : (
-                        <p className="mt-3 text-sm text-white/80">
-                          Chapter objectives awaiting instructor content.
-                        </p>
-                      )}
+                        </ul></details>
+                      ) : null}
                     </div>
                     <button
                       type="button"
-                      className="mt-1 rounded-lg bg-white/20 p-2 text-white xl:hidden"
+                      className="mt-1 rounded-xl bg-[var(--jose-surface)] p-2 text-[var(--jose-text)] xl:hidden"
                       aria-expanded={!isCollapsed}
                       aria-controls={`section-body-${section.id}`}
                       onClick={() =>
@@ -327,7 +311,6 @@ export function PathView({ path }: { path: PathResponse }) {
                     />
                   )}
                 </div>
-                <ArtifactAccent sectionId={section.id} />
               </section>
             );
           })}
@@ -371,7 +354,11 @@ function PathList({
               {node.title}
             </span>
             <span className="text-sm text-[var(--jose-ink-muted)]">
-              {node.kind}
+              {node.status === "completed"
+                ? node.kind === "lesson"
+                  ? "Read again"
+                  : "Review"
+                : node.kind}
               {prereq ? ` · ${prereq}` : ""}
             </span>
           </span>
@@ -444,6 +431,7 @@ function PathTrack({
         <path
           d={d}
           fill="none"
+          className="path-spine"
           stroke="rgba(255,255,255,0.55)"
           strokeWidth="4"
           strokeLinecap="round"
@@ -484,12 +472,11 @@ function PathAside({
 }) {
   return (
     <div className="space-y-5">
-      <SectionBannerCard section={active} elevated />
       <div className="rounded-2xl border border-[var(--jose-rule)] bg-white/90 p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between gap-2">
           <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-stone-400">
             <Compass className="size-4" strokeWidth={2.25} aria-hidden />
-            Journey map
+            Path
           </p>
           <button
             type="button"
@@ -583,44 +570,5 @@ function StatusBadge({ done, current }: { done: boolean; current: boolean }) {
       <Lock className="size-3.5" strokeWidth={2.25} aria-hidden />
       Soon
     </span>
-  );
-}
-
-function SectionBannerCard({
-  section,
-  elevated = true,
-}: {
-  section?: Section;
-  elevated?: boolean;
-}) {
-  if (!section) return null;
-  return (
-    <div
-      className={`rounded-2xl px-5 py-4 text-white sm:px-6 sm:py-5 ${
-        elevated ? "shadow-lg ring-2 ring-white/40" : "ring-1 ring-white/30"
-      }`}
-      style={{ backgroundColor: elevated ? section.themeColor : "transparent" }}
-    >
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/80">
-        Now exploring
-      </p>
-      <p className="font-display text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
-        {section.title}
-      </p>
-      <p className="mt-0.5 text-base text-white/90 sm:text-lg">{section.subtitle}</p>
-    </div>
-  );
-}
-
-function ArtifactAccent({ sectionId }: { sectionId: string }) {
-  const side =
-    sectionId.length % 2 === 0 ? "left-4 sm:left-8" : "right-4 sm:right-8";
-  return (
-    <div
-      className={`float-soft pointer-events-none absolute bottom-8 ${side} flex size-14 items-center justify-center rounded-xl bg-white/90 text-teal-800 shadow-md md:size-16`}
-      aria-hidden
-    >
-      <Compass className="size-7 md:size-8" strokeWidth={2} />
-    </div>
   );
 }

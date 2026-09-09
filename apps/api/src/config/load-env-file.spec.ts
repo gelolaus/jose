@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadApiEnvFile } from "./load-env-file";
+import { apiRootEnvPath, loadApiEnvFile } from "./load-env-file";
 
 describe("loadApiEnvFile", () => {
   it("loads the API .env values without replacing explicitly supplied environment values", async () => {
@@ -19,5 +19,10 @@ describe("loadApiEnvFile", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it("resolves the single local file at the repository root", () => {
+    expect(apiRootEnvPath()).toMatch(/[\\/]jose[\\/]\.env$/);
+    expect(apiRootEnvPath()).not.toMatch(/[\\/]apps[\\/]api[\\/]\.env$/);
   });
 });

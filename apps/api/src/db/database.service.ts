@@ -5,7 +5,7 @@ import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { loadJoseEnv } from "../config/env";
 import * as schema from "./schema";
-import { assertMigrationsApplied, runMigrations } from "./migrate";
+import { assertMigrationsApplied, isRemoteLibsqlUrl, runMigrations } from "./migrate";
 
 export type JoseDb = LibSQLDatabase<typeof schema>;
 
@@ -30,7 +30,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     if (env.isProduction) {
       await assertMigrationsApplied(this.client);
     } else {
-      await runMigrations(this.client);
+      await runMigrations(this.client, { remoteLibsql: isRemoteLibsqlUrl(url) });
     }
   }
 

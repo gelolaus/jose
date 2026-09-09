@@ -6,19 +6,21 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
+  ARLAUS_ADMIN_EMAIL,
   DEFAULT_AVATAR_ID,
-  isLocalDevTestEmail,
+  isExactStaffTeacherDomain,
   MAX_HEARTS,
+  paginateInMemory,
   roleFromAdmissionEmail,
   userRoleSchema,
-  type LocalDevRole,
+  type AdminUserQuery,
   type SessionUser,
   type UserRole,
 } from "@jose/shared";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { DatabaseService } from "../db/database.service";
-import { learners, users } from "../db/schema";
+import { learners, roleAudit, userNameAudit, users } from "../db/schema";
 
 export type UserRow = typeof users.$inferSelect;
 
@@ -143,10 +145,12 @@ export class UsersService {
   /**
    * Grants student or teacher by APC mailbox. Admin is deliberately unreachable here:
    * the only path to admin is the one-time operator bootstrap.
+   * Teacher grants require the verified admission mailbox's exact apc.edu.ph domain.
    */
   async setRoleByEmail(input: {
     email: string;
     role: Exclude<UserRole, "admin">;
+    actorId: string;
   }): Promise<SessionUser> {
     if ((input.role as UserRole) === "admin") {
       throw new BadRequestException("Admin role can only be set through bootstrap");
@@ -161,40 +165,128 @@ export class UsersService {
     if (existing.role === "admin") {
       throw new BadRequestException("Admin accounts cannot be demoted through this route");
     }
+    if (input.role === "teacher" && !isExactStaffTeacherDomain(admissionEmail)) {
+      throw new ForbiddenException(
+        "Teacher access can only be granted to verified apc.edu.ph staff mailboxes.",
+      );
+    }
+    const priorRole = existing.role;
     await this.db
       .update(users)
       .set({ role: input.role, updatedAt: Date.now() })
       .where(eq(users.id, existing.id));
+    await this.db.insert(roleAudit).values({
+      id: randomUUID(),
+      actorId: input.actorId,
+      targetUserId: existing.id,
+      priorRole,
+      newRole: input.role,
+      createdAt: Date.now(),
+    });
     return this.requireById(existing.id);
+  }
+
+  async listAccounts(query: AdminUserQuery) {
+    const rows = await this.db.select().from(users).orderBy(asc(users.admissionEmail));
+    const needle = query.q?.trim().toLowerCase();
+    const filtered = rows.filter((row) => {
+      const role = userRoleSchema.catch("student").parse(row.role);
+      if (query.role && role !== query.role) return false;
+      if (!needle) return true;
+      return (
+        row.admissionEmail.toLowerCase().includes(needle) ||
+        row.displayName.toLowerCase().includes(needle)
+      );
+    });
+    const mapped = filtered.map((row) => {
+      const role = userRoleSchema.catch("student").parse(row.role);
+      return {
+        id: row.id,
+        admissionEmail: row.admissionEmail,
+        displayName: row.displayName,
+        role,
+        staffEligible: isExactStaffTeacherDomain(row.admissionEmail),
+      };
+    });
+    const page = paginateInMemory(mapped, query, (item) => item.id);
+    return { users: page.items, nextCursor: page.nextCursor };
   }
 
   /**
-   * Localhost Arlaus shortcut only. May set student, teacher, or admin and may
-   * demote that same account so the local switch can return to Student.
-   * Production role grants still cannot assign admin.
+   * Admin-only audited display-name correction. Separate from self-service
+   * profile editing (which is avatar-only). Updates users + learners atomically
+   * from the operator's perspective and records prior/new names.
    */
-  async setLocalDevTestRole(input: {
-    email: string;
-    role: LocalDevRole;
+  async correctDisplayName(input: {
+    userId?: string;
+    email?: string;
+    displayName: string;
+    actorId: string;
   }): Promise<SessionUser> {
-    if (!isLocalDevTestEmail(input.email)) {
-      throw new ForbiddenException("This switch exists only for the local test account.");
+    const displayName = input.displayName.trim();
+    if (!displayName || displayName.length > 80) {
+      throw new BadRequestException("Display name must be 1-80 characters");
     }
-    const existing = await this.findByAdmissionEmail(input.email);
-    if (!existing) {
-      throw new NotFoundException("No Jose account for that APC mailbox yet.");
+    let target: SessionUser | null = null;
+    if (input.userId) {
+      target = await this.findById(input.userId);
+    } else if (input.email) {
+      target = await this.findByAdmissionEmail(input.email);
     }
-    await this.db
-      .update(users)
-      .set({ role: input.role, updatedAt: Date.now() })
-      .where(eq(users.id, existing.id));
-    return this.requireById(existing.id);
+    if (!target) {
+      throw new NotFoundException("No Jose account for that user");
+    }
+    const priorName = target.displayName;
+    const now = Date.now();
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ displayName, updatedAt: now })
+        .where(eq(users.id, target.id));
+      await tx
+        .update(learners)
+        .set({ displayName })
+        .where(eq(learners.id, target.id));
+      await tx.insert(userNameAudit).values({
+        id: randomUUID(),
+        actorId: input.actorId,
+        targetUserId: target.id,
+        priorName,
+        newName: displayName,
+        createdAt: now,
+      });
+    });
+    return this.requireById(target.id);
   }
 
-  async updateDisplayName(userId: string, displayName: string) {
+  /**
+   * Pinned one-time promotion for arlaus@student.apc.edu.ph. Requires the
+   * account to already exist from normal sign-in; idempotent if already admin.
+   * Writes a role_audit row. Never hard-codes authz elsewhere.
+   */
+  async promoteArlausToAdmin(input: { actorId?: string }): Promise<SessionUser> {
+    const existing = await this.findByAdmissionEmail(ARLAUS_ADMIN_EMAIL);
+    if (!existing) {
+      throw new NotFoundException(
+        "No Jose account for arlaus@student.apc.edu.ph yet. Ask them to complete normal sign-in first.",
+      );
+    }
+    if (existing.role === "admin") {
+      return existing;
+    }
+    const priorRole = existing.role;
     await this.db
       .update(users)
-      .set({ displayName, updatedAt: Date.now() })
-      .where(eq(users.id, userId));
+      .set({ role: "admin", updatedAt: Date.now() })
+      .where(eq(users.id, existing.id));
+    await this.db.insert(roleAudit).values({
+      id: randomUUID(),
+      actorId: input.actorId ?? existing.id,
+      targetUserId: existing.id,
+      priorRole,
+      newRole: "admin",
+      createdAt: Date.now(),
+    });
+    return this.requireById(existing.id);
   }
 }

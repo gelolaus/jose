@@ -1,15 +1,17 @@
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { loadJoseEnv } from "../config/env";
+import { loadApiEnvFile } from "../config/load-env-file";
 import {
   backupFileDatabase,
   defaultBackupPath,
   writeLogicalBackup,
 } from "./backup";
 import { openDatabaseClient, resolveDatabaseUrl } from "./database.service";
-import { runMigrations } from "./migrate";
+import { isRemoteLibsqlUrl, runMigrations } from "./migrate";
 
 async function main() {
+  loadApiEnvFile();
   loadJoseEnv(process.env);
   const url = resolveDatabaseUrl();
   const preferJson = process.argv.includes("--json") || !url.startsWith("file:");
@@ -25,7 +27,7 @@ async function main() {
 
   const client = openDatabaseClient(url);
   try {
-    await runMigrations(client);
+    await runMigrations(client, { remoteLibsql: isRemoteLibsqlUrl(url) });
     if (preferJson) {
       const destination = out ?? defaultBackupPath("json");
       const result = await writeLogicalBackup(client, url, destination);

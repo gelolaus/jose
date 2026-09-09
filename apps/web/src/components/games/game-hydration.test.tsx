@@ -6,7 +6,7 @@ import { GameSwitch } from "../game-player";
 describe("game server rendering", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  for (const type of ["blank", "timeline", "memory"] as const) {
+  for (const type of ["blank", "timeline", "memory", "quiz"] as const) {
     it(`keeps the initial ${type} board stable across random seeds`, () => {
       const game = LAB_GAMES.find((entry) => entry.type === type)!.game;
       const props = {

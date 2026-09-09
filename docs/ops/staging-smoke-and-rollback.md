@@ -1,5 +1,8 @@
 # Staging smoke checks and rollback
 
+Full deploy order lives in `docs/ops/deployment.md`; empty-start cutover lives
+in `docs/ops/empty-start-and-cutover.md`. This file is the pre-deploy gate.
+
 ## Pre-deploy
 
 1. Set production/staging secrets in the host (never in `NEXT_PUBLIC_*`):
@@ -23,6 +26,8 @@ directly, so leaving trust-proxy off ignores spoofed client IPs.
 - Signed-in student → `403` on `/teach/*` (`TEACHER_DENIED`)
 - Student can load `/modules` over HTTPS via the web origin
 - Oversized attempt payload returns `400`
+- Teacher `Download CSV` for one assignment returns headers plus safe cells
+- Logout revokes `jose_session` and `/teach/*` returns 401 afterwards
 - Confirm logs show `requestId` / `supportRef` and no raw emails, answers, or tokens
 
 ## Rollback

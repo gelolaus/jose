@@ -335,9 +335,52 @@ export const assignments = sqliteTable("assignments", {
   contentRevisionId: text("content_revision_id")
     .notNull()
     .references(() => moduleRevisions.id),
+  /** Teacher-defined title; backfilled for pre-title rows. */
+  title: text("title"),
   dueAt: integer("due_at"),
+  /** IANA timezone for due display; defaults to Asia/Manila. */
+  dueTimezone: text("due_timezone"),
+  /** Explicit grading policy: best|latest|override (default best preserves history). */
+  gradingPolicy: text("grading_policy").notNull().default("best"),
+  /** Immutable snapshot copy for reproducible grading (E). */
+  assignedSnapshotJson: text("assigned_snapshot_json"),
   assignedAt: integer("assigned_at").notNull(),
   archivedAt: integer("archived_at"),
+});
+
+/** Dedicated manual-grade overrides, separate from attempts (D). */
+export const gradeOverrides = sqliteTable(
+  "grade_overrides",
+  {
+    assignmentId: text("assignment_id")
+      .notNull()
+      .references(() => assignments.id, { onDelete: "cascade" }),
+    learnerId: text("learner_id")
+      .notNull()
+      .references(() => learners.id, { onDelete: "cascade" }),
+    score: integer("score").notNull(),
+    maxScore: integer("max_score").notNull(),
+    reason: text("reason").notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.assignmentId, table.learnerId] }),
+  }),
+);
+
+/** Append-only override history (create/revise/remove). */
+export const gradeOverrideAudit = sqliteTable("grade_override_audit", {
+  id: text("id").primaryKey(),
+  assignmentId: text("assignment_id").notNull(),
+  learnerId: text("learner_id").notNull(),
+  action: text("action").notNull(),
+  score: integer("score"),
+  maxScore: integer("max_score"),
+  reason: text("reason"),
+  actorId: text("actor_id").notNull(),
+  createdAt: integer("created_at").notNull(),
 });
 
 export const classChallenges = sqliteTable("class_challenges", {
@@ -484,6 +527,54 @@ export const learnerAchievements = sqliteTable(
     pk: primaryKey({ columns: [table.learnerId, table.achievementId] }),
   }),
 );
+
+export const bookmarks = sqliteTable(
+  "bookmarks",
+  {
+    learnerId: text("learner_id")
+      .notNull()
+      .references(() => learners.id, { onDelete: "cascade" }),
+    levelId: text("level_id").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.learnerId, table.levelId] }),
+  }),
+);
+
+/** One lesson-time credit per learner and stable lesson id. credit_ms is 0 when already full. */
+export const lessonLifeCredits = sqliteTable(
+  "lesson_life_credits",
+  {
+    learnerId: text("learner_id")
+      .notNull()
+      .references(() => learners.id, { onDelete: "cascade" }),
+    levelId: text("level_id").notNull(),
+    createdAt: integer("created_at").notNull(),
+    creditMs: integer("credit_ms").notNull().default(0),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.learnerId, table.levelId] }),
+  }),
+);
+
+export const roleAudit = sqliteTable("role_audit", {
+  id: text("id").primaryKey(),
+  actorId: text("actor_id").notNull(),
+  targetUserId: text("target_user_id").notNull(),
+  priorRole: text("prior_role").notNull(),
+  newRole: text("new_role").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const userNameAudit = sqliteTable("user_name_audit", {
+  id: text("id").primaryKey(),
+  actorId: text("actor_id").notNull(),
+  targetUserId: text("target_user_id").notNull(),
+  priorName: text("prior_name").notNull(),
+  newName: text("new_name").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
 
 export const learnerArtifacts = sqliteTable(
   "learner_artifacts",

@@ -15,10 +15,10 @@
     "db:migrate": "npm run db:migrate --workspace=@jose/api",
     "db:backup": "npm run db:backup --workspace=@jose/api",
     "db:restore": "npm run db:restore --workspace=@jose/api",
+    "db:empty": "npm run db:empty --workspace=@jose/api",
     "typecheck": "turbo run lint",
     "ci": "npm run build --workspace=@jose/shared && turbo run lint test build",
-    "audit:deps": "npm audit --omit=dev",
-    "db:seed": "npm run db:seed --workspace=@jose/api"
+    "audit:deps": "npm audit --omit=dev"
   },
   "devDependencies": {
     "turbo": "^2.10.12",

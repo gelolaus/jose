@@ -1,4 +1,4 @@
-import { Test } from "@nestjs/testing";
+﻿import { Test } from "@nestjs/testing";
 import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -57,7 +57,6 @@ describe("critical path release gate", () => {
       JOSE_WEB_ORIGIN: "http://localhost:3000",
       JOSE_API_PUBLIC_URL: "http://localhost:3001",
     };
-    delete process.env.JOSE_AUTH_STUB;
     delete process.env.JOSE_DEMO_MODE;
 
     const moduleRef = await Test.createTestingModule({

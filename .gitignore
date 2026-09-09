@@ -30,7 +30,7 @@ coverage
 # Brainstorm companion mockups
 .superpowers/
 
-# Local SQLite (seeded on API boot)
+# Local SQLite (created on API boot, never seeded)
 apps/api/data/*.sqlite
 apps/api/data/*.sqlite-*
 apps/api/data/backups/

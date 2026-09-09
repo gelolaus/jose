@@ -2,20 +2,12 @@ import { describe, expect, it } from "vitest";
 import { LAB_GAMES, getLabGame, isLabGameType } from "./lab-games";
 
 describe("lab games", () => {
-  it("covers classic and advanced board types", () => {
-    expect(LAB_GAMES.map((entry) => entry.type).sort()).toEqual(
-      [
-        "blank",
-        "case-files",
-        "dapitan",
-        "dispatches",
-        "editorial",
-        "memory",
-        "quiz",
-        "sort",
-        "timeline",
-      ].sort(),
-    );
+  it("offers only the five simple games", () => {
+    expect(LAB_GAMES.map((entry) => entry.type)).toEqual(["timeline", "quiz", "memory", "sort", "blank"]);
+    for (const type of ["case-files", "dispatches", "editorial", "dapitan"]) {
+      expect(isLabGameType(type)).toBe(false);
+      expect(getLabGame(type)).toBeUndefined();
+    }
   });
 
   it("looks up a type and rejects unknown ones", () => {

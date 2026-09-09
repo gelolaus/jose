@@ -30,10 +30,6 @@ import {
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { BlankGame } from "./games/blank-game";
-import { CaseFilesGame } from "./games/case-files-game";
-import { DapitanGame } from "./games/dapitan-game";
-import { DispatchesGame } from "./games/dispatches-game";
-import { EditorialGame } from "./games/editorial-game";
 import {
   GameFrame,
   StarCelebration,
@@ -122,14 +118,13 @@ export function GamePlayer({
     if (!resume) return "playing";
     return resume.status === "saving" ? "save-failed" : resume.status;
   });
-  const [nonce, setNonce] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(() =>
     resume
       ? "Your result was kept on this device. Retry saving when you are back online."
       : null,
   );
-  const [attemptId, setAttemptId] = useState(attempt.id);
+  const attemptId = attempt.id;
   const pendingMissKey = useRef<string | null>(null);
   const pendingMissPayload = useRef<string | null>(null);
 
@@ -262,6 +257,7 @@ export function GamePlayer({
     const unsaved = isUnsavedSavePhase(savePhase);
     return (
       <StarCelebration
+        timedOut={game.type === "memory" && result.score === 0}
         title={title}
         score={result.score}
         maxScore={result.maxScore}
@@ -277,12 +273,8 @@ export function GamePlayer({
         }
         onPlayAgain={() => {
           clearAttemptDraft({ accountId, levelId, revision });
-          setResult(null);
-          setSavePhase("playing");
-          setError(null);
-          setNonce((n) => n + 1);
+          setBusy(true);
           router.refresh();
-          setAttemptId(attempt.id);
         }}
         onContinue={() => {
           router.push(
@@ -314,7 +306,6 @@ export function GamePlayer({
           </p>
         ) : null}
         <GameSwitch
-          key={nonce}
           game={game}
           disabled={busy || Boolean(why)}
           onMiss={onMiss}
@@ -428,50 +419,8 @@ export function GameSwitch({
           onChange={onChange as ((g: Extract<GameContent, { type: "sort" }>) => void) | undefined}
         />
       );
-    case "case-files":
-      return (
-        <CaseFilesGame
-          game={game}
-          mode={mode}
-          disabled={Boolean(disabled)}
-          onMiss={onMiss}
-          onFinish={onFinish}
-          onChange={onChange as ((g: typeof game) => void) | undefined}
-        />
-      );
-    case "dispatches":
-      return (
-        <DispatchesGame
-          game={game}
-          mode={mode}
-          disabled={Boolean(disabled)}
-          onMiss={onMiss}
-          onFinish={onFinish}
-          onChange={onChange as ((g: typeof game) => void) | undefined}
-        />
-      );
-    case "editorial":
-      return (
-        <EditorialGame
-          game={game}
-          mode={mode}
-          disabled={Boolean(disabled)}
-          onMiss={onMiss}
-          onFinish={onFinish}
-          onChange={onChange as ((g: typeof game) => void) | undefined}
-        />
-      );
-    case "dapitan":
-      return (
-        <DapitanGame
-          game={game}
-          mode={mode}
-          disabled={Boolean(disabled)}
-          onMiss={onMiss}
-          onFinish={onFinish}
-          onChange={onChange as ((g: typeof game) => void) | undefined}
-        />
-      );
+    default:
+      return <div className="rounded-2xl border-2 border-[var(--jose-rule)] p-6"><p className="font-bold">This game has been retired.</p><p className="mt-2 text-sm text-[var(--jose-text-muted)]">Choose Timeline, Quiz, Matching, Sorting, or Fill in the Blank.</p></div>;
   }
 }
 
