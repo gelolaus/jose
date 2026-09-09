@@ -145,7 +145,7 @@ export class UsersService {
   /**
    * Grants student or teacher by APC mailbox. Admin is deliberately unreachable here:
    * the only path to admin is the one-time operator bootstrap.
-   * Teacher grants require the verified admission mailbox's exact apc.edu.ph domain.
+   * Teacher grants require the admitted APC email's exact apc.edu.ph domain.
    */
   async setRoleByEmail(input: {
     email: string;

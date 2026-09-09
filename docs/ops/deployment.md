@@ -35,8 +35,8 @@ Set on the API host only:
 - `JOSE_TRUST_PROXY=1` when behind one reverse proxy (hop count, not `true`);
   leave unset/false with no proxy. Rate limits use `req.ip` only.
 
-Production refuses to boot with `JOSE_AUTH_MODE=mock|disabled`,
-`JOSE_DEMO_MODE=true`, or `JOSE_MAIL_TRANSPORT=memory` in microsoft mode.
+Production refuses to boot with `JOSE_AUTH_MODE=mock|disabled` or
+`JOSE_DEMO_MODE=true`.
 
 ## 3. Migrate, then start API
 
@@ -65,7 +65,7 @@ curl -s https://api.your-school.edu/ready   # -> {"ok":true,"database":"up"}
 3. Run `npm run db:migrate` against Turso.
 4. Deploy API and verify `/ready`.
 5. Set Vercel server-only rewrite target and deploy web.
-6. Verify login (Microsoft → APC mailbox OTP), a teacher-only request
+6. Verify login with an APC Microsoft account, a teacher-only request
    (student gets 403 `TEACHER_DENIED`), one per-assignment CSV export,
    and logout (session revoked, `/teach/*` → 401).
 7. Delete one-time bootstrap/promotion tokens from the environment.

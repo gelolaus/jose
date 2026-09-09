@@ -11,10 +11,7 @@ export type AuthRuntimeConfig = {
   apiPublicUrl: string;
   cookieSecure: boolean;
   sessionTtlSeconds: number;
-  pendingTtlSeconds: number;
-  mailboxCodeTtlSeconds: number;
-  mailboxMaxAttempts: number;
-  mailboxResendCooldownSeconds: number;
+  oauthStateTtlSeconds: number;
   /** Anonymous callers may use the shared demo learner. Never true in production. */
   demoMode: boolean;
   isProduction: boolean;
@@ -65,7 +62,7 @@ export function isProductionEnv(env: NodeJS.ProcessEnv = process.env): boolean {
 
 /**
  * Refuse to boot a production deployment that still carries test-only auth.
- * Every branch here is a way to sign in without a verified APC mailbox.
+ * Every branch here is a way to sign in without Microsoft identity verification.
  */
 function assertProductionSafe(env: NodeJS.ProcessEnv, mode: AuthMode) {
   if (!isProductionEnv(env)) return;
@@ -83,11 +80,6 @@ function assertProductionSafe(env: NodeJS.ProcessEnv, mode: AuthMode) {
   if (isTruthy(env.JOSE_DEMO_MODE)) {
     throw new AuthConfigError(
       "JOSE_DEMO_MODE grants anonymous access to the shared demo learner and cannot run in production. Remove JOSE_DEMO_MODE.",
-    );
-  }
-  if (mode === "microsoft" && env.JOSE_MAIL_TRANSPORT?.trim().toLowerCase() === "memory") {
-    throw new AuthConfigError(
-      "JOSE_MAIL_TRANSPORT=memory keeps mailbox codes in server memory and would expose them as the only OTP path in production. Configure a real mail transport.",
     );
   }
 }
@@ -126,10 +118,7 @@ export function loadAuthConfig(
       apiPublicUrl: env.JOSE_API_PUBLIC_URL?.trim() || "http://localhost:3001",
       cookieSecure,
       sessionTtlSeconds: 60 * 60 * 24 * 14,
-      pendingTtlSeconds: 60 * 30,
-      mailboxCodeTtlSeconds: 60 * 15,
-      mailboxMaxAttempts: 5,
-      mailboxResendCooldownSeconds: 60,
+      oauthStateTtlSeconds: 60 * 30,
       demoMode,
       isProduction,
       microsoft: null,
@@ -179,26 +168,11 @@ export function loadAuthConfig(
       env.JOSE_SESSION_TTL_SECONDS,
       60 * 60 * 24 * 14,
     ) || 60 * 60 * 24 * 14,
-    pendingTtlSeconds: parseNonNegativeInt(
-      "JOSE_PENDING_TTL_SECONDS",
-      env.JOSE_PENDING_TTL_SECONDS,
+    oauthStateTtlSeconds: parseNonNegativeInt(
+      "JOSE_OAUTH_STATE_TTL_SECONDS",
+      env.JOSE_OAUTH_STATE_TTL_SECONDS,
       60 * 30,
     ) || 60 * 30,
-    mailboxCodeTtlSeconds: parseNonNegativeInt(
-      "JOSE_MAILBOX_CODE_TTL_SECONDS",
-      env.JOSE_MAILBOX_CODE_TTL_SECONDS,
-      60 * 15,
-    ) || 60 * 15,
-    mailboxMaxAttempts: parseNonNegativeInt(
-      "JOSE_MAILBOX_MAX_ATTEMPTS",
-      env.JOSE_MAILBOX_MAX_ATTEMPTS,
-      5,
-    ) || 5,
-    mailboxResendCooldownSeconds: parseNonNegativeInt(
-      "JOSE_MAILBOX_RESEND_COOLDOWN_SECONDS",
-      env.JOSE_MAILBOX_RESEND_COOLDOWN_SECONDS,
-      60,
-    ),
     demoMode,
     isProduction,
     microsoft,

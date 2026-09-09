@@ -2,13 +2,10 @@ import {
   AUTH_DENIAL_MESSAGES,
   authMeResponseSchema,
   authStatusSchema,
-  pendingAdmissionStatusSchema,
   type AuthDenialReason,
   type AuthMeResponse,
   type AuthStatus,
   type AvatarId,
-  type PendingAdmissionStatus,
-  type SessionUser,
 } from "@jose/shared";
 import { apiRequestInit, getApiBaseUrl, type ApiCallOptions } from "./path-api";
 
@@ -32,59 +29,6 @@ export async function fetchAuthMe(options?: ApiCallOptions): Promise<AuthMeRespo
   const res = await authFetch("/auth/me", undefined, options);
   const json = await res.json();
   return authMeResponseSchema.parse(json);
-}
-
-export async function fetchPendingAdmission(): Promise<
-  PendingAdmissionStatus & { devCode?: string }
-> {
-  const res = await authFetch("/auth/pending");
-  const json = await res.json();
-  if (!res.ok) {
-    throw new Error(json.message ?? "Pending admission expired");
-  }
-  return {
-    ...pendingAdmissionStatusSchema.parse(json),
-    devCode: typeof json.devCode === "string" ? json.devCode : undefined,
-  };
-}
-
-export async function requestMailboxCode(email?: string): Promise<
-  PendingAdmissionStatus & { devCode?: string }
-> {
-  const res = await authFetch("/auth/mailbox/request", {
-    method: "POST",
-    body: JSON.stringify(email ? { email } : {}),
-  });
-  const json = await res.json();
-  if (!res.ok) {
-    throw new Error(json.message ?? "Could not send verification code");
-  }
-  return {
-    ...pendingAdmissionStatusSchema.parse(json),
-    devCode: typeof json.devCode === "string" ? json.devCode : undefined,
-  };
-}
-
-export async function verifyMailboxCode(
-  code: string,
-): Promise<{ authenticated: boolean; user?: SessionUser; reason?: AuthDenialReason; message?: string }> {
-  const res = await authFetch("/auth/mailbox/verify", {
-    method: "POST",
-    body: JSON.stringify({ code }),
-  });
-  const json = await res.json();
-  if (!res.ok) {
-    return {
-      authenticated: false,
-      reason: json.reason,
-      message: json.message ?? AUTH_DENIAL_MESSAGES.verification_failed,
-    };
-  }
-  return json;
-}
-
-export async function cancelLogin(): Promise<void> {
-  await authFetch("/auth/cancel", { method: "POST", body: "{}" });
 }
 
 export async function logoutJose(): Promise<void> {

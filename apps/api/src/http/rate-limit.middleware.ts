@@ -67,7 +67,7 @@ function classify(req: Request): {
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
     return { budget: false, kind: "none" };
   }
-  if (/\/auth\/|\/login|\/callback|\/verify|\/mailbox/i.test(path)) {
+  if (/\/auth\/|\/login|\/callback/i.test(path)) {
     return { budget: true, kind: "login" };
   }
   if (/\/attempts|\/miss$|\/complete$|\/finish$/i.test(path)) {

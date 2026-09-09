@@ -19,8 +19,6 @@ export const authDenialReasonSchema = z.enum([
   "not_configured",
   "invalid_callback",
   "suspended",
-  "mailbox_required",
-  "verification_failed",
   "rate_limited",
 ]);
 export type AuthDenialReason = z.infer<typeof authDenialReasonSchema>;
@@ -28,21 +26,16 @@ export type AuthDenialReason = z.infer<typeof authDenialReasonSchema>;
 export const AUTH_DENIAL_MESSAGES: Record<AuthDenialReason, string> = {
   switch_account:
     "Jose school accounts require an APC email. Switch Microsoft account.",
-  missing_email:
-    "We could not read a trusted email from Microsoft. Enter and verify your APC mailbox to continue.",
+  missing_email: "We could not read a trusted APC email from Microsoft. Switch Microsoft account.",
   consent_denied: "Microsoft sign-in was cancelled. No Jose session was created.",
-  consent_blocked:
-    "Your school blocked Microsoft consent for this app. Ask IT, or use APC email-code login when available.",
+  consent_blocked: "Your school blocked Microsoft consent for this app. Ask IT for access.",
   cancelled: "Login cancelled. No Jose session was created.",
   expired: "This login step expired. Start Microsoft sign-in again.",
-  conflict:
-    "This Microsoft account or APC mailbox is already linked to a different Jose account.",
+  conflict: "This Microsoft account or APC email is already linked to a different Jose account.",
   not_configured:
     "Microsoft login is not configured on this server yet. See docs/auth/microsoft-entra-setup.md.",
   invalid_callback: "Sign-in callback was invalid or forged. Start again from Jose.",
   suspended: "This Jose account is suspended. Contact your instructor or admin.",
-  mailbox_required: "Verify your APC mailbox to finish joining Jose.",
-  verification_failed: "That verification code is incorrect or no longer valid.",
   rate_limited: "Too many attempts. Wait a moment and try again.",
 };
 
@@ -124,26 +117,6 @@ export const authMeResponseSchema = z.object({
 });
 export type AuthMeResponse = z.infer<typeof authMeResponseSchema>;
 
-export const pendingAdmissionStatusSchema = z.object({
-  pendingId: z.string().min(1),
-  status: z.enum(["pending_mailbox"]),
-  candidateEmail: z.string().email().nullable(),
-  claimedEmail: z.string().email().nullable(),
-  canChooseEmail: z.boolean(),
-  message: z.string(),
-});
-export type PendingAdmissionStatus = z.infer<typeof pendingAdmissionStatusSchema>;
-
-export const requestMailboxBodySchema = z.object({
-  email: z.string().email().optional(),
-});
-export type RequestMailboxBody = z.infer<typeof requestMailboxBodySchema>;
-
-export const verifyMailboxBodySchema = z.object({
-  code: z.string().min(4).max(12),
-});
-export type VerifyMailboxBody = z.infer<typeof verifyMailboxBodySchema>;
-
 export const profilePatchBodySchema = z
   .object({
     avatarId: avatarIdSchema,
@@ -220,7 +193,7 @@ export function admissionMailboxDomain(email: string): string {
   return normalized.slice(at + 1);
 }
 
-/** Staff teacher grants require the verified admission mailbox's exact domain. */
+/** Staff teacher grants require the admitted APC email's exact domain. */
 export function isExactStaffTeacherDomain(email: string): boolean {
   return admissionMailboxDomain(email) === APC_STAFF_TEACHER_DOMAIN;
 }

@@ -111,7 +111,6 @@ test-only login path is still enabled, so remove these:
 - `JOSE_AUTH_MODE=mock`
 - `JOSE_DEMO_MODE=true`
 - `JOSE_AUTH_MODE=disabled`
-- `JOSE_MAIL_TRANSPORT=memory` while `JOSE_AUTH_MODE=microsoft`
 
 Local dev login shortcuts (`/auth/dev/*`, `LocalDevPanel`, local role switch) were deleted
 and must not be reintroduced.

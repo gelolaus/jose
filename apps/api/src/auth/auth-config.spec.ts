@@ -83,14 +83,12 @@ describe("production hard rejects (issues #4 and #5)", () => {
     ).toThrow(/JOSE_DEMO_MODE/);
   });
 
-  it("refuses in-memory mail as the only OTP path for microsoft mode", () => {
-    expect(() =>
-      loadAuthConfig({
-        ...MICROSOFT_ENV,
-        NODE_ENV: "production",
-        JOSE_MAIL_TRANSPORT: "memory",
-      }),
-    ).toThrow(/JOSE_MAIL_TRANSPORT=memory/);
+  it("does not require a mail transport for microsoft mode", () => {
+    const config = loadAuthConfig({
+      ...MICROSOFT_ENV,
+      NODE_ENV: "production",
+    });
+    expect(config.mode).toBe("microsoft");
   });
 
   it("treats JOSE_ENV=production the same as NODE_ENV=production", () => {

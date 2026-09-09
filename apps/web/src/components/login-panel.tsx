@@ -74,8 +74,7 @@ function LoginPanelBody({ reason, signedIn }: Props) {
         <p className="jose-login__brand">Jose</p>
         <h1>School sign-in</h1>
         <p className="jose-login__lead">
-          Anyone can start Microsoft authentication. Only verified APC mailboxes receive a Jose
-          session.
+          Sign in with your APC Microsoft account to access Jose.
         </p>
 
         {message ? (

@@ -1,10 +1,7 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   GoneException,
-  HttpException,
-  HttpStatus,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
@@ -20,26 +17,21 @@ import {
   type AuthLearnerProfile,
   type AuthMeResponse,
   type AuthStatus,
-  type PendingAdmissionStatus,
   type ProfilePatchBody,
   type SessionUser,
   type UserRole,
-  requestMailboxBodySchema,
-  verifyMailboxBodySchema,
 } from "@jose/shared";
 import type { Request } from "express";
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { DatabaseService } from "../db/database.service";
 import {
   externalIdentities,
   learners,
-  mailboxVerifications,
   oauthStates,
-  pendingAdmissions,
   users,
 } from "../db/schema";
-import { evaluateMicrosoftEmailClaim, evaluateChosenMailbox } from "./admission";
+import { evaluateMicrosoftEmailClaim } from "./admission";
 import {
   AuthConfigError,
   isProductionEnv,
@@ -47,14 +39,7 @@ import {
   toAuthStatus,
   type AuthRuntimeConfig,
 } from "./auth-config";
-import {
-  generateNumericCode,
-  hashVerificationCode,
-  randomToken,
-  safeEqualHex,
-} from "./crypto.util";
-import type { MailTransport } from "./mail.transport";
-import { MemoryMailTransport, UnconfiguredMailTransport } from "./mail.transport";
+import { randomToken } from "./crypto.util";
 import { MockMicrosoftOidcProvider } from "./microsoft-oidc.mock";
 import type {
   MicrosoftOidcProvider,
@@ -68,15 +53,12 @@ const PROVIDER = "microsoft";
 
 export type AdmissionOutcome =
   | { kind: "session"; user: SessionUser; token: string }
-  | { kind: "pending"; pending: PendingAdmissionStatus }
   | { kind: "denied"; reason: AuthDenialReason; message: string };
 
 @Injectable()
 export class AuthService {
   private config: AuthRuntimeConfig;
   private oidc: MicrosoftOidcProvider | null = null;
-  readonly mail: MailTransport;
-  private readonly memoryMail: MemoryMailTransport | null;
 
   constructor(
     private readonly database: DatabaseService,
@@ -102,26 +84,14 @@ export class AuthService {
     }
 
     if (this.config.mode === "mock") {
-      this.memoryMail = new MemoryMailTransport();
-      this.mail = this.memoryMail;
       this.oidc = new MockMicrosoftOidcProvider(
         this.config.apiPublicUrl,
         this.config.sessionSecret,
       );
     } else if (this.config.mode === "microsoft") {
-      this.memoryMail = null;
-      this.mail =
-        process.env.JOSE_MAIL_TRANSPORT === "memory"
-          ? new MemoryMailTransport()
-          : new UnconfiguredMailTransport();
-      if (this.mail instanceof MemoryMailTransport) {
-        this.memoryMail = this.mail;
-      }
       // Lazy require path avoided; construct via dynamic import helper.
       this.oidc = createMicrosoftOidcClient(this.config);
     } else {
-      this.memoryMail = null;
-      this.mail = new UnconfiguredMailTransport();
       this.oidc = null;
     }
   }
@@ -155,10 +125,6 @@ export class AuthService {
     return this.oidc;
   }
 
-  lastMockMailboxCode(email: string): string | undefined {
-    return this.memoryMail?.lastCodeFor(email);
-  }
-
   async startMicrosoftLogin(): Promise<{ redirectTo: string }> {
     this.requireAuthEnabled();
     const state = randomToken(24);
@@ -175,7 +141,7 @@ export class AuthService {
       nonce,
       codeVerifier,
       createdAt: now,
-      expiresAt: now + this.config.pendingTtlSeconds * 1000,
+      expiresAt: now + this.config.oauthStateTtlSeconds * 1000,
       consumedAt: null,
     });
 
@@ -299,189 +265,11 @@ export class AuthService {
       return this.denied("switch_account");
     }
 
-    const pendingId = randomUUID();
-    const now = Date.now();
-    const candidateEmail =
-      decision.kind === "admit_candidate" ? decision.email : null;
-
-    await this.db.insert(pendingAdmissions).values({
-      id: pendingId,
-      provider: PROVIDER,
-      issuer: identity.issuer,
-      subject: identity.subject,
-      tenantId: identity.tid,
-      oid: identity.oid,
-      claimedEmail: emailClaim,
-      candidateEmail,
-      displayName: identity.name ?? candidateEmail?.split("@")[0] ?? "Explorer",
-      status: "pending_mailbox",
-      denialReason: null,
-      createdAt: now,
-      expiresAt: now + this.config.pendingTtlSeconds * 1000,
-      consumedAt: null,
-    });
-
-    if (candidateEmail) {
-      await this.issueMailboxCode(pendingId, candidateEmail);
+    if (decision.kind !== "admit_candidate") {
+      return this.denied("missing_email");
     }
 
-    return {
-      kind: "pending",
-      pending: {
-        pendingId,
-        status: "pending_mailbox",
-        candidateEmail,
-        claimedEmail: emailClaim,
-        canChooseEmail: candidateEmail == null,
-        message:
-          candidateEmail == null
-            ? AUTH_DENIAL_MESSAGES.missing_email
-            : AUTH_DENIAL_MESSAGES.mailbox_required,
-      },
-    };
-  }
-
-  async getPendingStatus(pendingId: string | undefined | null): Promise<
-    PendingAdmissionStatus & { devCode?: string }
-  > {
-    const pending = await this.requirePending(pendingId);
-    const status: PendingAdmissionStatus & { devCode?: string } = {
-      pendingId: pending.id,
-      status: "pending_mailbox",
-      candidateEmail: pending.candidateEmail,
-      claimedEmail: pending.claimedEmail,
-      canChooseEmail: pending.candidateEmail == null && !pending.claimedEmail,
-      message:
-        pending.candidateEmail == null
-          ? AUTH_DENIAL_MESSAGES.missing_email
-          : AUTH_DENIAL_MESSAGES.mailbox_required,
-    };
-    if (this.memoryMail && pending.candidateEmail) {
-      status.devCode = this.lastMockMailboxCode(pending.candidateEmail) ?? undefined;
-    }
-    return status;
-  }
-
-  async requestMailboxCode(
-    pendingId: string | undefined | null,
-    body: unknown,
-  ): Promise<PendingAdmissionStatus & { devCode?: string }> {
-    const pending = await this.requirePending(pendingId);
-    const parsed = requestMailboxBodySchema.safeParse(body ?? {});
-    if (!parsed.success) {
-      throw new BadRequestException("Invalid mailbox request");
-    }
-
-    let email = pending.candidateEmail;
-    if (pending.candidateEmail == null) {
-      if (!parsed.data.email) {
-        throw new BadRequestException("APC email is required");
-      }
-      const decision = evaluateChosenMailbox(parsed.data.email);
-      if (decision.kind !== "admit_candidate") {
-        throw new ForbiddenException(AUTH_DENIAL_MESSAGES.switch_account);
-      }
-      // Strict: if Microsoft presented a conflicting claim, do not allow a different mailbox.
-      if (pending.claimedEmail) {
-        const claimed = evaluateMicrosoftEmailClaim(pending.claimedEmail);
-        if (
-          claimed.kind === "admit_candidate" &&
-          claimed.email !== decision.email
-        ) {
-          throw new ConflictException(AUTH_DENIAL_MESSAGES.conflict);
-        }
-        if (claimed.kind === "reject_switch_account") {
-          throw new ForbiddenException(AUTH_DENIAL_MESSAGES.switch_account);
-        }
-      }
-      email = decision.email;
-      await this.db
-        .update(pendingAdmissions)
-        .set({ candidateEmail: email })
-        .where(eq(pendingAdmissions.id, pending.id));
-    } else if (parsed.data.email) {
-      const decision = evaluateChosenMailbox(parsed.data.email);
-      if (decision.kind !== "admit_candidate" || decision.email !== pending.candidateEmail) {
-        throw new ForbiddenException(
-          "Microsoft already provided an APC mailbox; verify that address or switch Microsoft account.",
-        );
-      }
-    }
-
-    await this.issueMailboxCode(pending.id, email!);
-    const status = await this.getPendingStatus(pending.id);
-    const result: PendingAdmissionStatus & { devCode?: string } = status;
-    if (this.memoryMail) {
-      result.devCode = this.lastMockMailboxCode(email!);
-    }
-    return result;
-  }
-
-  async verifyMailboxCode(
-    pendingId: string | undefined | null,
-    body: unknown,
-  ): Promise<AdmissionOutcome> {
-    const pending = await this.requirePending(pendingId);
-    const parsed = verifyMailboxBodySchema.safeParse(body);
-    if (!parsed.success) {
-      throw new BadRequestException("Invalid verification payload");
-    }
-    if (!pending.candidateEmail) {
-      throw new BadRequestException("Request a mailbox code first");
-    }
-
-    const rows = await this.db
-      .select()
-      .from(mailboxVerifications)
-      .where(eq(mailboxVerifications.pendingAdmissionId, pending.id))
-      .orderBy(desc(mailboxVerifications.createdAt))
-      .limit(20);
-
-    const active = rows.find((row) => row.consumedAt == null);
-    if (!active || active.expiresAt <= Date.now()) {
-      return this.denied("expired");
-    }
-    if (active.attempts >= active.maxAttempts) {
-      return this.denied("rate_limited");
-    }
-
-    const expectedHash = hashVerificationCode(
-      parsed.data.code,
-      this.config.sessionSecret,
-    );
-    const matches = safeEqualHex(expectedHash, active.codeHash);
-    await this.db
-      .update(mailboxVerifications)
-      .set({ attempts: active.attempts + 1 })
-      .where(eq(mailboxVerifications.id, active.id));
-
-    if (!matches) {
-      if (active.attempts + 1 >= active.maxAttempts) {
-        return this.denied("rate_limited");
-      }
-      return this.denied("verification_failed");
-    }
-
-    await this.db
-      .update(mailboxVerifications)
-      .set({ consumedAt: Date.now() })
-      .where(eq(mailboxVerifications.id, active.id));
-
-    return this.finalizeAdmission(pending.id);
-  }
-
-  async cancelPending(pendingId: string | undefined | null): Promise<AdmissionOutcome> {
-    if (pendingId) {
-      await this.db
-        .update(pendingAdmissions)
-        .set({
-          status: "cancelled",
-          denialReason: "cancelled",
-          consumedAt: Date.now(),
-        })
-        .where(eq(pendingAdmissions.id, pendingId));
-    }
-    return this.denied("cancelled");
+    return this.createAdmittedAccount(identity, decision.email);
   }
 
   async logout(token: string | undefined | null): Promise<void> {
@@ -609,21 +397,24 @@ export class AuthService {
     return user;
   }
 
-  private async finalizeAdmission(pendingId: string): Promise<AdmissionOutcome> {
-    const pending = await this.requirePending(pendingId);
-    if (!pending.candidateEmail) {
-      return this.denied("mailbox_required");
-    }
-
-    const linked = await this.findIdentity(pending.issuer, pending.subject);
+  private async createAdmittedAccount(
+    identity: ValidatedMicrosoftIdentity,
+    admissionEmail: string,
+  ): Promise<AdmissionOutcome> {
+    const linked = await this.findIdentity(identity.issuer, identity.subject);
     if (linked) {
-      return this.denied("conflict");
+      const user = await this.getUser(linked.userId);
+      if (!user || user.suspendedAt != null) {
+        return this.denied(user?.suspendedAt != null ? "suspended" : "invalid_callback");
+      }
+      const session = await this.sessions.createSession(user.id, this.config);
+      return { kind: "session", user: toSessionUser(user), token: session.token };
     }
 
     const emailOwner = await this.db
       .select()
       .from(users)
-      .where(eq(users.admissionEmail, pending.candidateEmail))
+      .where(eq(users.admissionEmail, admissionEmail))
       .limit(1);
     if (emailOwner[0]) {
       // Never silently merge by email alone.
@@ -635,8 +426,8 @@ export class AuthService {
     await this.db.insert(users).values({
       id: userId,
       role: "student",
-      admissionEmail: pending.candidateEmail,
-      displayName: pending.displayName || pending.candidateEmail.split("@")[0],
+      admissionEmail,
+      displayName: identity.name ?? admissionEmail.split("@")[0],
       suspendedAt: null,
       createdAt: now,
       updatedAt: now,
@@ -645,28 +436,23 @@ export class AuthService {
       id: randomUUID(),
       userId,
       provider: PROVIDER,
-      issuer: pending.issuer,
-      subject: pending.subject,
-      tenantId: pending.tenantId,
-      oid: pending.oid,
+      issuer: identity.issuer,
+      subject: identity.subject,
+      tenantId: identity.tid,
+      oid: identity.oid,
       createdAt: now,
     });
     // Fresh learner profile keyed by account id (not demo progress).
     await this.db.insert(learners).values({
       id: userId,
       userId,
-      displayName: pending.displayName || pending.candidateEmail.split("@")[0],
+      displayName: identity.name ?? admissionEmail.split("@")[0],
       avatarId: DEFAULT_AVATAR_ID,
       streak: 0,
       hearts: MAX_HEARTS,
       heartsUpdatedAt: now,
       xp: 0,
     });
-    await this.db
-      .update(pendingAdmissions)
-      .set({ status: "admitted", consumedAt: now })
-      .where(eq(pendingAdmissions.id, pending.id));
-
     const user = await this.getUser(userId);
     const session = await this.sessions.createSession(userId, this.config);
     return {
@@ -674,45 +460,6 @@ export class AuthService {
       user: toSessionUser(user!),
       token: session.token,
     };
-  }
-
-  private async issueMailboxCode(pendingId: string, email: string): Promise<void> {
-    const existing = await this.db
-      .select()
-      .from(mailboxVerifications)
-      .where(eq(mailboxVerifications.pendingAdmissionId, pendingId))
-      .orderBy(desc(mailboxVerifications.createdAt))
-      .limit(5);
-    const latest = existing[0];
-    if (
-      latest &&
-      latest.consumedAt == null &&
-      Date.now() - latest.lastSentAt < this.config.mailboxResendCooldownSeconds * 1000
-    ) {
-      throw new HttpException(AUTH_DENIAL_MESSAGES.rate_limited, HttpStatus.TOO_MANY_REQUESTS);
-    }
-
-    const code = generateNumericCode(6);
-    const now = Date.now();
-    await this.db.insert(mailboxVerifications).values({
-      id: randomUUID(),
-      pendingAdmissionId: pendingId,
-      email,
-      codeHash: hashVerificationCode(code, this.config.sessionSecret),
-      attempts: 0,
-      maxAttempts: this.config.mailboxMaxAttempts,
-      expiresAt: now + this.config.mailboxCodeTtlSeconds * 1000,
-      lastSentAt: now,
-      consumedAt: null,
-      createdAt: now,
-    });
-
-    await this.mail.send({
-      to: email,
-      subject: "Jose verification code",
-      text: `Your Jose APC mailbox verification code is ${code}. It expires soon. If you did not request this, ignore the message.`,
-      debugCode: code,
-    });
   }
 
   private async consumeOauthState(state: string) {
@@ -731,25 +478,6 @@ export class AuthService {
       .set({ consumedAt: Date.now() })
       .where(eq(oauthStates.state, state));
     return row;
-  }
-
-  private async requirePending(pendingId: string | undefined | null) {
-    if (!pendingId) {
-      throw new UnauthorizedException(AUTH_DENIAL_MESSAGES.expired);
-    }
-    const rows = await this.db
-      .select()
-      .from(pendingAdmissions)
-      .where(eq(pendingAdmissions.id, pendingId))
-      .limit(1);
-    const pending = rows[0];
-    if (!pending || pending.consumedAt != null || pending.expiresAt <= Date.now()) {
-      throw new GoneException(AUTH_DENIAL_MESSAGES.expired);
-    }
-    if (pending.status !== "pending_mailbox") {
-      throw new GoneException(AUTH_DENIAL_MESSAGES.expired);
-    }
-    return pending;
   }
 
   private async findIdentity(issuer: string, subject: string) {

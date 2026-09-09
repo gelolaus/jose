@@ -259,7 +259,7 @@ export const oauthStates = sqliteTable("oauth_states", {
   consumedAt: integer("consumed_at"),
 });
 
-/** Pending Microsoft identity awaiting APC mailbox verification / admission. */
+/** Legacy mailbox-verification records retained for backup/restore compatibility. */
 export const pendingAdmissions = sqliteTable("pending_admissions", {
   id: text("id").primaryKey(),
   provider: text("provider").notNull(),

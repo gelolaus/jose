@@ -1,10 +1,6 @@
-import type { Metadata } from "next";
-import { MailboxVerifyPanel } from "@/components/mailbox-verify-panel";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Verify mailbox",
-};
-
-export default function VerifyMailboxPage() {
-  return <MailboxVerifyPanel />;
+/** Legacy mailbox-verification URLs now return users to Microsoft sign-in. */
+export default function LegacyMailboxVerificationPage() {
+  redirect("/login");
 }
