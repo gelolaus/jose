@@ -21,7 +21,9 @@ import {
   teacherChallengeViewSchema,
   assignmentSchema,
   classReportSchema,
+  classRosterResponseSchema,
   classSummarySchema,
+  gradebookResponseSchema,
   studentClassMembershipSchema,
   bookmarksResponseSchema,
   bookmarkMutationResponseSchema,
@@ -631,6 +633,46 @@ export async function fetchClassReport(
     options,
   );
   return classReportSchema.parse(json);
+}
+
+export async function fetchGradebook(
+  classId: string,
+  query?: { includeArchived?: boolean; cursor?: string; limit?: number },
+  options?: ApiCallOptions,
+) {
+  const params = new URLSearchParams();
+  if (query?.includeArchived !== undefined)
+    params.set("includeArchived", String(query.includeArchived));
+  if (query?.cursor) params.set("cursor", query.cursor);
+  if (query?.limit !== undefined) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const json = await apiFetch(
+    `/teach/classes/${classId}/gradebook${qs ? `?${qs}` : ""}`,
+    undefined,
+    options,
+  );
+  return gradebookResponseSchema.parse(json);
+}
+
+export async function fetchClassRoster(
+  classId: string,
+  query?: { cursor?: string; limit?: number },
+  options?: ApiCallOptions,
+) {
+  const params = new URLSearchParams();
+  if (query?.cursor) params.set("cursor", query.cursor);
+  if (query?.limit !== undefined) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const json = await apiFetch(
+    `/teach/classes/${classId}/roster${qs ? `?${qs}` : ""}`,
+    undefined,
+    options,
+  );
+  return classRosterResponseSchema.parse(json);
+}
+
+export function gradebookCsvUrl(classId: string, assignmentId: string) {
+  return `/api/teach/classes/${classId}/assignments/${assignmentId}/export.csv`;
 }
 
 export async function fetchMyChallenges(options?: ApiCallOptions) {

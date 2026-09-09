@@ -19,6 +19,8 @@ import {
   fetchTeachClasses as baseFetchTeachClasses,
   fetchTeachClassAssignments as baseFetchTeachClassAssignments,
   fetchClassReport as baseFetchClassReport,
+  fetchGradebook as baseFetchGradebook,
+  fetchClassRoster as baseFetchClassRoster,
   fetchMyChallenges as baseFetchMyChallenges,
   fetchMyClasses as baseFetchMyClasses,
   fetchMyAssignments as baseFetchMyAssignments,
@@ -92,6 +94,20 @@ export async function fetchTeachClassAssignments(classId: string) {
 
 export async function fetchClassReport(classId: string, assignmentId: string) {
   return baseFetchClassReport(classId, assignmentId, await options());
+}
+
+export async function fetchGradebook(
+  classId: string,
+  query?: { includeArchived?: boolean; cursor?: string; limit?: number },
+) {
+  return baseFetchGradebook(classId, query, await options());
+}
+
+export async function fetchClassRoster(
+  classId: string,
+  query?: { cursor?: string; limit?: number },
+) {
+  return baseFetchClassRoster(classId, query, await options());
 }
 
 export async function fetchMyClasses() {

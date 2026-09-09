@@ -573,6 +573,25 @@ export const migration011NameAudit: Migration = {
   },
 };
 
+/** Gradebook lookups: assignments per class incl. archived, members incl. history, attempts by revision/time. */
+export const migration012GradebookIndexes: Migration = {
+  id: "012_gradebook_indexes",
+  async up(client) {
+    await client.execute(
+      `CREATE INDEX IF NOT EXISTS idx_assignments_class_archived ON assignments (class_id, archived_at, assigned_at)`,
+    );
+    await client.execute(
+      `CREATE INDEX IF NOT EXISTS idx_class_members_class_archived ON class_members (class_id, archived_at, joined_at)`,
+    );
+    await client.execute(
+      `CREATE INDEX IF NOT EXISTS idx_attempts_learner_revision_time ON attempts (learner_id, published_revision_id, created_at) WHERE status = 'finished' AND mode = 'assessment'`,
+    );
+    await client.execute(
+      `CREATE INDEX IF NOT EXISTS idx_learner_progress_learner_level ON learner_progress (learner_id, level_id)`,
+    );
+  },
+};
+
 export const MIGRATIONS: Migration[] = [
   migration001InitialSchema,
   migration002QueryIndexes,
@@ -585,6 +604,7 @@ export const MIGRATIONS: Migration[] = [
   migration009ClassChallenges,
   migration010BookmarksLivesRoles,
   migration011NameAudit,
+  migration012GradebookIndexes,
 ];
 
 export async function ensureColumn(

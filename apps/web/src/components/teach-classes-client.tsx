@@ -2,12 +2,12 @@
 
 import { TeachTitle } from "@/components/teach-shell";
 import { ApiError } from "@/lib/path-api";
+import { gradebookCsvUrl } from "@/lib/path-api";
 import {
-  assignmentSchema,
-  classReportSchema,
   classSummarySchema,
-  type ClassReport,
+  gradebookResponseSchema,
   type ClassSummary,
+  type GradebookResponse,
   type TeachModule,
 } from "@jose/shared";
 import { useMemo, useState } from "react";
@@ -32,22 +32,30 @@ async function teachFetch(path: string, init?: RequestInit) {
   return json;
 }
 
+function formatAttemptTime(iso: string | null) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString();
+}
+
 export function TeachClassesClient({
   initial,
   modules,
-  initialReports,
+  initialGradebook,
   initialError,
 }: {
   initial: ClassSummary[];
   modules: TeachModule[];
-  initialReports: Record<string, ClassReport>;
+  initialGradebook: Record<string, GradebookResponse>;
   initialError: string | null;
 }) {
   const [classes, setClasses] = useState<ClassSummary[]>(initial);
   const [name, setName] = useState("");
   const [inviteByClass, setInviteByClass] = useState<Record<string, string>>({});
   const [moduleByClass, setModuleByClass] = useState<Record<string, string>>({});
-  const [reportByClass, setReportByClass] = useState<Record<string, ClassReport>>(initialReports);
+  const [gradebookByClass, setGradebookByClass] =
+    useState<Record<string, GradebookResponse>>(initialGradebook);
   const [error, setError] = useState<string | null>(initialError);
   const [creating, setCreating] = useState(false);
   const [assigningId, setAssigningId] = useState<string | null>(null);
@@ -56,25 +64,22 @@ export function TeachClassesClient({
     [modules],
   );
 
-  async function loadReports(list: ClassSummary[]) {
-    const next: Record<string, ClassReport> = {};
+  async function loadGradebooks(list: ClassSummary[]) {
+    const next: Record<string, GradebookResponse> = {};
     for (const klass of list) {
-      const rows = assignmentSchema.array().parse(
-        await teachFetch(`/teach/classes/${klass.id}/assignments`),
-      );
-      const latest = rows[rows.length - 1];
-      if (!latest) continue;
-      next[klass.id] = classReportSchema.parse(
-        await teachFetch(`/teach/classes/${klass.id}/assignments/${latest.id}/report`),
+      next[klass.id] = gradebookResponseSchema.parse(
+        await teachFetch(
+          `/teach/classes/${klass.id}/gradebook?includeArchived=true`,
+        ),
       );
     }
-    setReportByClass(next);
+    setGradebookByClass(next);
   }
 
   async function reload() {
     const json = classSummarySchema.array().parse(await teachFetch("/teach/classes"));
     setClasses(json);
-    await loadReports(json);
+    await loadGradebooks(json);
   }
 
   return (
@@ -124,6 +129,7 @@ export function TeachClassesClient({
       <ul className="space-y-3">
         {classes.map((klass) => {
           const invite = inviteByClass[klass.id];
+          const gradebook = gradebookByClass[klass.id];
           return (
             <li key={klass.id} className="learning-card rounded-[1.5rem] p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -209,19 +215,18 @@ export function TeachClassesClient({
                     setError(null);
                     setAssigningId(klass.id);
                     try {
-                      const assignment = await teachFetch(
-                        `/teach/classes/${klass.id}/assignments`,
-                        {
-                          method: "POST",
-                          body: JSON.stringify({ moduleId }),
-                        },
+                      await teachFetch(`/teach/classes/${klass.id}/assignments`, {
+                        method: "POST",
+                        body: JSON.stringify({ moduleId }),
+                      });
+                      const gb = gradebookResponseSchema.parse(
+                        await teachFetch(
+                          `/teach/classes/${klass.id}/gradebook?includeArchived=true`,
+                        ),
                       );
-                      const json = await teachFetch(
-                        `/teach/classes/${klass.id}/assignments/${assignment.id}/report`,
-                      );
-                      setReportByClass((prev) => ({
+                      setGradebookByClass((prev) => ({
                         ...prev,
-                        [klass.id]: classReportSchema.parse(json),
+                        [klass.id]: gb,
                       }));
                     } catch (err) {
                       setError(err instanceof Error ? err.message : "Assign failed");
@@ -257,22 +262,100 @@ export function TeachClassesClient({
                   {assigningId === klass.id ? "Assigning…" : "Assign"}
                 </button>
               </form>
-              {reportByClass[klass.id] ? (
-                <div className="mt-4 rounded-2xl bg-slate-50 p-3">
-                  <p className="font-extrabold">{reportByClass[klass.id]!.moduleTitle}</p>
-                  <p className="text-sm font-bold text-slate-500">
-                    not started {reportByClass[klass.id]!.counts.notStarted} · in progress{" "}
-                    {reportByClass[klass.id]!.counts.inProgress} · completed{" "}
-                    {reportByClass[klass.id]!.counts.completed}
-                  </p>
-                  <ul className="mt-2 space-y-1">
-                    {reportByClass[klass.id]!.members.map((member) => (
-                      <li key={member.learnerId} className="text-sm font-semibold">
-                        {member.displayName}: {member.status.replace("_", " ")} (
-                        {member.completedCount}/{member.totalCount})
-                      </li>
+              {gradebook && gradebook.assignments.length > 0 ? (
+                <div className="mt-4 space-y-4">
+                  <nav
+                    aria-label={`Assignments for ${klass.name}`}
+                    className="flex flex-wrap gap-2"
+                  >
+                    {gradebook.assignments.map((assignment) => (
+                      <a
+                        key={assignment.id}
+                        href={`#assignment-${assignment.id}`}
+                        className="min-h-11 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-700"
+                      >
+                        {assignment.moduleTitle} · rev {assignment.revisionNumber}
+                        {assignment.archivedAt ? " · archived" : ""}
+                      </a>
                     ))}
-                  </ul>
+                  </nav>
+                  {gradebook.assignments.map((assignment) => (
+                    <section
+                      key={assignment.id}
+                      id={`assignment-${assignment.id}`}
+                      aria-label={`${assignment.moduleTitle} grade table`}
+                      className="rounded-2xl bg-slate-50 p-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="font-extrabold">
+                            {assignment.moduleTitle}
+                            {assignment.archivedAt ? " (archived)" : ""}
+                          </p>
+                          <p className="text-sm font-bold text-slate-500">
+                            rev {assignment.revisionNumber} · assigned{" "}
+                            {new Date(assignment.assignedAt).toLocaleDateString()} ·
+                            not started {assignment.counts.notStarted} · in
+                            progress {assignment.counts.inProgress} · completed{" "}
+                            {assignment.counts.completed}
+                          </p>
+                        </div>
+                        <a
+                          href={gradebookCsvUrl(klass.id, assignment.id)}
+                          download
+                          className="min-h-11 rounded-full bg-slate-900 px-3 py-1.5 text-xs font-extrabold text-white"
+                        >
+                          Download CSV
+                        </a>
+                      </div>
+                      <div className="mt-2 overflow-x-auto">
+                        <table className="w-full min-w-[880px] text-left text-sm">
+                          <thead>
+                            <tr className="font-extrabold text-slate-600">
+                              <th scope="col" className="px-2 py-1">Student name</th>
+                              <th scope="col" className="px-2 py-1">APC email</th>
+                              <th scope="col" className="px-2 py-1">Membership</th>
+                              <th scope="col" className="px-2 py-1">Progress</th>
+                              <th scope="col" className="px-2 py-1">Completed levels</th>
+                              <th scope="col" className="px-2 py-1">Best assessed score</th>
+                              <th scope="col" className="px-2 py-1">Latest assessed score</th>
+                              <th scope="col" className="px-2 py-1">Latest attempt time</th>
+                              <th scope="col" className="px-2 py-1">Assigned revision</th>
+                              <th scope="col" className="px-2 py-1">Assignment state</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {assignment.members.map((member) => (
+                              <tr
+                                key={member.learnerId}
+                                className="border-t border-slate-200 font-semibold"
+                              >
+                                <td className="px-2 py-1">{member.displayName}</td>
+                                <td className="px-2 py-1">{member.admissionEmail}</td>
+                                <td className="px-2 py-1">{member.membership}</td>
+                                <td className="px-2 py-1">{member.progress}</td>
+                                <td className="px-2 py-1">
+                                  {member.completedCount}/{member.totalCount}
+                                </td>
+                                <td className="px-2 py-1">{member.bestScore ?? "—"}</td>
+                                <td className="px-2 py-1">{member.latestScore ?? "—"}</td>
+                                <td
+                                  className="px-2 py-1"
+                                  title={member.latestAttemptAt ?? ""}
+                                >
+                                  {formatAttemptTime(member.latestAttemptAt)}
+                                </td>
+                                <td className="px-2 py-1">
+                                  rev {member.revisionNumber}
+                                </td>
+                                <td className="px-2 py-1">{member.assignmentState}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  ))}
                 </div>
               ) : null}
             </li>

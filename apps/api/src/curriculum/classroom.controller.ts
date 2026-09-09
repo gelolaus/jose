@@ -6,6 +6,7 @@ import {
   Header,
   Param,
   Post,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import type { SessionUser } from "@jose/shared";
@@ -53,8 +54,34 @@ export class ClassroomController {
 
   @Get("teach/classes/:id/assignments")
   @UseGuards(SessionAuthGuard, TeacherRoleGuard)
-  listAssignments(@CurrentUser() user: SessionUser, @Param("id") id: string) {
-    return this.classroom.listClassAssignments(user, id);
+  listAssignments(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Query() query: Record<string, unknown>,
+  ) {
+    const includeArchived =
+      query.includeArchived === "true" || query.includeArchived === true;
+    return this.classroom.listClassAssignments(user, id, { includeArchived });
+  }
+
+  @Get("teach/classes/:id/gradebook")
+  @UseGuards(SessionAuthGuard, TeacherRoleGuard)
+  gradebook(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Query() query: Record<string, unknown>,
+  ) {
+    return this.classroom.gradebook(user, id, query);
+  }
+
+  @Get("teach/classes/:id/roster")
+  @UseGuards(SessionAuthGuard, TeacherRoleGuard)
+  roster(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Query() query: Record<string, unknown>,
+  ) {
+    return this.classroom.classRoster(user, id, query);
   }
 
   @Get("teach/classes/:id/assignments/:assignmentId/report")
@@ -70,12 +97,19 @@ export class ClassroomController {
   @Get("teach/classes/:id/assignments/:assignmentId/export.csv")
   @UseGuards(SessionAuthGuard, TeacherRoleGuard)
   @Header("content-type", "text/csv; charset=utf-8")
+  @Header("content-disposition", "attachment; filename=gradebook.csv")
   async exportCsv(
     @CurrentUser() user: SessionUser,
     @Param("id") id: string,
     @Param("assignmentId") assignmentId: string,
+    @Query() query: Record<string, unknown>,
   ) {
-    const exported = await this.classroom.exportClassReportCsv(user, id, assignmentId);
+    const exported = await this.classroom.exportClassReportCsv(
+      user,
+      id,
+      assignmentId,
+      query,
+    );
     return exported.csv;
   }
 
