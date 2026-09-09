@@ -4,7 +4,7 @@ import { loadJoseEnv } from "../config/env";
 import { loadApiEnvFile } from "../config/load-env-file";
 import { restoreLogicalBackup } from "./backup";
 import { openDatabaseClient, resolveDatabaseUrl } from "./database.service";
-import { runMigrations } from "./migrate";
+import { isRemoteLibsqlUrl, runMigrations } from "./migrate";
 
 async function main() {
   loadApiEnvFile();
@@ -25,7 +25,7 @@ async function main() {
 
   const client = openDatabaseClient(url);
   try {
-    await runMigrations(client);
+    await runMigrations(client, { remoteLibsql: isRemoteLibsqlUrl(url) });
     if (from.endsWith(".sqlite")) {
       throw new Error(
         "SQLite file restore: copy the backup file over JOSE_DATABASE_URL (after stopping the API), then run db:migrate. For cross-environment restore use a --json logical backup.",

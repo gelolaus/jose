@@ -8,7 +8,7 @@ import {
   writeLogicalBackup,
 } from "./backup";
 import { openDatabaseClient, resolveDatabaseUrl } from "./database.service";
-import { runMigrations } from "./migrate";
+import { isRemoteLibsqlUrl, runMigrations } from "./migrate";
 
 async function main() {
   loadApiEnvFile();
@@ -27,7 +27,7 @@ async function main() {
 
   const client = openDatabaseClient(url);
   try {
-    await runMigrations(client);
+    await runMigrations(client, { remoteLibsql: isRemoteLibsqlUrl(url) });
     if (preferJson) {
       const destination = out ?? defaultBackupPath("json");
       const result = await writeLogicalBackup(client, url, destination);

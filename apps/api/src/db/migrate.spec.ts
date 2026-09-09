@@ -6,7 +6,11 @@ import { copyFileSync, existsSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runMigrations, listAppliedMigrations } from "./migrate";
+import {
+  configureMigrationConnection,
+  runMigrations,
+  listAppliedMigrations,
+} from "./migrate";
 import {
   backupFileDatabase,
   exportLogicalBackup,
@@ -96,6 +100,20 @@ describe("migrations and backup/restore", () => {
 
   afterAll(async () => {
     await removeFixtureDir(rootDir);
+  });
+
+  it("does not send local journal tuning pragmas to a hosted libSQL connection", async () => {
+    const executed: string[] = [];
+    const client = {
+      execute: async (sql: string) => {
+        executed.push(sql);
+        return { rows: [] };
+      },
+    } as unknown as Client;
+
+    await configureMigrationConnection(client, { remoteLibsql: true });
+
+    expect(executed).toEqual(["PRAGMA foreign_keys = ON"]);
   });
 
   it("upgrades an older representative database without losing attempts", async () => {

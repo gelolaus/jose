@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import { loadJoseEnv } from "../config/env";
 import { loadApiEnvFile } from "../config/load-env-file";
 import { openDatabaseClient, resolveDatabaseUrl } from "./database.service";
-import { runMigrations } from "./migrate";
+import { isRemoteLibsqlUrl, runMigrations } from "./migrate";
 
 async function main() {
   loadApiEnvFile();
@@ -18,7 +18,7 @@ async function main() {
 
   const client = openDatabaseClient(url);
   try {
-    const results = await runMigrations(client);
+    const results = await runMigrations(client, { remoteLibsql: isRemoteLibsqlUrl(url) });
     for (const result of results) {
       console.log(`${result.status}: ${result.id}`);
     }

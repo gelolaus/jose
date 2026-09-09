@@ -5,7 +5,7 @@ import { ARLAUS_ADMIN_EMAIL } from "@jose/shared";
 import { loadJoseEnv } from "../config/env";
 import { loadApiEnvFile } from "../config/load-env-file";
 import { openDatabaseClient, resolveDatabaseUrl } from "../db/database.service";
-import { runMigrations } from "../db/migrate";
+import { isRemoteLibsqlUrl, runMigrations } from "../db/migrate";
 import * as schema from "../db/schema";
 
 /**
@@ -47,7 +47,7 @@ async function main() {
   const url = resolveDatabaseUrl();
   const client = openDatabaseClient(url);
   try {
-    await runMigrations(client);
+    await runMigrations(client, { remoteLibsql: isRemoteLibsqlUrl(url) });
     const db = drizzle(client, { schema });
     const normalized = ARLAUS_ADMIN_EMAIL.trim().toLowerCase();
     const rows = await db.select().from(schema.users).where(eq(schema.users.admissionEmail, normalized)).limit(1);

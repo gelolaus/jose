@@ -11,6 +11,27 @@ export type MigrationResult = {
   status: "applied" | "skipped";
 };
 
+export type MigrationConnectionOptions = {
+  /** Hosted libSQL manages journal mode and write waiting itself. */
+  remoteLibsql?: boolean;
+};
+
+/** libsql:// is the hosted connection form used by Turso and remote libSQL. */
+export function isRemoteLibsqlUrl(url: string): boolean {
+  return url.trim().toLowerCase().startsWith("libsql://");
+}
+
+export async function configureMigrationConnection(
+  client: Client,
+  options: MigrationConnectionOptions = {},
+): Promise<void> {
+  await client.execute("PRAGMA foreign_keys = ON");
+  if (options.remoteLibsql) return;
+
+  await client.execute("PRAGMA journal_mode = WAL");
+  await client.execute("PRAGMA busy_timeout = 5000");
+}
+
 export async function ensureMigrationHistory(client: Client) {
   await client.execute(HISTORY_TABLE);
 }
@@ -27,10 +48,11 @@ export async function listAppliedMigrations(client: Client): Promise<string[]> {
  * Apply pending versioned migrations. Safe to re-run.
  * Deployments should invoke this as a controlled step (`npm run db:migrate`).
  */
-export async function runMigrations(client: Client): Promise<MigrationResult[]> {
-  await client.execute("PRAGMA foreign_keys = ON");
-  await client.execute("PRAGMA journal_mode = WAL");
-  await client.execute("PRAGMA busy_timeout = 5000");
+export async function runMigrations(
+  client: Client,
+  options: MigrationConnectionOptions = {},
+): Promise<MigrationResult[]> {
+  await configureMigrationConnection(client, options);
   await ensureMigrationHistory(client);
   const applied = new Set(await listAppliedMigrations(client));
   const results: MigrationResult[] = [];
