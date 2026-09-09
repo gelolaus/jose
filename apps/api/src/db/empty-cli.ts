@@ -14,9 +14,13 @@ async function main() {
   const backupOut = process.argv
     .find((a) => a.startsWith("--backup-out="))
     ?.slice("--backup-out=".length);
-  const allowRemote =
-    process.argv.includes("--allow-remote") &&
-    process.env.JOSE_ALLOW_EMPTY_REMOTE === "true";
+  if (process.argv.includes("--allow-remote") || process.env.JOSE_ALLOW_EMPTY_REMOTE) {
+    console.error(
+      "db:empty is local-only; --allow-remote / JOSE_ALLOW_EMPTY_REMOTE are no longer supported. For Turso, create a new empty database and follow docs/ops/empty-start-and-cutover.md.",
+    );
+    process.exitCode = 1;
+    return;
+  }
   const allowProduction = process.env.JOSE_ALLOW_EMPTY_PRODUCTION === "true";
   const url = resolveDatabaseUrl();
   if (!process.env.JOSE_DATABASE_URL?.trim()) {
@@ -27,7 +31,7 @@ async function main() {
   await assertEmptyAllowed({
     databaseUrl: url,
     confirm,
-    allowRemote,
+    allowRemote: false,
     isProduction: isProductionEnv(process.env),
     allowProduction,
   });

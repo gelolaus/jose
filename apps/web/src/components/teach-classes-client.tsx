@@ -4,8 +4,10 @@ import { TeachTitle } from "@/components/teach-shell";
 import { ApiError } from "@/lib/path-api";
 import { gradebookCsvUrl } from "@/lib/path-api";
 import {
+  classRosterResponseSchema,
   classSummarySchema,
   gradebookResponseSchema,
+  type ClassRosterResponse,
   type ClassSummary,
   type GradebookResponse,
   type TeachModule,
@@ -43,11 +45,13 @@ export function TeachClassesClient({
   initial,
   modules,
   initialGradebook,
+  initialRoster,
   initialError,
 }: {
   initial: ClassSummary[];
   modules: TeachModule[];
   initialGradebook: Record<string, GradebookResponse>;
+  initialRoster?: Record<string, ClassRosterResponse>;
   initialError: string | null;
 }) {
   const [classes, setClasses] = useState<ClassSummary[]>(initial);
@@ -56,9 +60,13 @@ export function TeachClassesClient({
   const [moduleByClass, setModuleByClass] = useState<Record<string, string>>({});
   const [gradebookByClass, setGradebookByClass] =
     useState<Record<string, GradebookResponse>>(initialGradebook);
+  const [rosterByClass, setRosterByClass] = useState<Record<string, ClassRosterResponse>>(
+    initialRoster ?? {},
+  );
   const [error, setError] = useState<string | null>(initialError);
   const [creating, setCreating] = useState(false);
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [loadingMoreByClass, setLoadingMoreByClass] = useState<Record<string, boolean>>({});
   const published = useMemo(
     () => modules.filter((mod) => mod.published),
     [modules],
@@ -66,14 +74,51 @@ export function TeachClassesClient({
 
   async function loadGradebooks(list: ClassSummary[]) {
     const next: Record<string, GradebookResponse> = {};
+    const rosters: Record<string, ClassRosterResponse> = {};
     for (const klass of list) {
       next[klass.id] = gradebookResponseSchema.parse(
         await teachFetch(
-          `/teach/classes/${klass.id}/gradebook?includeArchived=true`,
+          `/teach/classes/${klass.id}/gradebook?includeArchived=true&limit=20`,
         ),
       );
+      try {
+        rosters[klass.id] = classRosterResponseSchema.parse(
+          await teachFetch(`/teach/classes/${klass.id}/roster?limit=100`),
+        );
+      } catch {
+        // Roster is teacher-owned; ignore if unavailable (error surfaces elsewhere).
+      }
     }
     setGradebookByClass(next);
+    setRosterByClass((prev) => ({ ...prev, ...rosters }));
+  }
+
+  async function loadMoreAssignments(classId: string) {
+    const current = gradebookByClass[classId];
+    if (!current?.nextCursor || loadingMoreByClass[classId]) return;
+    setLoadingMoreByClass((prev) => ({ ...prev, [classId]: true }));
+    try {
+      const next = gradebookResponseSchema.parse(
+        await teachFetch(
+          `/teach/classes/${classId}/gradebook?includeArchived=true&limit=20&cursor=${encodeURIComponent(current.nextCursor)}`,
+        ),
+      );
+      setGradebookByClass((prev) => {
+        const existing = prev[classId];
+        if (!existing) return { ...prev, [classId]: next };
+        return {
+          ...prev,
+          [classId]: {
+            ...next,
+            assignments: [...existing.assignments, ...next.assignments],
+          },
+        };
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Load more failed");
+    } finally {
+      setLoadingMoreByClass((prev) => ({ ...prev, [classId]: false }));
+    }
   }
 
   async function reload() {
@@ -130,6 +175,7 @@ export function TeachClassesClient({
         {classes.map((klass) => {
           const invite = inviteByClass[klass.id];
           const gradebook = gradebookByClass[klass.id];
+          const roster = rosterByClass[klass.id];
           return (
             <li key={klass.id} className="learning-card rounded-[1.5rem] p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -262,6 +308,47 @@ export function TeachClassesClient({
                   {assigningId === klass.id ? "Assigning…" : "Assign"}
                 </button>
               </form>
+              <section
+                aria-label={`Roster for ${klass.name}`}
+                className="mt-4 rounded-2xl bg-white p-3 ring-1 ring-black/10"
+              >
+                <p className="font-extrabold">Roster · {klass.memberCount} members</p>
+                {roster && roster.members.length > 0 ? (
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="w-full min-w-[520px] text-left text-sm">
+                      <thead>
+                        <tr className="font-extrabold text-slate-600">
+                          <th scope="col" className="px-2 py-1">Student name</th>
+                          <th scope="col" className="px-2 py-1">APC email</th>
+                          <th scope="col" className="px-2 py-1">Membership</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {roster.members.map((member) => (
+                          <tr
+                            key={member.learnerId}
+                            className="border-t border-slate-200 font-semibold"
+                          >
+                            <td className="px-2 py-1">{member.displayName}</td>
+                            <td className="px-2 py-1">{member.admissionEmail}</td>
+                            <td className="px-2 py-1">{member.membership}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {roster.nextCursor ? (
+                      <p className="mt-2 text-xs font-bold text-slate-500">
+                        Showing {roster.members.length} of {klass.memberCount} · refine in gradebook
+                        export
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    No students yet. Share the invite code to grow this roster.
+                  </p>
+                )}
+              </section>
               {gradebook && gradebook.assignments.length > 0 ? (
                 <div className="mt-4 space-y-4">
                   <nav
@@ -356,6 +443,16 @@ export function TeachClassesClient({
                       </div>
                     </section>
                   ))}
+                  {gradebook.nextCursor ? (
+                    <button
+                      type="button"
+                      disabled={Boolean(loadingMoreByClass[klass.id])}
+                      onClick={() => void loadMoreAssignments(klass.id)}
+                      className="min-h-11 rounded-full bg-slate-100 px-4 py-2 text-xs font-extrabold text-slate-700 disabled:opacity-60"
+                    >
+                      {loadingMoreByClass[klass.id] ? "Loading…" : "Load more assignments"}
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
             </li>

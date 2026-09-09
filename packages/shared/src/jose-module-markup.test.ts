@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseJoseModuleMarkup } from "./jose-module-markup";
+import {
+  JMM_MAX_SOURCE_BYTES,
+  jmmImportCommitBodySchema,
+  jmmSourceByteLength,
+  parseJoseModuleMarkup,
+} from "./jose-module-markup";
 
 const MINIMAL = `<<<JoseModule version="1">>>
 title: The Propaganda Movement
@@ -79,6 +84,39 @@ describe("jmm parser", () => {
   it("rejects oversized input", () => {
     const big = `<<<JoseModule version="1">>>\n${"x".repeat(200_001)}`;
     expect(parseJoseModuleMarkup(big).ok).toBe(false);
+  });
+
+  it("measures UTF-8 bytes, not JS chars", () => {
+    // "é" is 1 char but 2 bytes; emoji is 2 chars (surrogate) but 4 bytes.
+    expect(jmmSourceByteLength("é")).toBe(2);
+    expect(jmmSourceByteLength("😀")).toBe(4);
+    // Char count below limit but byte count above must be rejected.
+    const prefix = `<<<JoseModule version="1">>>\ntitle: T\nsubtitle: S\ncoverColor: #22C55E\nobjectives:\n  - O\n\n<<<Section>>>\ntitle: S\nsubtitle: S\nthemeColor: #38BDF8\n\n<<<Lesson>>>\ntitle: L\n\n<<<Text markdown>>>\n`;
+    const suffix = `\n<<<Text/>>>\n<<<Lesson/>>>\n<<<Section/>>>\n<<<JoseModule/>>>`;
+    const overhead = jmmSourceByteLength(prefix + suffix);
+    const remaining = JMM_MAX_SOURCE_BYTES - overhead;
+    // Fill with 2-byte chars so char length stays under limit while bytes exceed it.
+    const charsNeeded = Math.floor(remaining / 2) + 10;
+    const multibyte = prefix + "é".repeat(charsNeeded) + suffix;
+    expect(multibyte.length).toBeLessThan(JMM_MAX_SOURCE_BYTES);
+    expect(jmmSourceByteLength(multibyte)).toBeGreaterThan(JMM_MAX_SOURCE_BYTES);
+    expect(parseJoseModuleMarkup(multibyte).ok).toBe(false);
+    expect(jmmImportCommitBodySchema.safeParse({ source: multibyte }).success).toBe(false);
+  });
+
+  it("accepts sources above 64 KiB up to the documented maximum", () => {
+    const header = `<<<JoseModule version="1">>>\ntitle: Big\nsubtitle: Subtitle for large import\ncoverColor: #22C55E\nobjectives:\n  - O\n`;
+    let body = "";
+    // 4 sections x 18k text = ~72k total, each block under JMM_MAX_TEXT_CHARS.
+    for (let s = 0; s < 4; s++) {
+      body += `\n<<<Section>>>\ntitle: Sec ${s}\nsubtitle: Sub ${s}\nthemeColor: #38BDF8\n\n<<<Lesson>>>\ntitle: Lesson ${s}\n\n<<<Text markdown>>>\n${"a".repeat(18_000)}\n<<<Text/>>>\n<<<Lesson/>>>\n<<<Section/>>>`;
+    }
+    const source = `${header}${body}\n<<<JoseModule/>>>`;
+    expect(jmmSourceByteLength(source)).toBeGreaterThan(64 * 1024);
+    expect(jmmSourceByteLength(source)).toBeLessThanOrEqual(JMM_MAX_SOURCE_BYTES);
+    const parsed = parseJoseModuleMarkup(source);
+    expect(parsed.ok).toBe(true);
+    expect(jmmImportCommitBodySchema.safeParse({ source }).success).toBe(true);
   });
 
   it("parses every lesson block tag", () => {

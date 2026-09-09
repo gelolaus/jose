@@ -189,7 +189,9 @@ export function loadJoseEnv(env: NodeJS.ProcessEnv = process.env): JoseEnv {
     databaseAuthToken,
     allowedOrigins,
     trustProxy: parseTrustProxy(env.JOSE_TRUST_PROXY),
-    maxBodyBytes: parsePositiveInt(env.JOSE_MAX_BODY_BYTES, 64 * 1024, "JOSE_MAX_BODY_BYTES"),
+    // Deliberate global limit: must safely carry the documented JMM maximum
+    // (200_000 UTF-8 bytes) plus JSON envelope/escaping overhead.
+    maxBodyBytes: parsePositiveInt(env.JOSE_MAX_BODY_BYTES, 256 * 1024, "JOSE_MAX_BODY_BYTES"),
     rateLimitWindowMs: parsePositiveInt(
       env.JOSE_RATE_LIMIT_WINDOW_MS,
       60_000,

@@ -25,14 +25,17 @@ never deletes users, learners, attempts, revisions, or history.
    into a scratch database, then `/ready` + one teacher/student path.
 5. Only then proceed with the new empty database.
 
-## Guarded local `db:empty` (never automatic)
+## Guarded local `db:empty` (never automatic, local-only, atomic)
 
 `db:empty` is for disposable local `file:` databases only. It never runs on
 startup or deploy, requires an explicit `JOSE_DATABASE_URL`, the exact phrase
-`EMPTY-JOSE-DATABASE`, and writes a preflight backup first. It refuses remote
-`libsql://` URLs unless `--allow-remote` plus `JOSE_ALLOW_EMPTY_REMOTE=true`
-are both present, and refuses production unless
-`JOSE_ALLOW_EMPTY_PRODUCTION=true` is set.
+`EMPTY-JOSE-DATABASE`, and writes a preflight backup first. Remote
+`libsql://`/`https://`/`wss://` URLs are always refused — remote-empty support
+was removed. For hosted databases, create a fresh empty Turso database and
+follow the cutover above; never empty a remote in place. Production is refused
+unless `JOSE_ALLOW_EMPTY_PRODUCTION=true` is set. Deletes run inside a single
+`BEGIN`/`COMMIT` transaction (rolled back on any failure) before migrations
+are re-applied.
 
 ```bash
 JOSE_DATABASE_URL="file:./apps/api/data/dev.sqlite" \

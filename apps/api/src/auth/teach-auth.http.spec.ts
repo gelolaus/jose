@@ -423,6 +423,35 @@ describe("Teacher studio authorization over HTTP (issues #3 and #4)", () => {
     expect(audit.newName).toBe("Fixed Name");
   });
 
+  it("rejects invalid name corrections without partial writes", async () => {
+    const before = await request(app.getHttpServer())
+      .get("/auth/me")
+      .set("Cookie", student.cookie)
+      .expect(200);
+    const priorName = before.body.user.displayName as string;
+    const auditBefore = await database.db.select().from(userNameAudit);
+
+    await request(app.getHttpServer())
+      .post("/admin/users/name-correction")
+      .set("Cookie", admin.cookie)
+      .send({ email: student.admissionEmail, displayName: "   " })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post("/admin/users/name-correction")
+      .set("Cookie", admin.cookie)
+      .send({ email: student.admissionEmail, displayName: "x".repeat(81) })
+      .expect(400);
+
+    const after = await request(app.getHttpServer())
+      .get("/auth/me")
+      .set("Cookie", student.cookie)
+      .expect(200);
+    expect(after.body.user.displayName).toBe(priorName);
+    expect(after.body.learner.displayName).toBe(priorName);
+    const auditAfter = await database.db.select().from(userNameAudit);
+    expect(auditAfter.length).toBe(auditBefore.length);
+  });
+
   it("promotes the pinned Arlaus account idempotently and lets admins enter teach", async () => {
     const usersService = moduleRef.get(UsersService);
     const arlaus = await createTestAccount(database, {

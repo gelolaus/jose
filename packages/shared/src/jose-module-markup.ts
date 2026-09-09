@@ -17,6 +17,14 @@ export const JMM_MAX_TEXT_CHARS = 20_000;
 export const JMM_MAX_IMAGES = 30;
 export const JMM_MAX_GAME_BYTES = 60_000;
 
+/** UTF-8 byte length (not JS string length) for enforcing byte limits. */
+export function jmmSourceByteLength(source: string): number {
+  if (typeof Buffer !== "undefined" && typeof Buffer.byteLength === "function") {
+    return Buffer.byteLength(source, "utf8");
+  }
+  return new TextEncoder().encode(source).length;
+}
+
 const ACTIVE_JMM_GAME_TYPES = ["quiz", "memory", "timeline", "blank", "sort"] as const;
 type ActiveJmmGameType = (typeof ACTIVE_JMM_GAME_TYPES)[number];
 
@@ -89,7 +97,12 @@ export type JmmParseResult = {
 };
 
 export const jmmImportCommitBodySchema = z.object({
-  source: z.string().min(1).max(JMM_MAX_SOURCE_BYTES),
+  source: z
+    .string()
+    .min(1)
+    .refine((s) => jmmSourceByteLength(s) <= JMM_MAX_SOURCE_BYTES, {
+      message: `Import exceeds ${JMM_MAX_SOURCE_BYTES} bytes`,
+    }),
 });
 
 export const jmmImportPreviewResponseSchema = z.object({
@@ -271,7 +284,7 @@ type StackFrame = {
 
 export function parseJoseModuleMarkup(source: string): JmmParseResult {
   const errors: JmmError[] = [];
-  if (source.length > JMM_MAX_SOURCE_BYTES) {
+  if (jmmSourceByteLength(source) > JMM_MAX_SOURCE_BYTES) {
     return {
       ok: false,
       errors: [
@@ -595,7 +608,7 @@ function buildPreview(moduleFrame: StackFrame, source: string): JmmParseResult {
         // Body = headerText remainder is title line; actual JSON lives in bodyText
         // plus any JSON accidentally placed in headerText after title. Combine.
         const rawBody = extractGameJson(lvl);
-        if (rawBody.length > JMM_MAX_GAME_BYTES) {
+        if (jmmSourceByteLength(rawBody) > JMM_MAX_GAME_BYTES) {
           errors.push(err(`Game payload exceeds ${JMM_MAX_GAME_BYTES} bytes`, lvl, `sections.${si}.levels.${li}.game`));
           continue;
         }

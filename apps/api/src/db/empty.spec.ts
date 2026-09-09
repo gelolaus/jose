@@ -44,6 +44,59 @@ describe("guarded empty", () => {
     ).rejects.toThrow(/remote/i);
   });
 
+  it("is local-only: refuses remote even with allowRemote true", async () => {
+    await expect(
+      assertEmptyAllowed({
+        databaseUrl: "libsql://demo.turso.io",
+        confirm: EMPTY_CONFIRM_PHRASE,
+        allowRemote: true,
+        isProduction: false,
+      }),
+    ).rejects.toThrow(/local-only|remote/i);
+    await expect(
+      assertEmptyAllowed({
+        databaseUrl: "https://demo.turso.io",
+        confirm: EMPTY_CONFIRM_PHRASE,
+        allowRemote: true,
+        isProduction: false,
+      }),
+    ).rejects.toThrow(/local-only|remote/i);
+  });
+
+  it("rolls back when a delete fails (atomic)", async () => {
+    const opened = openTmp();
+    try {
+      await runMigrations(opened.client);
+      await opened.db.insert(learners).values({
+        id: "atomic-keep",
+        displayName: "Atomic",
+        streak: 0,
+        hearts: 5,
+        heartsUpdatedAt: 0,
+        xp: 0,
+      });
+      // Fault injection: fail the second DELETE to prove atomic rollback.
+      const original = opened.client.execute.bind(opened.client);
+      let calls = 0;
+      (opened.client as unknown as { execute: typeof original }).execute = (async (
+        ...args: Parameters<typeof original>
+      ) => {
+        const sql = typeof args[0] === "string" ? args[0] : (args[0] as { sql: string }).sql;
+        if (typeof sql === "string" && sql.startsWith("DELETE FROM")) {
+          calls += 1;
+          if (calls === 2) throw new Error("injected delete failure");
+        }
+        return original(...args);
+      }) as typeof original;
+      await expect(emptyDatabase(opened.client)).rejects.toThrow(/injected/);
+      (opened.client as unknown as { execute: typeof original }).execute = original;
+      const rows = await opened.db.select().from(learners);
+      expect(rows.some((r) => r.id === "atomic-keep")).toBe(true);
+    } finally {
+      opened.client.close();
+    }
+  });
+
   it("empties a file database but preserves migrations", async () => {
     const opened = openTmp();
     try {

@@ -6,6 +6,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
+import { z } from "zod";
 import {
   createAssignmentBodySchema,
   createClassBodySchema,
@@ -317,7 +318,10 @@ export class ClassroomService {
       start = idx >= 0 ? idx + 1 : 0;
     }
     const page = visible.slice(start, start + query.limit);
-    if (page.length === 0) return { classId, assignments: [] };
+    const last = page[page.length - 1];
+    const nextCursor =
+      last && start + query.limit < visible.length ? last.id : null;
+    if (page.length === 0) return { classId, assignments: [], nextCursor: null };
 
     const memberRows = await this.db
       .select()
@@ -379,7 +383,60 @@ export class ClassroomService {
         counts,
       });
     }
-    return { classId, assignments: tables };
+    return { classId, assignments: tables, nextCursor };
+  }
+
+  private async buildGradebookTableForAssignment(
+    row: typeof assignments.$inferSelect,
+  ) {
+    const memberRows = await this.db
+      .select()
+      .from(classMembers)
+      .where(eq(classMembers.classId, row.classId));
+    const learnerIds = [...new Set(memberRows.map((m) => m.learnerId))];
+    const [learnerMap, userMap, progressMap, attemptMap, revisionMap, moduleMap] =
+      await Promise.all([
+        this.batchLearners(learnerIds),
+        this.batchUsers(learnerIds),
+        this.batchProgress(learnerIds),
+        this.batchAssessmentAttempts(learnerIds),
+        this.batchRevisions([row.contentRevisionId]),
+        this.batchModules([row.moduleId]),
+      ]);
+    const levelIds = await this.revisionLevelIdsCached(row.contentRevisionId, revisionMap);
+    const members = memberRows.map((member) =>
+      this.buildGradebookRow({
+        member,
+        assignment: row,
+        levelIds,
+        learnerMap,
+        userMap,
+        progressMap,
+        attemptMap,
+        revisionMap,
+      }),
+    );
+    members.sort((a, b) =>
+      a.joinedAt < b.joinedAt ? -1 : a.joinedAt > b.joinedAt ? 1 : a.learnerId.localeCompare(b.learnerId),
+    );
+    const counts = {
+      notStarted: members.filter((m) => m.status === "not_started").length,
+      inProgress: members.filter((m) => m.status === "in_progress").length,
+      completed: members.filter((m) => m.status === "completed").length,
+    };
+    return {
+      id: row.id,
+      classId: row.classId,
+      moduleId: row.moduleId,
+      moduleTitle: moduleMap.get(row.moduleId) ?? row.moduleId,
+      contentRevisionId: row.contentRevisionId,
+      revisionNumber: revisionMap.get(row.contentRevisionId)?.revisionNumber ?? 0,
+      dueAt: row.dueAt,
+      assignedAt: row.assignedAt,
+      archivedAt: row.archivedAt,
+      members,
+      counts,
+    };
   }
 
   async classRoster(
@@ -518,17 +575,17 @@ export class ClassroomService {
     assignmentId: string,
     rawQuery?: unknown,
   ) {
-    const parsed = gradebookQuerySchema
-      .pick({ limit: true })
-      .extend({ maxRows: gradebookQuerySchema.shape.limit })
-      .safeParse(rawQuery ?? {});
-    const maxRows = parsed.success ? parsed.data.maxRows : 2000;
-    const gb = await this.gradebook(user, classId, {
-      includeArchived: true,
-      limit: 100,
+    const maxRowsSchema = z.object({
+      maxRows: z.coerce.number().int().min(1).max(5000).default(2000),
     });
-    const table = gb.assignments.find((a) => a.id === assignmentId);
-    if (!table) throw new NotFoundException("Assignment not found");
+    const parsed = maxRowsSchema.safeParse(rawQuery ?? {});
+    const maxRows = parsed.success ? parsed.data.maxRows : 2000;
+    await this.requireOwnedClass(user, classId);
+    const assignment = await this.requireAssignment(assignmentId);
+    if (assignment.classId !== classId) {
+      throw new NotFoundException("Assignment not found");
+    }
+    const table = await this.buildGradebookTableForAssignment(assignment);
     if (table.members.length > maxRows) {
       throw new BadRequestException(
         `Export exceeds ${maxRows} rows; narrow the class roster first`,
@@ -602,7 +659,7 @@ export class ClassroomService {
       .from(moduleRevisions)
       .where(eq(moduleRevisions.id, row.contentRevisionId));
     const levelIds = await this.revisionLevelIds(row.contentRevisionId);
-    const completed = await this.completedSet(learnerId);
+    const completed = await this.completedSetForRevision(learnerId, row.contentRevisionId);
     const completedCount = levelIds.filter((id) => completed.has(id)).length;
     const status =
       completedCount <= 0
@@ -635,7 +692,10 @@ export class ClassroomService {
   ) {
     const [learner] = await this.db.select().from(learners).where(eq(learners.id, learnerId));
     const levelIds = await this.revisionLevelIds(assignment.contentRevisionId);
-    const completed = await this.completedSet(learnerId);
+    const completed = await this.completedSetForRevision(
+      learnerId,
+      assignment.contentRevisionId,
+    );
     const completedCount = levelIds.filter((id) => completed.has(id)).length;
     const status =
       completedCount <= 0
@@ -699,7 +759,8 @@ export class ClassroomService {
       input;
     const learner = learnerMap.get(member.learnerId);
     const account = userMap.get(member.learnerId);
-    const completed = progressMap.get(member.learnerId) ?? new Set<string>();
+    const progressKey = `${member.learnerId}::${assignment.contentRevisionId}`;
+    const completed = progressMap.get(progressKey) ?? new Set<string>();
     const completedCount = levelIds.filter((id) => completed.has(id)).length;
     const status =
       completedCount <= 0
@@ -793,9 +854,14 @@ export class ClassroomService {
       .from(learnerProgress)
       .where(inArray(learnerProgress.learnerId, learnerIds));
     for (const row of rows) {
-      const set = map.get(row.learnerId) ?? new Set<string>();
+      // Key by learner + revision so overlapping level IDs in distinct
+      // revisions never leak. Rows without a revision are preserved in the
+      // table but excluded from revision-scoped counts.
+      if (!row.publishedRevisionId) continue;
+      const key = `${row.learnerId}::${row.publishedRevisionId}`;
+      const set = map.get(key) ?? new Set<string>();
       set.add(row.levelId);
-      map.set(row.learnerId, set);
+      map.set(key, set);
     }
     return map;
   }
@@ -921,6 +987,19 @@ export class ClassroomService {
       .select()
       .from(learnerProgress)
       .where(eq(learnerProgress.learnerId, learnerId));
+    return new Set(rows.map((row) => row.levelId));
+  }
+
+  private async completedSetForRevision(learnerId: string, revisionId: string) {
+    const rows = await this.db
+      .select()
+      .from(learnerProgress)
+      .where(
+        and(
+          eq(learnerProgress.learnerId, learnerId),
+          eq(learnerProgress.publishedRevisionId, revisionId),
+        ),
+      );
     return new Set(rows.map((row) => row.levelId));
   }
 

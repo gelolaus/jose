@@ -13,6 +13,7 @@ import {
   assignments,
   attempts,
   classMembers,
+  learnerProgress,
   practiceAttempts,
 } from "../db/schema";
 import {
@@ -381,6 +382,47 @@ describe("gradebook batch 2", () => {
     expect(row2.bestNumerator).toBeNull();
   });
 
+  it("revision-scoped progress does not leak across overlapping level IDs", async () => {
+    const fresh = await createTestAccount(database, {
+      admissionEmail: `revprog.${Date.now()}@student.apc.edu.ph`,
+      displayName: "Rev Progress Student",
+    });
+    const klass = await classroom.createClass(teacher, { name: "GB-REVPROG" });
+    await classroom.joinClass(asUser(fresh), { inviteCode: klass.inviteCode! });
+    const first = await classroom.createAssignment(teacher, klass.id, {
+      moduleId: modId,
+      contentRevisionId: rev1,
+    });
+    const second = await classroom.createAssignment(teacher, klass.id, {
+      moduleId: modId,
+      contentRevisionId: rev2,
+    });
+    // Same level ID exists in both revisions (overlapping snapshot).
+    await database.db.insert(learnerProgress).values({
+      learnerId: fresh.learnerId,
+      levelId: lessonLevelId,
+      completedAt: Date.now(),
+      publishedRevisionId: rev1,
+    });
+    const gb = await classroom.gradebook(teacher, klass.id, {
+      includeArchived: true,
+      limit: 20,
+    });
+    const r1 = gb.assignments.find((a) => a.id === first.id)!;
+    const r2 = gb.assignments.find((a) => a.id === second.id)!;
+    const row1 = r1.members.find((m) => m.learnerId === fresh.learnerId)!;
+    const row2 = r2.members.find((m) => m.learnerId === fresh.learnerId)!;
+    // Completing revision A must not mark revision B complete.
+    expect(row1.completedCount).toBe(1);
+    expect(row2.completedCount).toBe(0);
+    expect(row2.status).toBe("not_started");
+    // Raw record preserved.
+    const raw = await database.db.select().from(learnerProgress);
+    expect(raw.some((r) => r.learnerId === fresh.learnerId && r.levelId === lessonLevelId)).toBe(
+      true,
+    );
+  });
+
   it("practice attempts are excluded", async () => {
     const fresh = await createTestAccount(database, {
       admissionEmail: `prac.${Date.now()}@student.apc.edu.ph`,
@@ -461,6 +503,75 @@ describe("gradebook batch 2", () => {
     expect(httpCsv.status).toBe(200);
     expect(httpCsv.headers.get("content-type")).toContain("text/csv");
     expect(httpCsv.text.split("\n")[0]).toContain("admissionEmail");
+  });
+
+  it("exports 21+ learners with omitted maxRows (defaults to 2000)", async () => {
+    const klass = await classroom.createClass(teacher, { name: "GB-CSV21" });
+    const assignment = await classroom.createAssignment(teacher, klass.id, {
+      moduleId: modId,
+      contentRevisionId: rev1,
+    });
+    for (let i = 0; i < 21; i++) {
+      const acc = await createTestAccount(database, {
+        admissionEmail: `csv21.${Date.now()}.${i}@student.apc.edu.ph`,
+        displayName: `Csv21 ${i}`,
+      });
+      await classroom.joinClass(asUser(acc), { inviteCode: klass.inviteCode! });
+    }
+    const exported = await classroom.exportClassReportCsv(teacher, klass.id, assignment.id);
+    const lines = exported.csv.split("\n");
+    // header + 21 members
+    expect(lines.length).toBe(22);
+  });
+
+  it("gradebook paginates with cursor and CSV resolves beyond first page", async () => {
+    const klass = await classroom.createClass(teacher, { name: "GB-PAGE" });
+    await classroom.joinClass(student, { inviteCode: klass.inviteCode! });
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const a = await classroom.createAssignment(teacher, klass.id, {
+        moduleId: modId,
+        contentRevisionId: rev1,
+      });
+      ids.push(a.id);
+    }
+    const first = await classroom.gradebook(teacher, klass.id, {
+      includeArchived: true,
+      limit: 2,
+    });
+    expect(first.assignments).toHaveLength(2);
+    expect((first as unknown as { nextCursor: string | null }).nextCursor).toBeTruthy();
+    const cursor = (first as unknown as { nextCursor: string }).nextCursor;
+    const second = await classroom.gradebook(teacher, klass.id, {
+      includeArchived: true,
+      limit: 2,
+      cursor,
+    });
+    expect(second.assignments.length).toBeGreaterThanOrEqual(1);
+    const allIds = [...first.assignments, ...second.assignments].map((a) => a.id);
+    expect(new Set(allIds).size).toBe(3);
+    // CSV must resolve the last assignment directly, not via first page.
+    const lastId = ids[2]!;
+    const exported = await classroom.exportClassReportCsv(teacher, klass.id, lastId);
+    expect(exported.csv).toContain(lastId);
+  });
+
+  it("student cannot access roster (teacher-owned only)", async () => {
+    const klass = await classroom.createClass(teacher, { name: "GB-ROSTER-AUTH" });
+    await classroom.joinClass(student, { inviteCode: klass.inviteCode! });
+    await expect(classroom.classRoster(student, klass.id, {})).rejects.toThrow(
+      /Teacher access|Forbidden/i,
+    );
+    const httpStudentRoster = await http("GET", `/teach/classes/${klass.id}/roster`, {
+      cookie: studentAccount.cookie,
+    });
+    expect(httpStudentRoster.status).toBe(403);
+    // Zero-assignment class still exposes roster to owner.
+    const roster = await classroom.classRoster(teacher, klass.id, { limit: 20 });
+    expect(roster.members.some((m) => m.learnerId === studentAccount.learnerId)).toBe(true);
+    const row = roster.members.find((m) => m.learnerId === studentAccount.learnerId)!;
+    expect(row.admissionEmail).toBe("student.gb@student.apc.edu.ph");
+    expect(row.displayName).toBeTruthy();
   });
 
   it("guards CSV formula injection over HTTP", async () => {

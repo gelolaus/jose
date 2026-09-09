@@ -242,4 +242,33 @@ describe("jmm import", () => {
     void teacher;
     void student;
   });
+
+  it("accepts a source above 64 KiB through HTTP body handling", async () => {
+    const header = `<<<JoseModule version="1">>>\ntitle: Big HTTP\nsubtitle: Subtitle for large import\ncoverColor: #22C55E\nobjectives:\n  - O\n`;
+    let body = "";
+    for (let s = 0; s < 4; s++) {
+      body += `\n<<<Section>>>\ntitle: Sec ${s}\nsubtitle: Sub ${s}\nthemeColor: #38BDF8\n\n<<<Lesson>>>\ntitle: Lesson ${s}\n\n<<<Text markdown>>>\n${"a".repeat(18_000)}\n<<<Text/>>>\n<<<Lesson/>>>\n<<<Section/>>>`;
+    }
+    const source = `${header}${body}\n<<<JoseModule/>>>`;
+    expect(Buffer.byteLength(source, "utf8")).toBeGreaterThan(64 * 1024);
+    const res = await http("POST", "/teach/modules/import/preview", {
+      cookie: teacherAccount.cookie,
+      body: { source },
+    });
+    expect(res.status).toBe(200);
+    expect((res.body as { ok: boolean }).ok).toBe(true);
+  });
+
+  it("rejects multibyte sources exceeding the byte limit", async () => {
+    const prefix = `<<<JoseModule version="1">>>\ntitle: T\nsubtitle: S\ncoverColor: #22C55E\nobjectives:\n  - O\n\n<<<Section>>>\ntitle: S\nsubtitle: S\nthemeColor: #38BDF8\n\n<<<Lesson>>>\ntitle: L\n\n<<<Text markdown>>>\n`;
+    const suffix = `\n<<<Text/>>>\n<<<Lesson/>>>\n<<<Section/>>>\n<<<JoseModule/>>>`;
+    const overhead = Buffer.byteLength(prefix + suffix, "utf8");
+    const remaining = 200_000 - overhead;
+    const charsNeeded = Math.floor(remaining / 2) + 10;
+    const source = prefix + "é".repeat(charsNeeded) + suffix;
+    expect(source.length).toBeLessThan(200_000);
+    expect(Buffer.byteLength(source, "utf8")).toBeGreaterThan(200_000);
+    // Service-level byte check (bypasses test-app body parser which has its own 100kb default).
+    expect(() => service.previewModuleImport({ source })).toThrow(/exceeds 200000 bytes/i);
+  });
 });

@@ -1481,7 +1481,7 @@ export class CurriculumService {
           jmmVersion: "1",
           sourceHash,
           sectionCount: preview.sections.length,
-          sourceBytes: data.source.length,
+          sourceBytes: Buffer.byteLength(data.source, "utf8"),
         }),
         createdAt: Date.now(),
       });

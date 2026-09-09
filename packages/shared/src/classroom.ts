@@ -144,6 +144,7 @@ export const gradebookAssignmentSchema = z.object({
 export const gradebookResponseSchema = z.object({
   classId: z.string().min(1),
   assignments: z.array(gradebookAssignmentSchema),
+  nextCursor: z.string().nullable().default(null),
 });
 
 export const classRosterRowSchema = z.object({

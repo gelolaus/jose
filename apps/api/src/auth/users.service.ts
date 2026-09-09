@@ -238,21 +238,23 @@ export class UsersService {
     }
     const priorName = target.displayName;
     const now = Date.now();
-    await this.db
-      .update(users)
-      .set({ displayName, updatedAt: now })
-      .where(eq(users.id, target.id));
-    await this.db
-      .update(learners)
-      .set({ displayName })
-      .where(eq(learners.id, target.id));
-    await this.db.insert(userNameAudit).values({
-      id: randomUUID(),
-      actorId: input.actorId,
-      targetUserId: target.id,
-      priorName,
-      newName: displayName,
-      createdAt: now,
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ displayName, updatedAt: now })
+        .where(eq(users.id, target.id));
+      await tx
+        .update(learners)
+        .set({ displayName })
+        .where(eq(learners.id, target.id));
+      await tx.insert(userNameAudit).values({
+        id: randomUUID(),
+        actorId: input.actorId,
+        targetUserId: target.id,
+        priorName,
+        newName: displayName,
+        createdAt: now,
+      });
     });
     return this.requireById(target.id);
   }

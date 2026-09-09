@@ -27,6 +27,21 @@ describe("teach jmm import", () => {
     expect(onCommit).not.toHaveBeenCalled();
   });
 
+  it("links to the served authoring guide asset", async () => {
+    const { readFileSync, existsSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    render(<TeachJmmImport />);
+    const link = screen.getByRole("link", { name: /authoring guide/i });
+    expect(link.getAttribute("href")).toBe("/docs/authoring/jose-module-markup-v1.md");
+    // Static public asset must exist and cover every active game type.
+    const p = join(process.cwd(), "public", "docs", "authoring", "jose-module-markup-v1.md");
+    expect(existsSync(p)).toBe(true);
+    const doc = readFileSync(p, "utf8");
+    for (const t of ['type="quiz"', 'type="memory"', 'type="timeline"', 'type="blank"', 'type="sort"']) {
+      expect(doc).toContain(t);
+    }
+  });
+
   it("shows read-only outline and confirms create-draft", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const commitAction = vi.fn(async () => ({

@@ -11,12 +11,16 @@ export type EmptyGuardOptions = {
   allowProduction?: boolean;
 };
 
-function isRemote(url: string): boolean {
+export function isRemoteDatabaseUrlForEmpty(url: string): boolean {
   return (
     url.startsWith("libsql://") ||
     url.startsWith("https://") ||
     url.startsWith("wss://")
   );
+}
+
+function isLocalFileUrl(url: string): boolean {
+  return url.startsWith("file:") || url.includes(":memory:");
 }
 
 export async function assertEmptyAllowed(opts: EmptyGuardOptions): Promise<void> {
@@ -28,9 +32,11 @@ export async function assertEmptyAllowed(opts: EmptyGuardOptions): Promise<void>
       `Refusing to empty: pass --confirm=${EMPTY_CONFIRM_PHRASE} to prove intent.`,
     );
   }
-  if (isRemote(opts.databaseUrl) && !opts.allowRemote) {
+  // Local-only tooling: remote empty support removed. For hosted databases,
+  // create a fresh empty Turso database and cut over (see docs/ops/empty-start-and-cutover.md).
+  if (!isLocalFileUrl(opts.databaseUrl) || isRemoteDatabaseUrlForEmpty(opts.databaseUrl)) {
     throw new Error(
-      "Refusing to empty a remote database. Prefer creating a new empty Turso database; re-run with --allow-remote plus JOSE_ALLOW_EMPTY_REMOTE=true if you truly mean it.",
+      "Refusing to empty a remote database. db:empty is local-only (file: URLs); for Turso, create a new empty database and follow docs/ops/empty-start-and-cutover.md fresh-database cutover.",
     );
   }
   if (opts.isProduction && !opts.allowProduction) {
@@ -82,13 +88,25 @@ const CHILD_FIRST_TABLES = [
 ] as const;
 
 export async function emptyDatabase(client: Client): Promise<void> {
-  await client.execute("PRAGMA foreign_keys = OFF");
+  // Atomic: all deletes succeed together or roll back together.
+  await client.execute("BEGIN");
   try {
+    await client.execute("PRAGMA foreign_keys = OFF");
     for (const table of CHILD_FIRST_TABLES) {
-      await client.execute(`DELETE FROM ${table}`).catch(() => undefined);
+      try {
+        await client.execute(`DELETE FROM ${table}`);
+      } catch (error) {
+        // Missing tables (fresh/partial DBs) are not failures; anything else rolls back.
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/no such table/i.test(message)) throw error;
+      }
     }
-  } finally {
     await client.execute("PRAGMA foreign_keys = ON");
+    await client.execute("COMMIT");
+  } catch (error) {
+    await client.execute("ROLLBACK").catch(() => undefined);
+    await client.execute("PRAGMA foreign_keys = ON").catch(() => undefined);
+    throw error;
   }
   await runMigrations(client);
   await client.execute("VACUUM").catch(() => undefined);

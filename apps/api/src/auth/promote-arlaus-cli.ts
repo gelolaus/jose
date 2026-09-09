@@ -9,16 +9,36 @@ import * as schema from "../db/schema";
 
 /**
  * One-time server-only promotion for arlaus@student.apc.edu.ph.
- * Requires JOSE_PROMOTE_ARLAUS_TOKEN to match, requires the account to already
- * exist from normal sign-in, idempotent if already admin, writes role_audit.
- * Remove JOSE_PROMOTE_ARLAUS_TOKEN from the environment after it runs.
+ * Requires an explicit CLI token argument matching JOSE_PROMOTE_ARLAUS_TOKEN,
+ * requires the account to already exist from normal sign-in, idempotent if
+ * already admin, writes role_audit. Remove JOSE_PROMOTE_ARLAUS_TOKEN after it runs.
+ * The environment token alone never satisfies the check; pass it explicitly:
+ *   JOSE_PROMOTE_ARLAUS_TOKEN=<token> npm run db:promote-arlaus -- <token>
  */
+export function resolvePromoteTokens(
+  argvToken?: string,
+  envToken?: string,
+): { expected: string; provided: string } {
+  return {
+    expected: envToken?.trim() ?? "",
+    provided: argvToken?.trim() ?? "",
+  };
+}
+
+export function isPromoteTokenValid(expected: string, provided: string): boolean {
+  return Boolean(expected) && Boolean(provided) && provided === expected;
+}
+
 async function main() {
   loadJoseEnv(process.env);
-  const expected = process.env.JOSE_PROMOTE_ARLAUS_TOKEN?.trim() ?? "";
-  const provided = process.argv[2]?.trim() ?? process.env.JOSE_PROMOTE_ARLAUS_TOKEN?.trim() ?? "";
-  if (!expected || provided !== expected) {
-    console.error("Missing or invalid promote token. Set JOSE_PROMOTE_ARLAUS_TOKEN and pass it.");
+  const { expected, provided } = resolvePromoteTokens(
+    process.argv[2],
+    process.env.JOSE_PROMOTE_ARLAUS_TOKEN,
+  );
+  if (!isPromoteTokenValid(expected, provided)) {
+    console.error(
+      "Missing or invalid promote token. Set JOSE_PROMOTE_ARLAUS_TOKEN and pass it explicitly as a CLI argument.",
+    );
     process.exitCode = 1;
     return;
   }
@@ -55,7 +75,12 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+const invokedAsCli =
+  process.argv[1]?.endsWith("promote-arlaus-cli.ts") ||
+  process.argv[1]?.endsWith("promote-arlaus-cli.js");
+if (invokedAsCli) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}
