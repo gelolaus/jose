@@ -28,9 +28,14 @@ export default async function TeachHomePage() {
         kicker="Teach"
         title="Modules"
         action={
-          <Link href="/teach/modules/new" className="jose-button">
-            Create module
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/teach/modules/import" className="jose-button jose-button--secondary">
+              Import
+            </Link>
+            <Link href="/teach/modules/new" className="jose-button">
+              Create module
+            </Link>
+          </div>
         }
       />
       <TeachModuleList initial={modules} />

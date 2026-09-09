@@ -79,6 +79,8 @@ import {
   patchModuleBodySchema,
   patchSectionBodySchema,
   parseImportQuestionsBody,
+  jmmImportCommitBodySchema,
+  parseJoseModuleMarkup,
   pathPosition,
   pickContinueLearning,
   practiceAttemptBodySchema,
@@ -1379,6 +1381,118 @@ export class CurriculumService {
       applied: true,
       questions: undefined,
       level,
+    };
+  }
+
+  previewModuleImport(body: unknown) {
+    const data = parseBody(jmmImportCommitBodySchema, body);
+    return parseJoseModuleMarkup(data.source);
+  }
+
+  async commitModuleImport(body: unknown, user: SessionUser) {
+    const data = parseBody(jmmImportCommitBodySchema, body);
+    const parsed = parseJoseModuleMarkup(data.source);
+    if (!parsed.ok || !parsed.preview) {
+      throw new BadRequestException({
+        message: "JMM validation failed",
+        errors: parsed.errors,
+      });
+    }
+    const preview = parsed.preview;
+    const sourceHash = createHash("sha256").update(data.source).digest("hex");
+    const moduleId = randomUUID();
+    const t = Date.now();
+    const maxSort = await this.maxModuleSort();
+    await this.runTx(async (tx) => {
+      await tx.insert(modules).values({
+        id: moduleId,
+        title: preview.title,
+        subtitle: preview.subtitle,
+        coverColor: preview.coverColor,
+        sortOrder: maxSort + 1,
+        published: false,
+        featured: false,
+        ownerUserId: user.id,
+        createdAt: t,
+        updatedAt: t,
+        revision: 0,
+        objectives: preview.objectives.join("\n") || null,
+        authorReviewedAt: null,
+        publishedRevisionId: null,
+        archivedAt: null,
+        trashedAt: null,
+        status: "draft",
+      });
+      for (const [si, sec] of preview.sections.entries()) {
+        const sectionId = randomUUID();
+        await tx.insert(sections).values({
+          id: sectionId,
+          moduleId,
+          title: sec.title,
+          subtitle: sec.subtitle,
+          themeColor: sec.themeColor,
+          sortOrder: si,
+          archivedAt: null,
+        });
+        for (const [li, lvl] of sec.levels.entries()) {
+          const levelId = randomUUID();
+          if (lvl.kind === "lesson") {
+            await tx.insert(levels).values({
+              id: levelId,
+              sectionId,
+              title: lvl.title,
+              kind: "lesson",
+              gameType: null,
+              sortOrder: li,
+              revision: 0,
+              archivedAt: null,
+            });
+            await tx.insert(lessonContent).values({
+              levelId,
+              markdown: blocksToMarkdown(lvl.blocks),
+              youtubeVideoId: primaryYoutubeIdFromBlocks(lvl.blocks),
+              blocksJson: JSON.stringify(lvl.blocks),
+              editorialJson: JSON.stringify(emptyLessonEditorial()),
+            });
+          } else {
+            await tx.insert(levels).values({
+              id: levelId,
+              sectionId,
+              title: lvl.title,
+              kind: "game",
+              gameType: lvl.gameType,
+              sortOrder: li,
+              revision: 0,
+              archivedAt: null,
+            });
+            await tx.insert(gameContent).values({
+              levelId,
+              json: JSON.stringify(simplifyGameContent(lvl.game)),
+            });
+          }
+        }
+      }
+      await tx.insert(contentAudit).values({
+        id: randomUUID(),
+        moduleId,
+        actorId: user.id,
+        action: "module.jmm_import",
+        detailJson: JSON.stringify({
+          jmmVersion: "1",
+          sourceHash,
+          sectionCount: preview.sections.length,
+          sourceBytes: data.source.length,
+        }),
+        createdAt: Date.now(),
+      });
+    });
+    return {
+      moduleId,
+      title: preview.title,
+      sectionCount: preview.sections.length,
+      levelCount: preview.sections.reduce((n, s) => n + s.levels.length, 0),
+      sourceHash,
+      jmmVersion: "1" as const,
     };
   }
 

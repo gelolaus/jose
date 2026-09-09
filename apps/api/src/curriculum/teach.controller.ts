@@ -5,6 +5,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   NotFoundException,
   Param,
   Patch,
@@ -54,6 +55,17 @@ export class TeachController {
   @Post("modules/wizard")
   createWizard(@CurrentUser() user: SessionUser, @Body() body: unknown) {
     return this.curriculum.createModuleFromWizard(body, user);
+  }
+
+  @Post("modules/import/preview")
+  @HttpCode(200)
+  previewImport(@Body() body: unknown) {
+    return this.curriculum.previewModuleImport(body);
+  }
+
+  @Post("modules/import/commit")
+  commitImport(@CurrentUser() user: SessionUser, @Body() body: unknown) {
+    return this.curriculum.commitModuleImport(body, user);
   }
 
   @Get("modules/:id")

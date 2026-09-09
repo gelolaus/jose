@@ -31,6 +31,8 @@ import {
   teachAssetSchema,
   teachLevelDetailSchema,
   teachModuleDetailSchema,
+  jmmImportPreviewResponseSchema,
+  jmmImportCommitResponseSchema,
   artifactsResponseSchema,
   teachModuleSchema,
   type ArtifactsResponse,
@@ -860,6 +862,24 @@ export async function importTeachQuestions(
 export async function fetchTeachAssets(moduleId: string): Promise<TeachAsset[]> {
   const json = await apiFetch(`/teach/modules/${moduleId}/assets`);
   return teachAssetSchema.array().parse(json);
+}
+
+export async function previewModuleImport(source: string, options?: ApiCallOptions) {
+  const json = await apiFetch(
+    "/teach/modules/import/preview",
+    { method: "POST", body: JSON.stringify({ source }) },
+    options,
+  );
+  return jmmImportPreviewResponseSchema.parse(json);
+}
+
+export async function commitModuleImport(source: string, options?: ApiCallOptions) {
+  const json = await apiFetch(
+    "/teach/modules/import/commit",
+    { method: "POST", body: JSON.stringify({ source }) },
+    options,
+  );
+  return jmmImportCommitResponseSchema.parse(json);
 }
 
 export async function createTeachAsset(
