@@ -1,0 +1,89 @@
+<<<JoseModule version="1">>>
+title: The Propaganda Movement
+subtitle: Ideas, writings, and reform 1872–1892
+coverColor: #1D4ED8
+objectives:
+  - Explain why the Propaganda Movement formed.
+  - Connect a primary source to its historical context.
+
+<<<Section>>>
+title: Origins
+subtitle: Context before 1882
+themeColor: #38BDF8
+
+<<<Lesson>>>
+title: Why reform mattered
+
+<<<Text markdown>>>
+## A movement across borders
+
+After 1872, Filipino expatriates in Spain used newspapers and associations to
+ask for representation, secularization, and freedom of speech. Read slowly and
+note who writes, for whom, and at what risk.
+<<<Text/>>>
+
+<<<Quote>>>
+text: The pen is mightier than the sword only when it tells the truth.
+source: Marcelo H. del Pilar
+citation: Diariong Tagalog, exact issue and page or stable archive URL
+<<<Quote/>>>
+
+<<<Image>>>
+src: https://example.edu/archive/newspaper.jpg
+alt: Students reading a nineteenth-century newspaper in a library
+attribution: Library collection, public domain
+<<<Image/>>>
+<<<Lesson/>>>
+
+<<<Game type="quiz">>>
+title: Check the evidence
+{
+  "type": "quiz",
+  "questions": [
+    {
+      "id": "q1",
+      "prompt": "Which source best supports a claim about reform aims?",
+      "choices": [
+        { "id": "a", "text": "A dated letter from 1882 with author and place" },
+        { "id": "b", "text": "An unsourced social post" }
+      ],
+      "correctChoiceId": "a",
+      "explanation": "Dated letters carry author, place, and time context."
+    },
+    {
+      "id": "q2",
+      "prompt": "Why did expatriates publish abroad?",
+      "choices": [
+        { "id": "a", "text": "To avoid colonial censorship" },
+        { "id": "b", "text": "To avoid paying postage" }
+      ],
+      "correctChoiceId": "a",
+      "explanation": "Overseas presses faced less prior restraint."
+    }
+  ]
+}
+<<<Game/>>>
+<<<Section/>>>
+
+<<<Section>>>
+title: Writings
+subtitle: La Solidaridad and replies
+themeColor: #22C55E
+
+<<<Lesson>>>
+title: Reading La Solidaridad
+
+<<<Text markdown>>>
+## How to read an editorial
+
+Identify the claim, the evidence cited, and what is missing. A strong answer
+quotes one line and explains what it proves.
+<<<Text/>>>
+
+<<<Checkpoint>>>
+prompt: Which condition made overseas publication useful?
+answerHint: Think about colonial censorship of presses in Manila.
+<<<Checkpoint/>>>
+<<<Lesson/>>>
+<<<Section/>>>
+<<<JoseModule/>>>

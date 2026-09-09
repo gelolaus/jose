@@ -16,14 +16,12 @@ Module grid + adventure path (Next.js) and NestJS API with local SQLite (Turso-r
 ```bash
 npm install
 npm run build --workspace=@jose/shared
-export JOSE_AUTH_MODE=mock JOSE_DEMO_MODE=true \
-  JOSE_SESSION_SECRET=dev-only-change-me-to-a-long-random-secret \
-  JOSE_WEB_ORIGIN=http://localhost:3000 JOSE_API_PUBLIC_URL=http://localhost:3001
+cp .env.example .env
 npm run dev
 ```
 
-The API reads its configuration from the environment (there is no `.env` loader), so export the
-variables above — see `apps/api/.env.example` for the full list. `JOSE_DEMO_MODE=true` lets you
+Both local applications read the repository-root `.env`. Shell and deployment
+environment values take precedence. `JOSE_DEMO_MODE=true` lets you
 browse as the shared demo learner before signing in; without it the learning routes ask for a
 sign-in, and without `JOSE_AUTH_MODE` there is no way to sign in at all.
 
@@ -119,7 +117,8 @@ Local dev login shortcuts (`/auth/dev/*`, `LocalDevPanel`, local role switch) we
 and must not be reintroduced.
 
 Full setup steps, including the Entra app registration, are in
-`docs/auth/microsoft-entra-setup.md`, and every variable is listed in `apps/api/.env.example`.
+`docs/auth/microsoft-entra-setup.md`. Local values are in `.env.example`; API
+and Vercel production values are in `.env.production.example`.
 Production deploy order and Vercel rewrite target are in
 `docs/ops/deployment.md` with values from `.env.production.example`.
 

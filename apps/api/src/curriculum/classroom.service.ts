@@ -10,25 +10,35 @@ import { z } from "zod";
 import {
   createAssignmentBodySchema,
   createClassBodySchema,
+  createOverrideBodySchema,
   csvSafeCell,
+  DEFAULT_ASSIGNMENT_TIMEZONE,
+  DEFAULT_GRADING_POLICY,
   formatScore,
+  generateAssignmentLabel,
   gradebookQuerySchema,
+  isValidIanaTimezone,
   joinClassBodySchema,
   toCsv,
+  updateAssignmentBodySchema,
   type ClassRosterResponse,
   type GradebookResponse,
+  type GradingPolicy,
   type SessionUser,
   type ClassReport,
   type ClassSummary,
   type StudentAssignment,
 } from "@jose/shared";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, isNotNull } from "drizzle-orm";
 import { DatabaseService } from "../db/database.service";
 import {
   assignments,
   attempts,
   classMembers,
   classes,
+  contentAudit,
+  gradeOverrideAudit,
+  gradeOverrides,
   inviteAttempts,
   learners,
   learnerProgress,
@@ -81,8 +91,35 @@ export class ClassroomService {
       .from(classes)
       .where(and(eq(classes.teacherId, user.id), isNull(classes.archivedAt)))
       .orderBy(asc(classes.createdAt));
+    // Admins see only owned here; archived area has its own listing.
+    const owned =
+      user.role === "admin"
+        ? await this.db
+            .select()
+            .from(classes)
+            .where(isNull(classes.archivedAt))
+            .orderBy(asc(classes.createdAt))
+        : rows;
     const result: ClassSummary[] = [];
-    for (const row of rows) {
+    for (const row of (user.role === "admin" ? owned : rows)) {
+      result.push(await this.toSummary(row, true));
+    }
+    return result;
+  }
+
+  /** Archived Classes area: owner + admins, read-only. Never reactivates. */
+  async listArchivedClasses(user: SessionUser): Promise<ClassSummary[]> {
+    this.requireTeacher(user);
+    const rows = await this.db
+      .select()
+      .from(classes)
+      .where(isNotNull(classes.archivedAt))
+      .orderBy(asc(classes.createdAt));
+    const visible = rows.filter(
+      (row) => row.teacherId === user.id || user.role === "admin",
+    );
+    const result: ClassSummary[] = [];
+    for (const row of visible) {
       result.push(await this.toSummary(row, true));
     }
     return result;
@@ -260,17 +297,224 @@ export class ClassroomService {
     if (!revision || revision.moduleId !== mod.id) {
       throw new BadRequestException("Unknown content revision");
     }
+    const assignedAt = Date.now();
+    const title =
+      data.title?.trim().slice(0, 80) ||
+      generateAssignmentLabel(mod.title, assignedAt);
+    if (data.dueTimezone && !isValidIanaTimezone(data.dueTimezone)) {
+      throw new BadRequestException("Invalid IANA timezone");
+    }
+    const dueTimezone = data.dueTimezone ?? DEFAULT_ASSIGNMENT_TIMEZONE;
+    const gradingPolicy = (data.gradingPolicy ?? DEFAULT_GRADING_POLICY) as GradingPolicy;
     const id = randomUUID();
     await this.db.insert(assignments).values({
       id,
       classId: klass.id,
       moduleId: mod.id,
+      title,
       contentRevisionId: revisionId,
       dueAt: data.dueAt ?? null,
-      assignedAt: Date.now(),
+      dueTimezone,
+      gradingPolicy,
+      assignedSnapshotJson: revision.snapshotJson,
+      assignedAt,
       archivedAt: null,
     });
+    await this.auditAssignment(mod.id, user.id, "assignment.create", {
+      assignmentId: id,
+      classId: klass.id,
+      contentRevisionId: revisionId,
+      revisionNumber: revision.revisionNumber,
+      title,
+      dueAt: data.dueAt ?? null,
+      dueTimezone,
+      gradingPolicy,
+    });
     return this.getAssignment(user, id);
+  }
+
+  async updateAssignment(user: SessionUser, assignmentId: string, body: unknown) {
+    const row = await this.requireAssignment(assignmentId);
+    await this.requireOwnedClass(user, row.classId);
+    const data = parseBody(updateAssignmentBodySchema, body);
+    if (data.dueTimezone && !isValidIanaTimezone(data.dueTimezone)) {
+      throw new BadRequestException("Invalid IANA timezone");
+    }
+    const patch: Partial<typeof assignments.$inferInsert> = {};
+    if (data.title !== undefined) patch.title = data.title.trim().slice(0, 80);
+    if (data.dueAt !== undefined) patch.dueAt = data.dueAt;
+    if (data.dueTimezone !== undefined) patch.dueTimezone = data.dueTimezone;
+    if (data.gradingPolicy !== undefined)
+      patch.gradingPolicy = data.gradingPolicy as string;
+    if (Object.keys(patch).length === 0) return this.getAssignment(user, assignmentId);
+    await this.db
+      .update(assignments)
+      .set(patch)
+      .where(eq(assignments.id, assignmentId));
+    const [mod] = await this.db
+      .select()
+      .from(modules)
+      .where(eq(modules.id, row.moduleId));
+    await this.auditAssignment(
+      row.moduleId,
+      user.id,
+      "assignment.update",
+      {
+        assignmentId,
+        ...data,
+        moduleTitle: mod?.title ?? row.moduleId,
+      },
+    );
+    return this.getAssignment(user, assignmentId);
+  }
+
+  /** Audited manual overrides (D): owner/admin only, never touches attempts. */
+  async upsertOverride(user: SessionUser, assignmentId: string, body: unknown) {
+    const data = parseBody(createOverrideBodySchema, body);
+    const assignment = await this.requireAssignment(assignmentId);
+    await this.requireOwnedClass(user, assignment.classId);
+    const [member] = await this.db
+      .select()
+      .from(classMembers)
+      .where(
+        and(
+          eq(classMembers.classId, assignment.classId),
+          eq(classMembers.learnerId, data.learnerId),
+        ),
+      );
+    if (!member) throw new NotFoundException("Learner is not in this class");
+    const now = Date.now();
+    const [existing] = await this.db
+      .select()
+      .from(gradeOverrides)
+      .where(
+        and(
+          eq(gradeOverrides.assignmentId, assignmentId),
+          eq(gradeOverrides.learnerId, data.learnerId),
+        ),
+      );
+    if (existing) {
+      await this.db
+        .update(gradeOverrides)
+        .set({
+          score: data.score,
+          maxScore: data.maxScore,
+          reason: data.reason.trim(),
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(gradeOverrides.assignmentId, assignmentId),
+            eq(gradeOverrides.learnerId, data.learnerId),
+          ),
+        );
+    } else {
+      await this.db.insert(gradeOverrides).values({
+        assignmentId,
+        learnerId: data.learnerId,
+        score: data.score,
+        maxScore: data.maxScore,
+        reason: data.reason.trim(),
+        createdBy: user.id,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    await this.db.insert(gradeOverrideAudit).values({
+      id: randomUUID(),
+      assignmentId,
+      learnerId: data.learnerId,
+      action: existing ? "revised" : "created",
+      score: data.score,
+      maxScore: data.maxScore,
+      reason: data.reason.trim(),
+      actorId: user.id,
+      createdAt: now,
+    });
+    await this.auditAssignment(assignment.moduleId, user.id, "assignment.override_upsert", {
+      assignmentId,
+      learnerId: data.learnerId,
+      score: data.score,
+      maxScore: data.maxScore,
+    });
+    return this.getOverride(assignmentId, data.learnerId);
+  }
+
+  async removeOverride(user: SessionUser, assignmentId: string, learnerId: string) {
+    const assignment = await this.requireAssignment(assignmentId);
+    await this.requireOwnedClass(user, assignment.classId);
+    await this.db
+      .delete(gradeOverrides)
+      .where(
+        and(
+          eq(gradeOverrides.assignmentId, assignmentId),
+          eq(gradeOverrides.learnerId, learnerId),
+        ),
+      );
+    await this.db.insert(gradeOverrideAudit).values({
+      id: randomUUID(),
+      assignmentId,
+      learnerId,
+      action: "removed",
+      score: null,
+      maxScore: null,
+      reason: null,
+      actorId: user.id,
+      createdAt: Date.now(),
+    });
+    await this.auditAssignment(assignment.moduleId, user.id, "assignment.override_remove", {
+      assignmentId,
+      learnerId,
+    });
+    return { ok: true };
+  }
+
+  async getOverride(assignmentId: string, learnerId: string) {
+    const [row] = await this.db
+      .select()
+      .from(gradeOverrides)
+      .where(
+        and(
+          eq(gradeOverrides.assignmentId, assignmentId),
+          eq(gradeOverrides.learnerId, learnerId),
+        ),
+      );
+    return row ?? null;
+  }
+
+  async listOverrides(user: SessionUser, assignmentId: string) {
+    const assignment = await this.requireAssignment(assignmentId);
+    await this.requireOwnedClassForRead(user, assignment.classId);
+    return this.db
+      .select()
+      .from(gradeOverrides)
+      .where(eq(gradeOverrides.assignmentId, assignmentId));
+  }
+
+  async overrideHistory(user: SessionUser, assignmentId: string, learnerId?: string) {
+    const assignment = await this.requireAssignment(assignmentId);
+    await this.requireOwnedClassForRead(user, assignment.classId);
+    const rows = await this.db
+      .select()
+      .from(gradeOverrideAudit)
+      .where(eq(gradeOverrideAudit.assignmentId, assignmentId))
+      .orderBy(asc(gradeOverrideAudit.createdAt));
+    return learnerId ? rows.filter((r) => r.learnerId === learnerId) : rows;
+  }
+
+  /** Archived audit history stays available (A): content audit for the module. */
+  async archivedAuditHistory(user: SessionUser, classId: string, assignmentId: string) {
+    await this.requireOwnedClassForRead(user, classId);
+    const assignment = await this.requireAssignment(assignmentId);
+    if (assignment.classId !== classId) throw new NotFoundException("Assignment not found");
+    const { contentAudit: audit } = await import("../db/schema");
+    const rows = await this.db
+      .select()
+      .from(audit)
+      .where(eq(audit.moduleId, assignment.moduleId))
+      .orderBy(asc(audit.createdAt));
+    const overrides = await this.overrideHistory(user, assignmentId);
+    return { assignmentId, classId, audit: rows, overrides };
   }
 
   async listClassAssignments(
@@ -278,7 +522,7 @@ export class ClassroomService {
     classId: string,
     opts?: { includeArchived?: boolean },
   ) {
-    await this.requireOwnedClass(user, classId);
+    await this.requireOwnedClassForRead(user, classId);
     const rows = await this.db
       .select()
       .from(assignments)
@@ -302,7 +546,8 @@ export class ClassroomService {
     rawQuery?: unknown,
   ): Promise<GradebookResponse> {
     const query = gradebookQuerySchema.parse(rawQuery ?? {});
-    await this.requireOwnedClass(user, classId);
+    // Archived classes remain readable (A) via the same owner/admin guard.
+    await this.requireOwnedClassForRead(user, classId);
     const allRows = await this.db
       .select()
       .from(assignments)
@@ -328,7 +573,7 @@ export class ClassroomService {
       .from(classMembers)
       .where(eq(classMembers.classId, classId));
     const learnerIds = [...new Set(memberRows.map((m) => m.learnerId))];
-    const [learnerMap, userMap, progressMap, attemptMap, revisionMap, moduleMap] =
+    const [learnerMap, userMap, progressMap, attemptMap, revisionMap, moduleMap, overrideMap] =
       await Promise.all([
         this.batchLearners(learnerIds),
         this.batchUsers(learnerIds),
@@ -336,14 +581,16 @@ export class ClassroomService {
         this.batchAssessmentAttempts(learnerIds),
         this.batchRevisions(page.map((p) => p.contentRevisionId)),
         this.batchModules(page.map((p) => p.moduleId)),
+        this.batchOverrides(page.map((p) => p.id)),
       ]);
 
     const tables = [];
     for (const row of page) {
-      const levelIds = await this.revisionLevelIdsCached(
-        row.contentRevisionId,
-        revisionMap,
-      );
+      const snapshotJson = this.snapshotJsonFor(row, revisionMap);
+      const levelIds = snapshotJson
+        ? this.levelIdsFromSnapshotJson(snapshotJson)
+        : await this.revisionLevelIdsCached(row.contentRevisionId, revisionMap);
+      const moduleTitle = moduleMap.get(row.moduleId) ?? row.moduleId;
       const members = memberRows.map((member) =>
         this.buildGradebookRow({
           member,
@@ -354,6 +601,7 @@ export class ClassroomService {
           progressMap,
           attemptMap,
           revisionMap,
+          overrideMap,
         }),
       );
       // Stable member order by joinedAt then learnerId.
@@ -373,10 +621,13 @@ export class ClassroomService {
         id: row.id,
         classId: row.classId,
         moduleId: row.moduleId,
-        moduleTitle: moduleMap.get(row.moduleId) ?? row.moduleId,
+        moduleTitle,
+        title: this.assignmentTitleOf(row, moduleTitle),
         contentRevisionId: row.contentRevisionId,
         revisionNumber: revisionMap.get(row.contentRevisionId)?.revisionNumber ?? 0,
         dueAt: row.dueAt,
+        dueTimezone: this.assignmentTimezoneOf(row),
+        gradingPolicy: this.assignmentPolicyOf(row),
         assignedAt: row.assignedAt,
         archivedAt: row.archivedAt,
         members,
@@ -394,7 +645,7 @@ export class ClassroomService {
       .from(classMembers)
       .where(eq(classMembers.classId, row.classId));
     const learnerIds = [...new Set(memberRows.map((m) => m.learnerId))];
-    const [learnerMap, userMap, progressMap, attemptMap, revisionMap, moduleMap] =
+    const [learnerMap, userMap, progressMap, attemptMap, revisionMap, moduleMap, overrideMap] =
       await Promise.all([
         this.batchLearners(learnerIds),
         this.batchUsers(learnerIds),
@@ -402,8 +653,13 @@ export class ClassroomService {
         this.batchAssessmentAttempts(learnerIds),
         this.batchRevisions([row.contentRevisionId]),
         this.batchModules([row.moduleId]),
+        this.batchOverrides([row.id]),
       ]);
-    const levelIds = await this.revisionLevelIdsCached(row.contentRevisionId, revisionMap);
+    const snapshotJson = this.snapshotJsonFor(row, revisionMap);
+    const levelIds = snapshotJson
+      ? this.levelIdsFromSnapshotJson(snapshotJson)
+      : await this.revisionLevelIdsCached(row.contentRevisionId, revisionMap);
+    const moduleTitle = moduleMap.get(row.moduleId) ?? row.moduleId;
     const members = memberRows.map((member) =>
       this.buildGradebookRow({
         member,
@@ -414,6 +670,7 @@ export class ClassroomService {
         progressMap,
         attemptMap,
         revisionMap,
+        overrideMap,
       }),
     );
     members.sort((a, b) =>
@@ -428,10 +685,13 @@ export class ClassroomService {
       id: row.id,
       classId: row.classId,
       moduleId: row.moduleId,
-      moduleTitle: moduleMap.get(row.moduleId) ?? row.moduleId,
+      moduleTitle,
+      title: this.assignmentTitleOf(row, moduleTitle),
       contentRevisionId: row.contentRevisionId,
       revisionNumber: revisionMap.get(row.contentRevisionId)?.revisionNumber ?? 0,
       dueAt: row.dueAt,
+      dueTimezone: this.assignmentTimezoneOf(row),
+      gradingPolicy: this.assignmentPolicyOf(row),
       assignedAt: row.assignedAt,
       archivedAt: row.archivedAt,
       members,
@@ -445,7 +705,7 @@ export class ClassroomService {
     rawQuery?: unknown,
   ): Promise<ClassRosterResponse> {
     const query = gradebookQuerySchema.parse(rawQuery ?? {});
-    await this.requireOwnedClass(user, classId);
+    await this.requireOwnedClassForRead(user, classId);
     const memberRows = await this.db
       .select()
       .from(classMembers)
@@ -493,20 +753,24 @@ export class ClassroomService {
 
   async getAssignment(user: SessionUser, assignmentId: string) {
     const row = await this.requireAssignment(assignmentId);
-    await this.requireOwnedClass(user, row.classId);
+    await this.requireOwnedClassForRead(user, row.classId);
     const [mod] = await this.db.select().from(modules).where(eq(modules.id, row.moduleId));
     const [revision] = await this.db
       .select()
       .from(moduleRevisions)
       .where(eq(moduleRevisions.id, row.contentRevisionId));
+    const moduleTitle = mod?.title ?? row.moduleId;
     return {
       id: row.id,
       classId: row.classId,
       moduleId: row.moduleId,
-      moduleTitle: mod?.title ?? row.moduleId,
+      moduleTitle,
+      title: this.assignmentTitleOf(row, moduleTitle),
       contentRevisionId: row.contentRevisionId,
       revisionNumber: revision?.revisionNumber ?? 0,
       dueAt: row.dueAt,
+      dueTimezone: this.assignmentTimezoneOf(row),
+      gradingPolicy: this.assignmentPolicyOf(row),
       assignedAt: row.assignedAt,
       archivedAt: row.archivedAt,
     };
@@ -537,7 +801,7 @@ export class ClassroomService {
   }
 
   async classReport(user: SessionUser, classId: string, assignmentId: string): Promise<ClassReport> {
-    await this.requireOwnedClass(user, classId);
+    await this.requireOwnedClassForRead(user, classId);
     const assignment = await this.requireAssignment(assignmentId);
     if (assignment.classId !== classId) {
       throw new ForbiddenException("Assignment is not in this class");
@@ -557,11 +821,13 @@ export class ClassroomService {
       inProgress: memberRows.filter((m) => m.status === "in_progress").length,
       completed: memberRows.filter((m) => m.status === "completed").length,
     };
+    const moduleTitle = mod?.title ?? assignment.moduleId;
     return {
       classId,
       assignmentId,
       moduleId: assignment.moduleId,
-      moduleTitle: mod?.title ?? assignment.moduleId,
+      moduleTitle,
+      assignmentTitle: this.assignmentTitleOf(assignment, moduleTitle),
       contentRevisionId: assignment.contentRevisionId,
       members: memberRows,
       counts,
@@ -580,7 +846,7 @@ export class ClassroomService {
     });
     const parsed = maxRowsSchema.safeParse(rawQuery ?? {});
     const maxRows = parsed.success ? parsed.data.maxRows : 2000;
-    await this.requireOwnedClass(user, classId);
+    await this.requireOwnedClassForRead(user, classId);
     const assignment = await this.requireAssignment(assignmentId);
     if (assignment.classId !== classId) {
       throw new NotFoundException("Assignment not found");
@@ -594,9 +860,13 @@ export class ClassroomService {
     const rows: Array<Array<string | number | null>> = [
       [
         "assignmentId",
+        "assignmentTitle",
         "contentRevisionId",
         "revisionNumber",
         "moduleTitle",
+        "dueAt",
+        "dueTimezone",
+        "gradingPolicy",
         "learnerId",
         "displayName",
         "admissionEmail",
@@ -611,6 +881,11 @@ export class ClassroomService {
         "latestScore",
         "latestNumerator",
         "latestDenominator",
+        "effectiveScore",
+        "effectiveNumerator",
+        "effectiveDenominator",
+        "isOverridden",
+        "overrideReason",
         "latestAttemptAt",
         "joinedAt",
         "assignmentState",
@@ -619,9 +894,13 @@ export class ClassroomService {
     for (const member of table.members) {
       rows.push([
         table.id,
+        (table as { title?: string }).title ?? "",
         table.contentRevisionId,
         table.revisionNumber,
         table.moduleTitle,
+        table.dueAt,
+        (table as { dueTimezone?: string }).dueTimezone ?? DEFAULT_ASSIGNMENT_TIMEZONE,
+        (table as { gradingPolicy?: string }).gradingPolicy ?? DEFAULT_GRADING_POLICY,
         member.learnerId,
         member.displayName,
         member.admissionEmail,
@@ -636,6 +915,11 @@ export class ClassroomService {
         member.latestScore,
         member.latestNumerator,
         member.latestDenominator,
+        (member as { effectiveScore?: string | null }).effectiveScore ?? null,
+        (member as { effectiveNumerator?: number | null }).effectiveNumerator ?? null,
+        (member as { effectiveDenominator?: number | null }).effectiveDenominator ?? null,
+        (member as { isOverridden?: boolean }).isOverridden ? "TRUE" : "FALSE",
+        (member as { overrideReason?: string | null }).overrideReason ?? null,
         member.latestAttemptAt,
         member.joinedAt,
         member.assignmentState,
@@ -658,7 +942,10 @@ export class ClassroomService {
       .select()
       .from(moduleRevisions)
       .where(eq(moduleRevisions.id, row.contentRevisionId));
-    const levelIds = await this.revisionLevelIds(row.contentRevisionId);
+    // Historical gradebooks resolve against the assigned snapshot (E).
+    const levelIds = row.assignedSnapshotJson
+      ? this.levelIdsFromSnapshotJson(row.assignedSnapshotJson)
+      : await this.revisionLevelIds(row.contentRevisionId);
     const completed = await this.completedSetForRevision(learnerId, row.contentRevisionId);
     const completedCount = levelIds.filter((id) => completed.has(id)).length;
     const status =
@@ -668,14 +955,18 @@ export class ClassroomService {
           ? "completed"
           : "in_progress";
     const nextLevelId = levelIds.find((id) => !completed.has(id)) ?? null;
+    const moduleTitle = mod?.title ?? row.moduleId;
     return {
       id: row.id,
       classId: row.classId,
       moduleId: row.moduleId,
-      moduleTitle: mod?.title ?? row.moduleId,
+      moduleTitle,
+      title: this.assignmentTitleOf(row, moduleTitle),
       contentRevisionId: row.contentRevisionId,
       revisionNumber: revision?.revisionNumber ?? 0,
       dueAt: row.dueAt,
+      dueTimezone: this.assignmentTimezoneOf(row),
+      gradingPolicy: this.assignmentPolicyOf(row),
       assignedAt: row.assignedAt,
       archivedAt: row.archivedAt,
       status,
@@ -691,7 +982,9 @@ export class ClassroomService {
     archivedAt: number | null,
   ) {
     const [learner] = await this.db.select().from(learners).where(eq(learners.id, learnerId));
-    const levelIds = await this.revisionLevelIds(assignment.contentRevisionId);
+    const levelIds = assignment.assignedSnapshotJson
+      ? this.levelIdsFromSnapshotJson(assignment.assignedSnapshotJson)
+      : await this.revisionLevelIds(assignment.contentRevisionId);
     const completed = await this.completedSetForRevision(
       learnerId,
       assignment.contentRevisionId,
@@ -754,9 +1047,18 @@ export class ClassroomService {
     progressMap: Map<string, Set<string>>;
     attemptMap: Map<string, Array<typeof attempts.$inferSelect>>;
     revisionMap: Map<string, typeof moduleRevisions.$inferSelect>;
+    overrideMap?: Map<string, typeof gradeOverrides.$inferSelect>;
   }) {
-    const { member, assignment, levelIds, learnerMap, userMap, progressMap, attemptMap } =
-      input;
+    const {
+      member,
+      assignment,
+      levelIds,
+      learnerMap,
+      userMap,
+      progressMap,
+      attemptMap,
+      overrideMap,
+    } = input;
     const learner = learnerMap.get(member.learnerId);
     const account = userMap.get(member.learnerId);
     const progressKey = `${member.learnerId}::${assignment.contentRevisionId}`;
@@ -791,6 +1093,17 @@ export class ClassroomService {
         ? Math.round((best.score / best.maxScore) * 100)
         : null;
     const revision = input.revisionMap.get(assignment.contentRevisionId);
+    const policy = this.assignmentPolicyOf(assignment);
+    const overrideKey = `${assignment.id}::${member.learnerId}`;
+    const override = overrideMap?.get(overrideKey) ?? null;
+    const bestPair = best ? { score: best.score, maxScore: best.maxScore } : null;
+    const latestPair = latest
+      ? { score: latest.score, maxScore: latest.maxScore }
+      : null;
+    const overridePair = override
+      ? { score: override.score, maxScore: override.maxScore }
+      : null;
+    const effective = this.resolveEffective(bestPair, latestPair, policy, overridePair);
     return {
       learnerId: member.learnerId,
       displayName: learner?.displayName ?? member.learnerId,
@@ -811,6 +1124,12 @@ export class ClassroomService {
       latestNumerator: latest?.score ?? null,
       latestDenominator: latest?.maxScore ?? null,
       latestAttemptAt: latest ? new Date(latest.createdAt).toISOString() : null,
+      effectiveScore: formatScore(effective?.score ?? null, effective?.maxScore ?? null),
+      effectiveNumerator: effective?.score ?? null,
+      effectiveDenominator: effective?.maxScore ?? null,
+      gradingPolicy: policy,
+      isOverridden: Boolean(override),
+      overrideReason: override?.reason ?? null,
       assignedRevisionId: assignment.contentRevisionId,
       revisionNumber: revision?.revisionNumber ?? 0,
       assignmentState: assignment.archivedAt
@@ -1031,6 +1350,112 @@ export class ClassroomService {
       throw new ForbiddenException("Not your class");
     }
     return row;
+  }
+
+  /** Read-only access for archived classes: owner/admin only, no mutations. */
+  private async requireOwnedClassForRead(user: SessionUser, classId: string) {
+    this.requireTeacher(user);
+    const [row] = await this.db.select().from(classes).where(eq(classes.id, classId));
+    if (!row) throw new NotFoundException("Class not found");
+    if (row.teacherId !== user.id && user.role !== "admin") {
+      throw new ForbiddenException("Not your class");
+    }
+    return row;
+  }
+
+  private assignmentTitleOf(
+    row: typeof assignments.$inferSelect,
+    moduleTitle: string,
+  ): string {
+    const t = (row.title ?? "").trim();
+    if (t) return t.slice(0, 80);
+    return generateAssignmentLabel(moduleTitle, row.assignedAt);
+  }
+
+  private assignmentTimezoneOf(row: typeof assignments.$inferSelect): string {
+    const tz = (row.dueTimezone ?? "").trim();
+    if (tz && isValidIanaTimezone(tz)) return tz;
+    return DEFAULT_ASSIGNMENT_TIMEZONE;
+  }
+
+  private assignmentPolicyOf(
+    row: typeof assignments.$inferSelect,
+  ): GradingPolicy {
+    const p = row.gradingPolicy as string | null | undefined;
+    if (p === "best" || p === "latest" || p === "override") return p;
+    return DEFAULT_GRADING_POLICY;
+  }
+
+  private async auditAssignment(
+    moduleId: string,
+    actorId: string,
+    action: string,
+    detail: unknown,
+  ) {
+    await this.db.insert(contentAudit).values({
+      id: randomUUID(),
+      moduleId,
+      actorId,
+      action,
+      detailJson: JSON.stringify(detail ?? {}),
+      createdAt: Date.now(),
+    });
+  }
+
+  private async batchOverrides(assignmentIds: string[]) {
+    const map = new Map<string, typeof gradeOverrides.$inferSelect>();
+    const unique = [...new Set(assignmentIds)];
+    if (unique.length === 0) return map;
+    // Overrides are keyed (assignment, learner); fetch per assignment then
+    // filter in memory to keep one round-trip for typical gradebook pages.
+    for (const assignmentId of unique) {
+      const rows = await this.db
+        .select()
+        .from(gradeOverrides)
+        .where(eq(gradeOverrides.assignmentId, assignmentId));
+      for (const row of rows) {
+        map.set(`${row.assignmentId}::${row.learnerId}`, row);
+      }
+    }
+    return map;
+  }
+
+  private resolveEffective(
+    best: { score: number; maxScore: number } | null,
+    latest: { score: number; maxScore: number } | null,
+    policy: GradingPolicy,
+    override: { score: number; maxScore: number } | null,
+  ): { score: number; maxScore: number } | null {
+    if (policy === "override" && override) return override;
+    if (policy === "latest" && latest) return latest;
+    if (policy === "best" && best) return best;
+    // Fallbacks preserve history when the preferred source is missing.
+    if (policy === "override") return best ?? latest;
+    if (policy === "latest") return latest ?? best;
+    return best ?? latest;
+  }
+
+  /** Prefer the immutable assigned copy (E); fall back to live revision. */
+  private snapshotJsonFor(
+    row: typeof assignments.$inferSelect,
+    revisionMap: Map<string, typeof moduleRevisions.$inferSelect>,
+  ): string | null {
+    if (row.assignedSnapshotJson) return row.assignedSnapshotJson;
+    return revisionMap.get(row.contentRevisionId)?.snapshotJson ?? null;
+  }
+
+  private levelIdsFromSnapshotJson(snapshotJson: string | null): string[] {
+    if (!snapshotJson) return [];
+    try {
+      const snapshot = JSON.parse(snapshotJson) as {
+        sections: Array<{ levels: Array<{ id: string }> }>;
+      };
+      return snapshot.sections.flatMap((section) =>
+        section.levels.map((level) => level.id),
+      );
+    } catch {
+      return [];
+    }
   }
 
   private async isLiveAssignment(row: typeof assignments.$inferSelect) {

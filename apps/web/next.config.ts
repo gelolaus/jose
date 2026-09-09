@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 import path from "node:path";
+import { loadRootEnvFile } from "./src/lib/root-env";
+
+// One local file for both workspaces. Host/Vercel values still win.
+loadRootEnvFile();
 
 const apiOrigin =
   process.env.JOSE_INTERNAL_API_URL?.replace(/\/$/, "") ||

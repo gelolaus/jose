@@ -2,14 +2,14 @@ import { config } from "dotenv";
 import { resolve } from "node:path";
 
 /** Absolute repository-root local configuration, stable across workspace CWDs. */
-export function apiRootEnvPath(): string {
+export function webRootEnvPath(): string {
   return resolve(__dirname, "../../../..", ".env");
 }
 
-/** Loads root `.env` while letting shell and host environment values win. */
-export function loadApiEnvFile(
+/** Loads root `.env` while letting Vercel and shell environment values win. */
+export function loadRootEnvFile(
   env: NodeJS.ProcessEnv = process.env,
-  path = apiRootEnvPath(),
+  path = webRootEnvPath(),
 ): void {
   config({ path, processEnv: env, override: false, quiet: true });
 }

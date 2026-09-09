@@ -17,9 +17,12 @@ const gradebook: GradebookResponse = {
       classId: "c1",
       moduleId: "m1",
       moduleTitle: "M1",
+      title: "M1",
       contentRevisionId: "r1",
       revisionNumber: 1,
       dueAt: null,
+      dueTimezone: "Asia/Manila",
+      gradingPolicy: "best",
       assignedAt: 1,
       archivedAt: null,
       members: [
@@ -40,6 +43,12 @@ const gradebook: GradebookResponse = {
           latestNumerator: 8,
           latestDenominator: 10,
           latestAttemptAt: "2026-09-01T00:00:00.000Z",
+          effectiveScore: "8 / 10 (80%)",
+          effectiveNumerator: 8,
+          effectiveDenominator: 10,
+          gradingPolicy: "best",
+          isOverridden: false,
+          overrideReason: null,
           assignedRevisionId: "r1",
           revisionNumber: 1,
           assignmentState: "active",
@@ -54,9 +63,12 @@ const gradebook: GradebookResponse = {
       classId: "c1",
       moduleId: "m1",
       moduleTitle: "M1 retry",
+      title: "M1 retry",
       contentRevisionId: "r2",
       revisionNumber: 2,
       dueAt: null,
+      dueTimezone: "Asia/Manila",
+      gradingPolicy: "best",
       assignedAt: 2,
       archivedAt: 3,
       members: [],
@@ -196,5 +208,110 @@ describe("TeachClassesClient gradebook", () => {
     } finally {
       fetchMock.mockRestore();
     }
+  });
+
+  it("loads every roster member via cursor, including zero-assignment classes", async () => {
+    const firstRoster: ClassRosterResponse = {
+      classId: "c2",
+      members: [roster.members[0]!],
+      nextCursor: "u1",
+    };
+    const secondRoster: ClassRosterResponse = {
+      classId: "c2",
+      members: [
+        {
+          learnerId: "u2",
+          displayName: "Ben",
+          admissionEmail: "ben@student.apc.edu.ph",
+          joinedAt: "2026-08-02T00:00:00.000Z",
+          membership: "active",
+          archivedAt: null,
+        },
+      ],
+      nextCursor: null,
+    };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      json: async () => secondRoster,
+    } as Response);
+    try {
+      render(
+        <TeachClassesClient
+          initial={[
+            {
+              id: "c2",
+              name: "Empty",
+              inviteCode: null,
+              memberCount: 2,
+              challengesEnabled: false,
+              archivedAt: null,
+              createdAt: 1,
+            },
+          ]}
+          modules={[]}
+          initialGradebook={{ c2: { classId: "c2", assignments: [], nextCursor: null } }}
+          initialRoster={{ c2: firstRoster }}
+          initialError={null}
+        />,
+      );
+      expect(screen.getByRole("button", { name: /load more roster/i })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /load more roster/i }));
+      const found = await screen.findByText("ben@student.apc.edu.ph");
+      expect(found).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalled();
+      expect(String(fetchMock.mock.calls[0]?.[0])).toContain("cursor=u1");
+      expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/roster");
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  it("shows assignment title, due timezone, policy, effective and override state", () => {
+    const withPolicy: GradebookResponse = {
+      classId: "c1",
+      nextCursor: null,
+      assignments: [
+        {
+          ...gradebook.assignments[0]!,
+          title: "Week 1 · Propaganda",
+          dueAt: Date.UTC(2026, 8, 15, 15, 59, 0),
+          dueTimezone: "Asia/Manila",
+          gradingPolicy: "best",
+          members: [
+            {
+              ...gradebook.assignments[0]!.members[0]!,
+              effectiveScore: "8 / 10 (80%)",
+              gradingPolicy: "best",
+              isOverridden: false,
+              overrideReason: null,
+            },
+          ],
+        },
+      ],
+    };
+    render(
+      <TeachClassesClient
+        initial={[
+          {
+            id: "c1",
+            name: "R1",
+            inviteCode: null,
+            memberCount: 1,
+            challengesEnabled: false,
+            archivedAt: null,
+            createdAt: 1,
+          },
+        ]}
+        modules={[]}
+        initialGradebook={{ c1: withPolicy }}
+        initialRoster={{ c1: roster }}
+        initialError={null}
+      />,
+    );
+    expect(screen.getByText("Week 1 · Propaganda")).toBeInTheDocument();
+    expect(screen.getByText(/Timezone: Asia\/Manila/)).toBeInTheDocument();
+    expect(screen.getByText(/Policy: best/)).toBeInTheDocument();
+    expect(screen.getAllByText("Effective score").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Calculated").length).toBeGreaterThan(0);
   });
 });

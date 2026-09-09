@@ -21,6 +21,7 @@ import {
 import { and, eq, gte, isNull } from "drizzle-orm";
 import type { JoseDb } from "./database.service";
 import {
+  assignments,
   gameContent,
   learners,
   learnerProgress,
@@ -920,6 +921,15 @@ async function spliceExtrasIntoPublishedSnapshots(db: JoseDb) {
   const published = await db.select().from(modules);
   for (const mod of published) {
     if (!mod.publishedRevisionId) continue;
+    // Immutable assigned revisions (E): never mutate a revision that backs
+    // an assignment. Historical gradebooks resolve against the assigned
+    // snapshot copy, so seed backfills must skip assigned revisions.
+    const assigned = await db
+      .select({ id: assignments.id })
+      .from(assignments)
+      .where(eq(assignments.contentRevisionId, mod.publishedRevisionId))
+      .limit(1);
+    if (assigned.length > 0) continue;
     const [revision] = await db
       .select()
       .from(moduleRevisions)

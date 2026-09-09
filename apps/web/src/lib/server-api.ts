@@ -88,6 +88,11 @@ export async function fetchTeachClasses() {
   return baseFetchTeachClasses(await options());
 }
 
+export async function fetchArchivedTeachClasses() {
+  const { fetchArchivedTeachClasses: base } = await import("./path-api");
+  return base(await options());
+}
+
 export async function fetchTeachClassAssignments(classId: string) {
   return baseFetchTeachClassAssignments(classId, await options());
 }

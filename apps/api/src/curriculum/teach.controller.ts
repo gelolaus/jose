@@ -301,7 +301,7 @@ export class TeachController {
   ) {
     const moduleId = await this.curriculum.moduleIdForLevel(id);
     await this.authorization.assertCanAccessModule(user, moduleId);
-    return this.curriculum.patchLevel(id, body);
+    return this.curriculum.patchLevel(id, body, user);
   }
 
   @Delete("levels/:id")
@@ -353,7 +353,7 @@ export class TeachController {
   ) {
     const moduleId = await this.curriculum.moduleIdForLevel(id);
     await this.authorization.assertCanAccessModule(user, moduleId);
-    return this.curriculum.putLesson(id, body);
+    return this.curriculum.putLesson(id, body, user);
   }
 
   @Put("levels/:id/game")
@@ -364,7 +364,7 @@ export class TeachController {
   ) {
     const moduleId = await this.curriculum.moduleIdForLevel(id);
     await this.authorization.assertCanAccessModule(user, moduleId);
-    return this.curriculum.putGame(id, body);
+    return this.curriculum.putGame(id, body, user);
   }
 
   @Put("levels/:id/chest")
@@ -375,7 +375,7 @@ export class TeachController {
   ) {
     const moduleId = await this.curriculum.moduleIdForLevel(id);
     await this.authorization.assertCanAccessModule(user, moduleId);
-    return this.curriculum.putChest(id, body);
+    return this.curriculum.putChest(id, body, user);
   }
 
   @Post("levels/:id/import-questions")

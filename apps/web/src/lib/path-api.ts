@@ -616,6 +616,76 @@ export async function fetchTeachClasses(options?: ApiCallOptions) {
   return classSummarySchema.array().parse(json);
 }
 
+export async function fetchArchivedTeachClasses(options?: ApiCallOptions) {
+  const json = await apiFetch("/teach/classes/archived", undefined, options);
+  return classSummarySchema.array().parse(json);
+}
+
+export async function patchTeachAssignment(
+  classId: string,
+  assignmentId: string,
+  body: { title?: string; dueAt?: number | null; dueTimezone?: string; gradingPolicy?: "best" | "latest" | "override" },
+) {
+  const json = await apiFetch(`/teach/classes/${classId}/assignments/${assignmentId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+  return assignmentSchema.parse(json);
+}
+
+export async function createTeachAssignment(
+  classId: string,
+  body: { moduleId: string; title: string; dueAt?: number | null; dueTimezone?: string; gradingPolicy?: "best" | "latest" | "override" },
+) {
+  const json = await apiFetch(`/teach/classes/${classId}/assignments`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return assignmentSchema.parse(json);
+}
+
+export async function fetchAssignmentOverrides(
+  classId: string,
+  assignmentId: string,
+  options?: ApiCallOptions,
+) {
+  const json = await apiFetch(
+    `/teach/classes/${classId}/assignments/${assignmentId}/overrides`,
+    undefined,
+    options,
+  );
+  return json as Array<{
+    assignmentId: string;
+    learnerId: string;
+    score: number;
+    maxScore: number;
+    reason: string;
+  }>;
+}
+
+export async function upsertAssignmentOverride(
+  classId: string,
+  assignmentId: string,
+  body: { learnerId: string; score: number; maxScore: number; reason: string },
+) {
+  const json = await apiFetch(
+    `/teach/classes/${classId}/assignments/${assignmentId}/overrides`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+  return json;
+}
+
+export async function removeAssignmentOverride(
+  classId: string,
+  assignmentId: string,
+  learnerId: string,
+) {
+  await apiFetch(
+    `/teach/classes/${classId}/assignments/${assignmentId}/overrides/${encodeURIComponent(learnerId)}`,
+    { method: "DELETE" },
+  );
+}
+
 export async function fetchTeachClassAssignments(
   classId: string,
   options?: ApiCallOptions,

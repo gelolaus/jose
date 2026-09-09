@@ -611,6 +611,132 @@ export const migration013EmptyStart: Migration = {
   },
 };
 
+/**
+ * Assignment titles, due timezones, and explicit grading policy.
+ * Migration-safe: adds nullable title/timezone + defaulted policy, then
+ * backfills existing rows with a generated label and documented defaults
+ * (Asia/Manila, best). Never deletes assignments or attempts.
+ */
+export const migration014AssignmentDetails: Migration = {
+  id: "014_assignment_details",
+  async up(client) {
+    await client.execute("PRAGMA foreign_keys = ON");
+    await ensureColumn(client, "assignments", "title", "TEXT");
+    await ensureColumn(client, "assignments", "due_timezone", "TEXT");
+    await ensureColumn(
+      client,
+      "assignments",
+      "grading_policy",
+      "TEXT NOT NULL DEFAULT 'best'",
+    );
+    await client.execute(
+      `UPDATE assignments SET due_timezone = 'Asia/Manila' WHERE due_timezone IS NULL`,
+    ).catch(() => undefined);
+    await client.execute(
+      `UPDATE assignments SET grading_policy = 'best' WHERE grading_policy IS NULL OR grading_policy NOT IN ('best','latest','override')`,
+    ).catch(() => undefined);
+    // Generated label keeps module title separate: "<module title> · <date>"
+    // falls back to Assignment <id prefix> when the module row is missing.
+    const rows = await client.execute(
+      `SELECT a.id as id, a.assigned_at as assignedAt, m.title as moduleTitle FROM assignments a LEFT JOIN modules m ON m.id = a.module_id WHERE a.title IS NULL`,
+    ).catch(() => ({ rows: [] as unknown[] }));
+    for (const row of (rows as { rows: Array<Record<string, unknown>> }).rows) {
+      const id = String((row as Record<string, unknown>).id ?? "");
+      if (!id) continue;
+      const moduleTitle = String(
+        (row as Record<string, unknown>).moduleTitle ?? "",
+      ).trim();
+      const assignedAt = Number(
+        (row as Record<string, unknown>).assignedAt ?? Date.now(),
+      );
+      const date = new Date(
+        Number.isFinite(assignedAt) ? assignedAt : Date.now(),
+      );
+      const ymd = Number.isNaN(date.getTime())
+        ? "undated"
+        : date.toISOString().slice(0, 10);
+      const label = `${moduleTitle || "Assignment " + id.slice(0, 8)} · ${ymd}`.slice(
+        0,
+        80,
+      );
+      await client.execute({
+        sql: `UPDATE assignments SET title = ? WHERE id = ? AND title IS NULL`,
+        args: [label, id],
+      }).catch(() => undefined);
+    }
+  },
+};
+
+/** Audited manual overrides, separate from attempts. Append-only history. */
+export const migration015GradeOverrides: Migration = {
+  id: "015_grade_overrides",
+  async up(client) {
+    await client.execute("PRAGMA foreign_keys = ON");
+    await client.execute(`CREATE TABLE IF NOT EXISTS grade_overrides (
+      assignment_id TEXT NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+      learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+      score INTEGER NOT NULL,
+      max_score INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (assignment_id, learner_id)
+    )`);
+    await client.execute(`CREATE TABLE IF NOT EXISTS grade_override_audit (
+      id TEXT PRIMARY KEY,
+      assignment_id TEXT NOT NULL,
+      learner_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      score INTEGER,
+      max_score INTEGER,
+      reason TEXT,
+      actor_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )`);
+    await client.execute(
+      `CREATE INDEX IF NOT EXISTS idx_grade_overrides_assignment ON grade_overrides (assignment_id)`,
+    );
+    await client.execute(
+      `CREATE INDEX IF NOT EXISTS idx_grade_override_audit_assignment ON grade_override_audit (assignment_id, created_at)`,
+    );
+  },
+};
+
+/**
+ * Immutable assigned-revision snapshots for reproducible grading.
+ * Copies the assigned moduleRevisions.snapshotJson into the assignment row
+ * once; gradebooks prefer this copy so later draft edits, republishes, or
+ * seed backfills cannot silently mutate historical grades.
+ */
+export const migration016AssignedSnapshots: Migration = {
+  id: "016_assigned_snapshots",
+  async up(client) {
+    await client.execute("PRAGMA foreign_keys = ON");
+    await ensureColumn(
+      client,
+      "assignments",
+      "assigned_snapshot_json",
+      "TEXT",
+    );
+    const rows = await client.execute(
+      `SELECT a.id as id, a.assigned_snapshot_json as snap, r.snapshot_json as revSnap FROM assignments a LEFT JOIN module_revisions r ON r.id = a.content_revision_id WHERE a.assigned_snapshot_json IS NULL`,
+    ).catch(() => ({ rows: [] as unknown[] }));
+    for (const row of (rows as { rows: Array<Record<string, unknown>> }).rows) {
+      const id = String((row as Record<string, unknown>).id ?? "");
+      const revSnap = (row as Record<string, unknown>).revSnap as
+        | string
+        | null
+        | undefined;
+      if (!id || !revSnap) continue;
+      await client.execute({
+        sql: `UPDATE assignments SET assigned_snapshot_json = ? WHERE id = ? AND assigned_snapshot_json IS NULL`,
+        args: [revSnap, id],
+      }).catch(() => undefined);
+    }
+  },
+};
+
 export const MIGRATIONS: Migration[] = [
   migration001InitialSchema,
   migration002QueryIndexes,
@@ -625,6 +751,9 @@ export const MIGRATIONS: Migration[] = [
   migration011NameAudit,
   migration012GradebookIndexes,
   migration013EmptyStart,
+  migration014AssignmentDetails,
+  migration015GradeOverrides,
+  migration016AssignedSnapshots,
 ];
 
 export async function ensureColumn(

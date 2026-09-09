@@ -1787,7 +1787,7 @@ export class CurriculumService {
     return this.getTeachLevel(id);
   }
 
-  async patchLevel(levelId: string, body: unknown) {
+  async patchLevel(levelId: string, body: unknown, actor?: SessionUser) {
     const ctx = await this.levelContext(levelId);
     const data = parseBody(patchLevelBodySchema, body);
     this.assertRevision(ctx.level.revision ?? 0, data.expectedRevision);
@@ -1799,6 +1799,7 @@ export class CurriculumService {
     }
     await this.bumpLevelRevision(levelId);
     await this.touchModule(ctx.module.id);
+    await this.audit(ctx.module.id, actor?.id, "level.edit", { levelId, ...data });
     return this.getTeachLevel(levelId);
   }
 
@@ -1950,7 +1951,7 @@ export class CurriculumService {
     return this.getTeachModule(mod.id);
   }
 
-  async putLesson(levelId: string, body: unknown) {
+  async putLesson(levelId: string, body: unknown, actor?: SessionUser) {
     const ctx = await this.levelContext(levelId);
     if (ctx.level.kind !== "lesson") {
       throw new BadRequestException("This level is not a lesson");
@@ -2001,12 +2002,13 @@ export class CurriculumService {
       });
     await this.bumpLevelRevision(levelId);
     await this.touchModule(ctx.module.id);
+    await this.audit(ctx.module.id, actor?.id, "level.edit_lesson", { levelId });
     return this.getTeachLevel(levelId);
   }
 
 
 
-  async putGame(levelId: string, body: unknown) {
+  async putGame(levelId: string, body: unknown, actor?: SessionUser) {
     const ctx = await this.levelContext(levelId);
     if (ctx.level.kind !== "game") {
       throw new BadRequestException("This level is not a game");
@@ -2028,10 +2030,11 @@ export class CurriculumService {
       });
     await this.bumpLevelRevision(levelId);
     await this.touchModule(ctx.module.id);
+    await this.audit(ctx.module.id, actor?.id, "level.edit_game", { levelId });
     return this.getTeachLevel(levelId);
   }
 
-  async putChest(levelId: string, body: unknown) {
+  async putChest(levelId: string, body: unknown, actor?: SessionUser) {
     const ctx = await this.levelContext(levelId);
     if (ctx.level.kind !== "chest") {
       throw new BadRequestException("This level is not a chest");
@@ -2046,6 +2049,7 @@ export class CurriculumService {
       });
     await this.bumpLevelRevision(levelId);
     await this.touchModule(ctx.module.id);
+    await this.audit(ctx.module.id, actor?.id, "level.edit_chest", { levelId });
     return this.getTeachLevel(levelId);
   }
 

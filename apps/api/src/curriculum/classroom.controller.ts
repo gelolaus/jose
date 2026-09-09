@@ -5,6 +5,7 @@ import {
   Get,
   Header,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -22,6 +23,12 @@ export class ClassroomController {
   @UseGuards(SessionAuthGuard, TeacherRoleGuard)
   list(@CurrentUser() user: SessionUser) {
     return this.classroom.listClasses(user);
+  }
+
+  @Get("teach/classes/archived")
+  @UseGuards(SessionAuthGuard, TeacherRoleGuard)
+  listArchived(@CurrentUser() user: SessionUser) {
+    return this.classroom.listArchivedClasses(user);
   }
 
   @Post("teach/classes")
@@ -62,6 +69,67 @@ export class ClassroomController {
     const includeArchived =
       query.includeArchived === "true" || query.includeArchived === true;
     return this.classroom.listClassAssignments(user, id, { includeArchived });
+  }
+
+  @Patch("teach/classes/:id/assignments/:assignmentId")
+  @UseGuards(SessionAuthGuard, TeacherRoleGuard)
+  updateAssignment(
+    @CurrentUser() user: SessionUser,
+    @Param("assignmentId") assignmentId: string,
+    @Body() body: unknown,
+  ) {
+    return this.classroom.updateAssignment(user, assignmentId, body);
+  }
+
+  @Get("teach/classes/:id/assignments/:assignmentId/overrides")
+  @UseGuards(SessionAuthGuard, TeacherRoleGuard)
+  listOverrides(
+    @CurrentUser() user: SessionUser,
+    @Param("assignmentId") assignmentId: string,
+  ) {
+    return this.classroom.listOverrides(user, assignmentId);
+  }
+
+  @Post("teach/classes/:id/assignments/:assignmentId/overrides")
+  @UseGuards(SessionAuthGuard, TeacherRoleGuard)
+  upsertOverride(
+    @CurrentUser() user: SessionUser,
+    @Param("assignmentId") assignmentId: string,
+    @Body() body: unknown,
+  ) {
+    return this.classroom.upsertOverride(user, assignmentId, body);
+  }
+
+  @Delete("teach/classes/:id/assignments/:assignmentId/overrides/:learnerId")
+  @UseGuards(SessionAuthGuard, TeacherRoleGuard)
+  removeOverride(
+    @CurrentUser() user: SessionUser,
+    @Param("assignmentId") assignmentId: string,
+    @Param("learnerId") learnerId: string,
+  ) {
+    return this.classroom.removeOverride(user, assignmentId, learnerId);
+  }
+
+  @Get("teach/classes/:id/assignments/:assignmentId/overrides/history")
+  @UseGuards(SessionAuthGuard, TeacherRoleGuard)
+  overrideHistory(
+    @CurrentUser() user: SessionUser,
+    @Param("assignmentId") assignmentId: string,
+    @Query() query: Record<string, unknown>,
+  ) {
+    const learnerId =
+      typeof query.learnerId === "string" ? query.learnerId : undefined;
+    return this.classroom.overrideHistory(user, assignmentId, learnerId);
+  }
+
+  @Get("teach/classes/:id/assignments/:assignmentId/history")
+  @UseGuards(SessionAuthGuard, TeacherRoleGuard)
+  archivedHistory(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Param("assignmentId") assignmentId: string,
+  ) {
+    return this.classroom.archivedAuditHistory(user, id, assignmentId);
   }
 
   @Get("teach/classes/:id/gradebook")
