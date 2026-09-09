@@ -33,14 +33,17 @@ sign-in, and without `JOSE_AUTH_MODE` there is no way to sign in at all.
 - Readiness: http://localhost:3001/ready  
 - Teacher studio: Profile → Teacher studio, or http://localhost:3000/teach  
 
-The API creates `apps/api/data/jose.sqlite` on first boot but does **not** insert curriculum or demo progress automatically. After a fresh database (or deploy), seed explicitly:
+The API creates `apps/api/data/jose.sqlite` on first boot and never inserts
+curriculum or demo progress. A fresh migrated database is the empty start —
+teachers create modules via Teacher studio or JMM import afterwards:
 
 ```bash
-npm run db:seed                 # curriculum@1 only — honest empty learner stats
-npm run db:seed -- --demo       # also apply demo-learner@1 (local shared Explorer only)
+npm run db:migrate
 ```
 
-Re-running the seed command skips already-applied versions, so deleting a seeded extra or the Ateneo module survives restart. `JOSE_DEMO_MODE` never invents XP for a signed-in student; production refuses to boot with it enabled.
+See `docs/ops/empty-start-and-cutover.md` for the clean-start and Turso
+cutover procedure. `JOSE_DEMO_MODE` never invents XP for a signed-in student;
+production refuses to boot with it enabled.
 
 Versioned schema changes live in `apps/api/src/db/migrations`. Development applies them on API boot; production must run `npm run db:migrate` first. Backup and restore:
 
@@ -50,7 +53,7 @@ npm run db:backup -- --json --out=./apps/api/data/backups/pre-change.json
 # npm run db:restore -- --from=./apps/api/data/backups/pre-change.json
 ```
 
-Point `JOSE_DATABASE_URL` at a persistent volume or hosted libSQL — never an ephemeral container disk. See `docs/ops/staging-smoke-and-rollback.md`.
+Point `JOSE_DATABASE_URL` at a persistent volume or hosted libSQL — never an ephemeral container disk. See `docs/ops/deployment.md` and `docs/ops/staging-smoke-and-rollback.md`. Production template: `.env.production.example`.
 
 ## Accounts and sign-in
 
@@ -78,11 +81,11 @@ rights. Teacher studio routes require a real signed-in `teacher` or `admin`.
 - A teacher edits the modules they own (`modules.owner_user_id`).
 - Another teacher's module is 403 unless they were added as a collaborator
   (`POST /teach/modules/:moduleId/collaborators`, owner or admin only).
-- Seeded curriculum has no owner, so only admins can edit it.
+- Legacy ownerless modules (pre-empty-start imports) are admin-only.
 
 ### First admin
 
-There are no seeded admin accounts. Bootstrap one once, on the running deployment:
+There are no seed admin accounts. Bootstrap one once, on the running deployment:
 
 ```bash
 JOSE_ADMIN_BOOTSTRAP_EMAIL=you@apc.edu.ph JOSE_ADMIN_BOOTSTRAP_TOKEN=<long-random> npm run dev
@@ -117,6 +120,8 @@ and must not be reintroduced.
 
 Full setup steps, including the Entra app registration, are in
 `docs/auth/microsoft-entra-setup.md`, and every variable is listed in `apps/api/.env.example`.
+Production deploy order and Vercel rewrite target are in
+`docs/ops/deployment.md` with values from `.env.production.example`.
 
 ## Tests
 
@@ -126,7 +131,7 @@ npm test
 
 ## Content ownership
 
-Seed lessons are structural placeholders. See `docs/CONTENT_GAPS.md` for syllabus, objectives, citations, and review work instructors must supply.
+Teacher-authored lessons start as structural placeholders. See `docs/CONTENT_GAPS.md` for syllabus, objectives, citations, and review work instructors must supply.
 
 ## Docs
 

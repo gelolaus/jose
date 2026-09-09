@@ -1,3 +1,10 @@
+/**
+ * @deprecated Test fixtures only. There is no production `db:seed` command.
+ * Empty start uses a fresh migrated database; see docs/ops/empty-start-and-cutover.md.
+ * Kept because http/service specs use applyPendingSeeds for isolated fixtures
+ * and existing deployments may still carry seed_history rows. Do not import
+ * from application runtime code.
+ */
 import { randomUUID } from "node:crypto";
 import {
   DEMO_LEARNER_ID,

@@ -592,6 +592,25 @@ export const migration012GradebookIndexes: Migration = {
   },
 };
 
+/**
+ * Empty-start release marker. Non-destructive: backfills module status for
+ * pre-release rows so fresh and upgraded databases agree. Never deletes
+ * curriculum, users, learners, attempts, or history. An empty database after
+ * this migration means "no modules yet", not "wiped".
+ */
+export const migration013EmptyStart: Migration = {
+  id: "013_empty_start",
+  async up(client) {
+    await client.execute("PRAGMA foreign_keys = ON");
+    await ensureColumn(client, "modules", "status", "TEXT");
+    await client
+      .execute(
+        `UPDATE modules SET status = CASE WHEN published = 1 THEN 'published' ELSE 'draft' END WHERE status IS NULL`,
+      )
+      .catch(() => undefined);
+  },
+};
+
 export const MIGRATIONS: Migration[] = [
   migration001InitialSchema,
   migration002QueryIndexes,
@@ -605,6 +624,7 @@ export const MIGRATIONS: Migration[] = [
   migration010BookmarksLivesRoles,
   migration011NameAudit,
   migration012GradebookIndexes,
+  migration013EmptyStart,
 ];
 
 export async function ensureColumn(
