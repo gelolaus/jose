@@ -524,6 +524,15 @@ export const roleAudit = sqliteTable("role_audit", {
   createdAt: integer("created_at").notNull(),
 });
 
+export const userNameAudit = sqliteTable("user_name_audit", {
+  id: text("id").primaryKey(),
+  actorId: text("actor_id").notNull(),
+  targetUserId: text("target_user_id").notNull(),
+  priorName: text("prior_name").notNull(),
+  newName: text("new_name").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
+
 export const learnerArtifacts = sqliteTable(
   "learner_artifacts",
   {

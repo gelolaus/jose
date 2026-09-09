@@ -58,7 +58,9 @@ In production, sign-in is Microsoft (Entra ID) only, and only for exactly `@apc.
 `@student.apc.edu.ph` mailboxes. Any other domain is denied, including look-alikes such as `apc.edu.ph.example.com`.
 A signed-in student gets their own learner row, so XP, hearts, streak and level progress never
 leak between accounts. Sessions live in an HttpOnly `jose_session` cookie; the API never reads
-identity from a request header.
+identity from a request header. Display names are copied from the admitted account at creation
+and are immutable via self-service profile editing (avatar-only); name corrections require an
+admin support action via `POST /admin/users/name-correction` with an audit row.
 
 `JOSE_AUTH_MODE` picks the stack:
 
@@ -93,6 +95,13 @@ It succeeds only while no admin exists, and sets a session cookie rather than re
 Remove both variables afterwards. That admin then promotes teachers with
 `POST /admin/users/role` (`student` or `teacher` only — admin is never granted over HTTP).
 
+Pinned promotion for `arlaus@student.apc.edu.ph` (must already exist from normal sign-in,
+idempotent, writes `role_audit`; delete the token afterwards):
+
+```bash
+JOSE_PROMOTE_ARLAUS_TOKEN=<long-random> npm run db:promote-arlaus --workspace=@jose/api
+```
+
 ### Before deploying to production
 
 The API refuses to boot in production (`NODE_ENV=production` or `JOSE_ENV=production`) when any
@@ -100,10 +109,11 @@ test-only login path is still enabled, so remove these:
 
 - `JOSE_AUTH_MODE=mock`
 - `JOSE_DEMO_MODE=true`
-- `JOSE_AUTH_DEV_LOGIN=1`
-- `JOSE_AUTH_STUB=1`
 - `JOSE_AUTH_MODE=disabled`
 - `JOSE_MAIL_TRANSPORT=memory` while `JOSE_AUTH_MODE=microsoft`
+
+Local dev login shortcuts (`/auth/dev/*`, `LocalDevPanel`, local role switch) were deleted
+and must not be reintroduced.
 
 Full setup steps, including the Entra app registration, are in
 `docs/auth/microsoft-entra-setup.md`, and every variable is listed in `apps/api/.env.example`.

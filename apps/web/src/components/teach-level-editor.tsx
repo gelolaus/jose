@@ -64,10 +64,10 @@ export function TeachLevelEditor({
     onDraftChange({ id: level.id, title, blocks, game });
   }, [blocks, game, level.id, onDraftChange, title]);
 
-  useEffect(() => {
+  const clearEditErrors = useCallback(() => {
     setError(null);
     setConflict(null);
-  }, [blocks, game, title]);
+  }, []);
 
   const save = useCallback(async () => {
     setError(null);
@@ -219,6 +219,7 @@ export function TeachLevelEditor({
         onChange={(e) => {
           setTitle(e.target.value);
           setStatus("dirty");
+          clearEditErrors();
         }}
         className="w-full rounded-2xl bg-[var(--jose-paper)] px-4 py-3 font-bold ring-1 ring-[var(--jose-rule)]"
       />
@@ -229,6 +230,7 @@ export function TeachLevelEditor({
           onChange={(next) => {
             setBlocks(next);
             setStatus("dirty");
+            clearEditErrors();
           }}
           disabled={status === "saving"}
         />
@@ -240,6 +242,7 @@ export function TeachLevelEditor({
             onChange={(next) => {
               setGame(next);
               setStatus("dirty");
+              clearEditErrors();
             }}
           />
           {game.type === "quiz" && !dirty ? (

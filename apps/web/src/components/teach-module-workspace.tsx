@@ -233,10 +233,11 @@ export function TeachModuleWorkspace({
               {pane !== "outline" ? (
                 <button
                   type="button"
+                  aria-label="Back to outline"
                   className="jose-button jose-button--secondary min-h-11 px-3 py-1.5 text-xs lg:hidden"
                   onClick={() => setPane("outline")}
                 >
-                  Outline
+                  Back to outline
                 </button>
               ) : null}
               <button
@@ -366,7 +367,15 @@ export function TeachModuleWorkspace({
           className={`min-h-0 overflow-y-auto p-4 sm:p-5 ${
             pane === "outline" ? "hidden lg:block" : "block"
           }`}
+          aria-label="Editor"
         >
+          <p aria-live="polite" className="mb-3 text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--jose-ink-muted)]">
+            {selection.type === "level"
+              ? `Editing lesson: ${level?.title ?? selection.levelId}`
+              : selection.type === "section"
+                ? "Editing section"
+                : "Editing module"}
+          </p>
           {pane === "preview" ? (
             <TeacherPreviewPane
               level={previewLevel(level, levelDraft)}

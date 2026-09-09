@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
 import {
+  adminNameCorrectionBodySchema,
   adminUserQuerySchema,
   grantRoleBodySchema,
   type SessionUser,
@@ -44,6 +45,31 @@ export class AdminController {
     const user = await this.users.setRoleByEmail({
       email: parsed.data.email,
       role: parsed.data.role,
+      actorId: admin.id,
+    });
+    return { user };
+  }
+
+  /**
+   * Admin-only audited display-name correction. Self-service profile editing
+   * cannot change names; corrections go through here with an audit row.
+   */
+  @Post("users/name-correction")
+  async correctName(@CurrentUser() admin: SessionUser, @Body() body: unknown) {
+    this.authorization.assertAdmin(admin);
+    const parsed = adminNameCorrectionBodySchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        parsed.error.issues.map((issue) => issue.message).join("; ") || "Invalid body",
+      );
+    }
+    if (!parsed.data.userId && !parsed.data.email) {
+      throw new BadRequestException("userId or email is required");
+    }
+    const user = await this.users.correctDisplayName({
+      userId: parsed.data.userId,
+      email: parsed.data.email,
+      displayName: parsed.data.displayName,
       actorId: admin.id,
     });
     return { user };

@@ -1,4 +1,4 @@
-import { Test, type TestingModule } from "@nestjs/testing";
+﻿import { Test, type TestingModule } from "@nestjs/testing";
 import type { INestApplication } from "@nestjs/common";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -8,9 +8,10 @@ import { eq } from "drizzle-orm";
 import { AppModule } from "../app.module";
 import { DatabaseService } from "../db/database.service";
 import { applyPendingSeeds } from "../db/seed";
-import { modules, users } from "../db/schema";
+import { modules, userNameAudit, users } from "../db/schema";
 import { SESSION_COOKIE } from "./crypto.util";
 import { createTestAccount, type TestAccount } from "./test-session.helper";
+import { UsersService } from "./users.service";
 
 const BASE_ENV = {
   JOSE_AUTH_MODE: "mock",
@@ -45,7 +46,6 @@ describe("Teacher studio authorization over HTTP (issues #3 and #4)", () => {
       JOSE_ADMIN_BOOTSTRAP_EMAIL: "admin@apc.edu.ph",
       JOSE_ADMIN_BOOTSTRAP_TOKEN: "bootstrap-secret-token",
     });
-    delete process.env.JOSE_AUTH_DEV_LOGIN;
     delete process.env.JOSE_DEMO_MODE;
 
     moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -383,6 +383,76 @@ describe("Teacher studio authorization over HTTP (issues #3 and #4)", () => {
       .expect(403);
   });
 
+  it("corrects display names only via admin audited action", async () => {
+    await request(app.getHttpServer())
+      .post("/admin/users/name-correction")
+      .send({ email: student.admissionEmail, displayName: "Fixed Name" })
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .post("/admin/users/name-correction")
+      .set("Cookie", student.cookie)
+      .send({ email: student.admissionEmail, displayName: "Fixed Name" })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post("/admin/users/name-correction")
+      .set("Cookie", teacherA.cookie)
+      .send({ email: student.admissionEmail, displayName: "Fixed Name" })
+      .expect(403);
+
+    const corrected = await request(app.getHttpServer())
+      .post("/admin/users/name-correction")
+      .set("Cookie", admin.cookie)
+      .send({ email: student.admissionEmail, displayName: "Fixed Name" })
+      .expect(201);
+    expect(corrected.body.user.displayName).toBe("Fixed Name");
+
+    const me = await request(app.getHttpServer())
+      .get("/auth/me")
+      .set("Cookie", student.cookie)
+      .expect(200);
+    expect(me.body.user.displayName).toBe("Fixed Name");
+    expect(me.body.learner.displayName).toBe("Fixed Name");
+
+    const [audit] = await database.db
+      .select()
+      .from(userNameAudit)
+      .where(eq(userNameAudit.targetUserId, student.userId))
+      .limit(1);
+    expect(audit.newName).toBe("Fixed Name");
+  });
+
+  it("promotes the pinned Arlaus account idempotently and lets admins enter teach", async () => {
+    const usersService = moduleRef.get(UsersService);
+    const arlaus = await createTestAccount(database, {
+      admissionEmail: "arlaus@student.apc.edu.ph",
+      displayName: "Arlaus",
+    });
+    const first = await usersService.promoteArlausToAdmin({});
+    expect(first.role).toBe("admin");
+    const second = await usersService.promoteArlausToAdmin({});
+    expect(second.role).toBe("admin");
+
+    const teach = await request(app.getHttpServer())
+      .get("/teach/modules")
+      .set("Cookie", arlaus.cookie)
+      .expect(200);
+    expect(Array.isArray(teach.body)).toBe(true);
+
+    await expect(usersService.promoteArlausToAdmin({})).resolves.toMatchObject({
+      role: "admin",
+    });
+  });
+
+  it("no longer exposes local dev login or role switch", async () => {
+    await request(app.getHttpServer()).post("/auth/dev/login").send({}).expect(404);
+    await request(app.getHttpServer())
+      .post("/auth/dev/role")
+      .send({ role: "teacher" })
+      .expect(404);
+  });
+
   it("reports the signed-in role through /auth/me and nothing for anonymous", async () => {
     const anon = await request(app.getHttpServer()).get("/auth/me").expect(200);
     expect(anon.body.authenticated).toBe(false);
@@ -411,7 +481,6 @@ describe("Admin bootstrap on an empty deployment", () => {
       JOSE_ADMIN_BOOTSTRAP_EMAIL: "first-admin@apc.edu.ph",
       JOSE_ADMIN_BOOTSTRAP_TOKEN: "one-time-bootstrap",
     });
-    delete process.env.JOSE_AUTH_DEV_LOGIN;
 
     moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();

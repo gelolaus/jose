@@ -552,6 +552,27 @@ export const migration010BookmarksLivesRoles: Migration = {
   },
 };
 
+export const migration011NameAudit: Migration = {
+  id: "011_name_audit",
+  async up(client) {
+    await client.execute("PRAGMA foreign_keys = ON");
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS user_name_audit (
+        id TEXT PRIMARY KEY,
+        actor_id TEXT NOT NULL,
+        target_user_id TEXT NOT NULL,
+        prior_name TEXT NOT NULL,
+        new_name TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )
+    `);
+    await client.execute(
+      `CREATE INDEX IF NOT EXISTS idx_user_name_audit_created
+        ON user_name_audit (created_at)`,
+    );
+  },
+};
+
 export const MIGRATIONS: Migration[] = [
   migration001InitialSchema,
   migration002QueryIndexes,
@@ -563,6 +584,7 @@ export const MIGRATIONS: Migration[] = [
   migration008LearnerArtifacts,
   migration009ClassChallenges,
   migration010BookmarksLivesRoles,
+  migration011NameAudit,
 ];
 
 export async function ensureColumn(

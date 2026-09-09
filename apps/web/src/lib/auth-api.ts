@@ -7,7 +7,6 @@ import {
   type AuthMeResponse,
   type AuthStatus,
   type AvatarId,
-  type LocalDevRole,
   type PendingAdmissionStatus,
   type SessionUser,
 } from "@jose/shared";
@@ -92,35 +91,8 @@ export async function logoutJose(): Promise<void> {
   await authFetch("/auth/logout", { method: "POST", body: "{}" });
 }
 
-export async function loginAsArlaus(): Promise<AuthMeResponse> {
-  const res = await authFetch("/auth/dev/login", {
-    method: "POST",
-    body: "{}",
-  });
-  const json = await res.json();
-  if (!res.ok) {
-    throw new Error(json.message ?? "Local test login is not available.");
-  }
-  return authMeResponseSchema.parse(json);
-}
-
-export async function switchLocalDevRole(
-  role: LocalDevRole,
-): Promise<AuthMeResponse> {
-  const res = await authFetch("/auth/dev/role", {
-    method: "POST",
-    body: JSON.stringify({ role }),
-  });
-  const json = await res.json();
-  if (!res.ok) {
-    throw new Error(json.message ?? "Could not switch the local test role.");
-  }
-  return authMeResponseSchema.parse(json);
-}
-
 export async function updateProfile(patch: {
-  displayName?: string;
-  avatarId?: AvatarId;
+  avatarId: AvatarId;
 }): Promise<AuthMeResponse["learner"]> {
   const res = await authFetch("/auth/profile", {
     method: "PATCH",

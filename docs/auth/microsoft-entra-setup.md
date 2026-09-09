@@ -113,8 +113,9 @@ curl -X POST https://your-web-origin/api/admin/users/role \
 |---|---|
 | `JOSE_AUTH_MODE=mock` | Test-only login bypass; no real Microsoft verification. |
 | `JOSE_DEMO_MODE=true` / `1` | Grants anonymous access to the shared demo learner. |
-| `JOSE_AUTH_DEV_LOGIN=1` / `true` | Test-only login shortcut. |
 | `JOSE_MAIL_TRANSPORT=memory` with `JOSE_AUTH_MODE=microsoft` | Would make an in-memory value the only OTP path. |
+
+Local dev login shortcuts (`/auth/dev/*`, local role switch) were deleted in Batch 1.
 
 `AuthService` also fails closed rather than degrading to `disabled` mode when the
 production configuration is invalid. `JOSE_COOKIE_SECURE` defaults to `true` in

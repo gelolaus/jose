@@ -13,18 +13,13 @@ import {
 import {
   AUTH_DENIAL_MESSAGES,
   DEFAULT_AVATAR_ID,
-  LOCAL_DEV_TEST_EMAIL,
   learnerLivesFields,
   MAX_HEARTS,
   isAvatarId,
-  isLocalDevTestEmail,
-  localDevRoleBodySchema,
-  normalizeDisplayName,
   type AuthDenialReason,
   type AuthLearnerProfile,
   type AuthMeResponse,
   type AuthStatus,
-  type AvatarId,
   type PendingAdmissionStatus,
   type ProfilePatchBody,
   type SessionUser,
@@ -66,7 +61,6 @@ import type {
   MockCompleteClaims,
   ValidatedMicrosoftIdentity,
 } from "./microsoft-oidc.types";
-import { localDevAccessFromRequest } from "./local-request";
 import { SessionService } from "./session.service";
 import { UsersService } from "./users.service";
 
@@ -100,7 +94,6 @@ export class AuthService {
           ...process.env,
           JOSE_AUTH_MODE: "disabled",
           JOSE_DEMO_MODE: "false",
-          JOSE_AUTH_DEV_LOGIN: "",
         });
         this.configError = error.message;
       } else {
@@ -143,77 +136,12 @@ export class AuthService {
     return this.config;
   }
 
-  getStatus(req?: Request): AuthStatus & { configError: string | null } {
+  getStatus(_req?: Request): AuthStatus & { configError: string | null } {
     return {
       ...toAuthStatus(this.config),
-      localDevAccess: this.hasLocalDevAccess(req),
+      localDevAccess: false,
       configError: this.configError,
     };
-  }
-
-  hasLocalDevAccess(req?: Request): boolean {
-    if (!req) return false;
-    return localDevAccessFromRequest(
-      req,
-      this.config.isProduction,
-      process.env.JOSE_AUTH_DEV_LOGIN,
-    );
-  }
-
-  private assertLocalDevAccess(req: Request): void {
-    if (!this.hasLocalDevAccess(req)) {
-      throw new ForbiddenException(
-        "Local development login is only available on localhost.",
-      );
-    }
-  }
-
-  /**
-   * Localhost-only shortcut that signs in the Arlaus test mailbox.
-   * Production and non-loopback peers never reach a session.
-   */
-  async localDevLogin(req: Request): Promise<{ token: string; me: AuthMeResponse }> {
-    this.assertLocalDevAccess(req);
-    let user = await this.users.findByAdmissionEmail(LOCAL_DEV_TEST_EMAIL);
-    if (!user) {
-      user = await this.users.createUser({
-        admissionEmail: LOCAL_DEV_TEST_EMAIL,
-        displayName: "Arlaus",
-        role: "student",
-      });
-    }
-    if (user.suspended) {
-      throw new ForbiddenException(AUTH_DENIAL_MESSAGES.suspended);
-    }
-    const session = await this.sessions.createSession(user.id, this.config);
-    const me = await this.me(session.token);
-    return { token: session.token, me };
-  }
-
-  async localDevSwitchRole(
-    req: Request,
-    token: string | undefined,
-    body: unknown,
-  ): Promise<AuthMeResponse> {
-    this.assertLocalDevAccess(req);
-    const user = await this.requireUser(token);
-    if (!isLocalDevTestEmail(user.admissionEmail)) {
-      throw new ForbiddenException(
-        "This switch exists only for the local test account.",
-      );
-    }
-    const parsed = localDevRoleBodySchema.safeParse(body);
-    if (!parsed.success) {
-      throw new BadRequestException(
-        parsed.error.issues.map((issue) => issue.message).join("; ") ||
-          "Role must be student, teacher, or admin.",
-      );
-    }
-    await this.users.setLocalDevTestRole({
-      email: user.admissionEmail,
-      role: parsed.data.role,
-    });
-    return this.me(token);
   }
 
   isDemoMode(): boolean {
@@ -616,36 +544,20 @@ export class AuthService {
     };
   }
 
-  /** Cosmetic profile edits are scoped to the caller's own learner row. */
+  /** Avatar-only self-service edits; display names are immutable here. */
   async updateProfile(
     user: SessionUser,
     patch: ProfilePatchBody,
   ): Promise<AuthLearnerProfile> {
-    const updates: { displayName?: string; avatarId?: AvatarId } = {};
-    if (patch.displayName !== undefined) {
-      const displayName = normalizeDisplayName(patch.displayName);
-      if (!displayName) {
-        throw new BadRequestException("Display name must be 1-20 characters");
-      }
-      updates.displayName = displayName;
-    }
-    if (patch.avatarId !== undefined) {
-      if (!isAvatarId(patch.avatarId)) {
-        throw new BadRequestException("Unknown avatar");
-      }
-      updates.avatarId = patch.avatarId;
+    if (!isAvatarId(patch.avatarId)) {
+      throw new BadRequestException("Unknown avatar");
     }
 
     await this.ensureLearnerFor(user);
-    if (Object.keys(updates).length > 0) {
-      await this.db.update(learners).set(updates).where(eq(learners.id, user.id));
-      if (updates.displayName) {
-        await this.db
-          .update(users)
-          .set({ displayName: updates.displayName, updatedAt: Date.now() })
-          .where(eq(users.id, user.id));
-      }
-    }
+    await this.db
+      .update(learners)
+      .set({ avatarId: patch.avatarId })
+      .where(eq(learners.id, user.id));
     const profile = await this.getLearnerProfile(user.id);
     if (!profile) throw new NotFoundException("Learner profile missing");
     return profile;

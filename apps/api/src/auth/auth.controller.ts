@@ -4,7 +4,6 @@ import {
   Controller,
   ForbiddenException,
   Get,
-  HttpCode,
   Patch,
   Post,
   Query,
@@ -56,23 +55,14 @@ export class AuthController {
     return this.auth.me(readSessionToken(req));
   }
 
-  @Post("dev/login")
-  async devLogin(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const { token, me } = await this.auth.localDevLogin(req);
-    const config = this.auth.getRuntimeConfig();
-    this.setSessionCookie(res, token, config.cookieSecure, config.sessionTtlSeconds);
-    return me;
-  }
-
-  @Post("dev/role")
-  @HttpCode(200)
-  async devRole(@Req() req: Request, @Body() body: unknown) {
-    return this.auth.localDevSwitchRole(req, readSessionToken(req), body);
-  }
-
   @Patch("profile")
   @UseGuards(SessionAuthGuard)
   async patchProfile(@CurrentUser() user: SessionUser, @Body() body: unknown) {
+    if (body !== null && typeof body === "object" && "displayName" in (body as Record<string, unknown>)) {
+      throw new BadRequestException(
+        "Display name cannot be changed from profile editing. Contact an administrator for a name correction.",
+      );
+    }
     const parsed = profilePatchBodySchema.safeParse(body);
     if (!parsed.success) {
       throw new BadRequestException(

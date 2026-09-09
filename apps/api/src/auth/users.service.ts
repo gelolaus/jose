@@ -6,22 +6,21 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
+  ARLAUS_ADMIN_EMAIL,
   DEFAULT_AVATAR_ID,
   isExactStaffTeacherDomain,
-  isLocalDevTestEmail,
   MAX_HEARTS,
   paginateInMemory,
   roleFromAdmissionEmail,
   userRoleSchema,
   type AdminUserQuery,
-  type LocalDevRole,
   type SessionUser,
   type UserRole,
 } from "@jose/shared";
 import { asc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { DatabaseService } from "../db/database.service";
-import { learners, roleAudit, users } from "../db/schema";
+import { learners, roleAudit, userNameAudit, users } from "../db/schema";
 
 export type UserRow = typeof users.$inferSelect;
 
@@ -214,32 +213,78 @@ export class UsersService {
   }
 
   /**
-   * Localhost Arlaus shortcut only. May set student, teacher, or admin and may
-   * demote that same account so the local switch can return to Student.
-   * Production role grants still cannot assign admin.
+   * Admin-only audited display-name correction. Separate from self-service
+   * profile editing (which is avatar-only). Updates users + learners atomically
+   * from the operator's perspective and records prior/new names.
    */
-  async setLocalDevTestRole(input: {
-    email: string;
-    role: LocalDevRole;
+  async correctDisplayName(input: {
+    userId?: string;
+    email?: string;
+    displayName: string;
+    actorId: string;
   }): Promise<SessionUser> {
-    if (!isLocalDevTestEmail(input.email)) {
-      throw new ForbiddenException("This switch exists only for the local test account.");
+    const displayName = input.displayName.trim();
+    if (!displayName || displayName.length > 80) {
+      throw new BadRequestException("Display name must be 1-80 characters");
     }
-    const existing = await this.findByAdmissionEmail(input.email);
-    if (!existing) {
-      throw new NotFoundException("No Jose account for that APC mailbox yet.");
+    let target: SessionUser | null = null;
+    if (input.userId) {
+      target = await this.findById(input.userId);
+    } else if (input.email) {
+      target = await this.findByAdmissionEmail(input.email);
     }
+    if (!target) {
+      throw new NotFoundException("No Jose account for that user");
+    }
+    const priorName = target.displayName;
+    const now = Date.now();
     await this.db
       .update(users)
-      .set({ role: input.role, updatedAt: Date.now() })
-      .where(eq(users.id, existing.id));
-    return this.requireById(existing.id);
+      .set({ displayName, updatedAt: now })
+      .where(eq(users.id, target.id));
+    await this.db
+      .update(learners)
+      .set({ displayName })
+      .where(eq(learners.id, target.id));
+    await this.db.insert(userNameAudit).values({
+      id: randomUUID(),
+      actorId: input.actorId,
+      targetUserId: target.id,
+      priorName,
+      newName: displayName,
+      createdAt: now,
+    });
+    return this.requireById(target.id);
   }
 
-  async updateDisplayName(userId: string, displayName: string) {
+  /**
+   * Pinned one-time promotion for arlaus@student.apc.edu.ph. Requires the
+   * account to already exist from normal sign-in; idempotent if already admin.
+   * Writes a role_audit row. Never hard-codes authz elsewhere.
+   */
+  async promoteArlausToAdmin(input: { actorId?: string }): Promise<SessionUser> {
+    const existing = await this.findByAdmissionEmail(ARLAUS_ADMIN_EMAIL);
+    if (!existing) {
+      throw new NotFoundException(
+        "No Jose account for arlaus@student.apc.edu.ph yet. Ask them to complete normal sign-in first.",
+      );
+    }
+    if (existing.role === "admin") {
+      return existing;
+    }
+    const priorRole = existing.role;
     await this.db
       .update(users)
-      .set({ displayName, updatedAt: Date.now() })
-      .where(eq(users.id, userId));
+      .set({ role: "admin", updatedAt: Date.now() })
+      .where(eq(users.id, existing.id));
+    await this.db.insert(roleAudit).values({
+      id: randomUUID(),
+      actorId: input.actorId ?? existing.id,
+      targetUserId: existing.id,
+      priorRole,
+      newRole: "admin",
+      createdAt: Date.now(),
+    });
+    return this.requireById(existing.id);
   }
 }

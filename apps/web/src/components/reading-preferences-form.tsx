@@ -1,16 +1,13 @@
 "use client";
 
-import { ConnectedLocalDevPanel } from "@/components/local-dev-panel";
 import { ThemeToggle } from "@/components/presentation-toggle";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { t, writeReadingPreferences } from "@/lib/reading-preferences";
-import { useJoseSession } from "@/lib/use-jose-session";
 import { useReadingPreferences } from "@/lib/use-reading-preferences";
 import type { TextSize } from "@jose/shared";
 
 export function ReadingPreferencesForm() {
   const prefs = useReadingPreferences();
-  const { localDevAccess } = useJoseSession();
 
   function update<K extends keyof typeof prefs>(key: K, value: (typeof prefs)[K]) {
     writeReadingPreferences({ ...prefs, [key]: value });
@@ -70,15 +67,6 @@ export function ReadingPreferencesForm() {
         />
         {t(prefs.locale, "prefs.sound")}
       </label>
-
-      {localDevAccess ? (
-        <details className="mt-8">
-          <summary className="cursor-pointer text-sm font-bold">Local testing</summary>
-          <div className="mt-3">
-            <ConnectedLocalDevPanel compact />
-          </div>
-        </details>
-      ) : null}
     </div>
   );
 }

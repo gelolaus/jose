@@ -1,11 +1,10 @@
 "use client";
 
 import { JoseShell } from "@/components/jose-shell";
-import { ConnectedLocalDevPanel } from "@/components/local-dev-panel";
 import { JoseSessionProvider, useJoseSession } from "@/lib/use-jose-session";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Layers, Map, Settings, UserRound, Users } from "lucide-react";
+import { Layers, Map, Settings, Users } from "lucide-react";
 
 export function TeachShell({ children }: { children: ReactNode }) {
   return (
@@ -45,9 +44,6 @@ function TeachShellBody({ children }: { children: ReactNode }) {
               Back to learning
             </Link>
           </div>
-          <div className="mx-auto max-w-sm pt-2 text-left">
-            <ConnectedLocalDevPanel />
-          </div>
         </div>
       </div>
     );
@@ -71,18 +67,21 @@ function TeachShellBody({ children }: { children: ReactNode }) {
           icon: Users,
           isActive: (path) => path.startsWith("/teach/classes"),
         },
-        { href: "/learn", label: "Learn", icon: Map },
-        { href: "/profile", label: "Profile", icon: UserRound },
       ]}
       footer={
         <div className="space-y-3">
+          <Link
+            href="/learn"
+            className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-[var(--jose-text-muted)]"
+          >
+            <Map className="size-5" aria-hidden /> Learn
+          </Link>
           <Link
             href="/profile/preferences"
             className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-[var(--jose-text-muted)]"
           >
             <Settings className="size-5" aria-hidden /> Settings
           </Link>
-          <ConnectedLocalDevPanel compact />
         </div>
       }
     >

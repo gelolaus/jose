@@ -83,23 +83,6 @@ describe("production hard rejects (issues #4 and #5)", () => {
     ).toThrow(/JOSE_DEMO_MODE/);
   });
 
-  it("refuses to boot with the dev login shortcut on", () => {
-    expect(() =>
-      loadAuthConfig({
-        ...MICROSOFT_ENV,
-        NODE_ENV: "production",
-        JOSE_AUTH_DEV_LOGIN: "1",
-      }),
-    ).toThrow(/JOSE_AUTH_DEV_LOGIN/);
-    expect(() =>
-      loadAuthConfig({
-        ...MICROSOFT_ENV,
-        NODE_ENV: "production",
-        JOSE_AUTH_DEV_LOGIN: "true",
-      }),
-    ).toThrow(/JOSE_AUTH_DEV_LOGIN/);
-  });
-
   it("refuses in-memory mail as the only OTP path for microsoft mode", () => {
     expect(() =>
       loadAuthConfig({
@@ -116,32 +99,22 @@ describe("production hard rejects (issues #4 and #5)", () => {
     ).toThrow(AuthConfigError);
   });
 
-  it("still rejects insecure flags when auth is disabled", () => {
+  it("still rejects insecure mode when auth is disabled", () => {
     expect(() =>
       loadAuthConfig({
         NODE_ENV: "production",
         JOSE_AUTH_MODE: "disabled",
-        JOSE_AUTH_DEV_LOGIN: "1",
       }),
     ).toThrow(AuthConfigError);
   });
 
-  it("refuses disabled and stub authentication in production", () => {
+  it("refuses disabled authentication in production", () => {
     expect(() =>
       loadAuthConfig({
         NODE_ENV: "production",
         JOSE_AUTH_MODE: "disabled",
       }),
     ).toThrow(/JOSE_AUTH_MODE=disabled/);
-    expect(() =>
-      loadAuthConfig({
-        ...MICROSOFT_ENV,
-        NODE_ENV: "production",
-        JOSE_WEB_ORIGIN: "https://jose.example",
-        JOSE_API_PUBLIC_URL: "https://api.jose.example",
-        JOSE_AUTH_STUB: "1",
-      }),
-    ).toThrow(/JOSE_AUTH_STUB/);
   });
 
   it("accepts a fully configured production deployment and secures cookies", () => {

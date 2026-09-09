@@ -94,7 +94,7 @@ describe("TeachShell navigation", () => {
     expect(screen.getAllByRole("link", { name: /^modules$/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /^classes$/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /^learn$/i }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: /^profile$/i }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("link", { name: /^profile$/i })).toBeNull();
     expect(screen.queryByRole("link", { name: /^practice$/i })).toBeNull();
     expect(screen.queryByRole("link", { name: /teacher area/i })).toBeNull();
   });

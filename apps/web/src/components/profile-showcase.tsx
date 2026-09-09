@@ -18,7 +18,7 @@ export function ProfileShowcase({
   stats: ProfileStatsResponse;
 }) {
   const identity = useExplorerIdentity(stats.learner.displayName);
-  const { authenticated, canTeach, canAdmin, loading, user } = useJoseSession();
+  const { authenticated, canAdmin, loading, user } = useJoseSession();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
 
@@ -88,9 +88,6 @@ export function ProfileShowcase({
         <ul className="flex flex-col gap-2">
           <SettingsLink href="/profile/preferences" label="Reading settings" />
           <SettingsLink href="/learn#classes" label="My classes" />
-          {!loading && canTeach ? (
-            <SettingsLink href="/teach" label="Teacher area" />
-          ) : null}
           {!loading && canAdmin ? (
             <SettingsLink href="/admin/teachers" label="Manage teachers" />
           ) : null}
