@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { loadJoseEnv } from "../config/env";
+import { loadApiEnvFile } from "../config/load-env-file";
 import {
   backupFileDatabase,
   defaultBackupPath,
@@ -10,6 +11,7 @@ import { openDatabaseClient, resolveDatabaseUrl } from "./database.service";
 import { runMigrations } from "./migrate";
 
 async function main() {
+  loadApiEnvFile();
   loadJoseEnv(process.env);
   const url = resolveDatabaseUrl();
   const preferJson = process.argv.includes("--json") || !url.startsWith("file:");

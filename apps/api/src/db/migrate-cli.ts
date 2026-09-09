@@ -1,10 +1,12 @@
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { loadJoseEnv } from "../config/env";
+import { loadApiEnvFile } from "../config/load-env-file";
 import { openDatabaseClient, resolveDatabaseUrl } from "./database.service";
 import { runMigrations } from "./migrate";
 
 async function main() {
+  loadApiEnvFile();
   loadJoseEnv(process.env);
   const url = resolveDatabaseUrl();
   if (url.startsWith("file:")) {

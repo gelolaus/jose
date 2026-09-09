@@ -51,7 +51,9 @@ curl -s https://api.your-school.edu/ready   # -> {"ok":true,"database":"up"}
 
 ## 4. Web (Vercel)
 
-- Set server-only `JOSE_INTERNAL_API_URL=https://api.your-school.edu`.
+- No Vercel environment variable is required for Jose's stable API domain:
+  `https://api.jose.gelolaus.com` is the production rewrite fallback.
+- On another host, set server-only `JOSE_INTERNAL_API_URL=https://api.your-school.edu`.
 - Leave `NEXT_PUBLIC_API_URL` unset so the browser uses same-origin `/api`
   (Next rewrite in `apps/web/next.config.ts` keeps the session cookie first-party).
 - Deploy web, then verify `https://jose.your-school.edu/api/health` proxies.

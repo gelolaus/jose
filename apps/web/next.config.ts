@@ -1,14 +1,11 @@
 import type { NextConfig } from "next";
 import path from "node:path";
-import { loadRootEnvFile } from "./src/lib/root-env";
+import { loadRootEnvFile, resolveWebApiOrigin } from "./src/lib/root-env";
 
 // One local file for both workspaces. Host/Vercel values still win.
 loadRootEnvFile();
 
-const apiOrigin =
-  process.env.JOSE_INTERNAL_API_URL?.replace(/\/$/, "") ||
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-  "http://127.0.0.1:3001";
+const apiOrigin = resolveWebApiOrigin();
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@jose/shared"],

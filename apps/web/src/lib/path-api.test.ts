@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   apiRequestInit,
@@ -27,8 +27,22 @@ describe("isUnauthorizedError", () => {
 });
 
 describe("getApiBaseUrl", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
   it("uses the same-origin proxy in the browser so the session cookie is first-party", () => {
     expect(getApiBaseUrl()).toBe("/api");
+  });
+
+  it("uses the stable production API for server rendering when Vercel has no override", () => {
+    vi.stubGlobal("window", undefined);
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("JOSE_INTERNAL_API_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "");
+
+    expect(getApiBaseUrl()).toBe("https://api.jose.gelolaus.com");
   });
 });
 

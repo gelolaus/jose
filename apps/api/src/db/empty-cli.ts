@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { loadJoseEnv } from "../config/env";
+import { loadApiEnvFile } from "../config/load-env-file";
 import { isProductionEnv } from "../auth/auth-config";
 import { writeLogicalBackup } from "./backup";
 import { openDatabaseClient, resolveDatabaseUrl } from "./database.service";
@@ -8,6 +9,7 @@ import { runMigrations } from "./migrate";
 import { EMPTY_CONFIRM_PHRASE, assertEmptyAllowed, emptyDatabase } from "./empty";
 
 async function main() {
+  loadApiEnvFile();
   loadJoseEnv(process.env);
   const confirm =
     process.argv.find((a) => a.startsWith("--confirm="))?.slice("--confirm=".length) ?? "";

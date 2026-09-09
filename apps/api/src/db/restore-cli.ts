@@ -1,11 +1,13 @@
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { loadJoseEnv } from "../config/env";
+import { loadApiEnvFile } from "../config/load-env-file";
 import { restoreLogicalBackup } from "./backup";
 import { openDatabaseClient, resolveDatabaseUrl } from "./database.service";
 import { runMigrations } from "./migrate";
 
 async function main() {
+  loadApiEnvFile();
   loadJoseEnv(process.env);
   const fromArg = process.argv.find((arg) => arg.startsWith("--from="));
   const from = fromArg?.slice("--from=".length);

@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/libsql";
 import { randomUUID } from "node:crypto";
 import { ARLAUS_ADMIN_EMAIL } from "@jose/shared";
 import { loadJoseEnv } from "../config/env";
+import { loadApiEnvFile } from "../config/load-env-file";
 import { openDatabaseClient, resolveDatabaseUrl } from "../db/database.service";
 import { runMigrations } from "../db/migrate";
 import * as schema from "../db/schema";
@@ -30,6 +31,7 @@ export function isPromoteTokenValid(expected: string, provided: string): boolean
 }
 
 async function main() {
+  loadApiEnvFile();
   loadJoseEnv(process.env);
   const { expected, provided } = resolvePromoteTokens(
     process.argv[2],

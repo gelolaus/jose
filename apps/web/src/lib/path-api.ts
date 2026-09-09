@@ -53,8 +53,7 @@ import {
   type TeachModule,
   type TeachModuleDetail,
 } from "@jose/shared";
-
-const DEFAULT_API = "http://localhost:3001";
+import { resolveWebApiOrigin } from "./root-env";
 
 /**
  * In the browser everything goes through the same-origin `/api` rewrite so the
@@ -63,11 +62,7 @@ const DEFAULT_API = "http://localhost:3001";
  */
 export function getApiBaseUrl() {
   if (typeof window !== "undefined") return "/api";
-  return (
-    process.env.JOSE_INTERNAL_API_URL?.replace(/\/$/, "") ||
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-    DEFAULT_API
-  );
+  return resolveWebApiOrigin();
 }
 
 /**

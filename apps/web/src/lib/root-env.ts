@@ -13,3 +13,15 @@ export function loadRootEnvFile(
 ): void {
   config({ path, processEnv: env, override: false, quiet: true });
 }
+
+/**
+ * Keeps Vercel configuration-free for Jose's stable production API domain.
+ * Explicit shell values still support local development and future overrides.
+ */
+export function resolveWebApiOrigin(env: NodeJS.ProcessEnv = process.env): string {
+  const explicit = env.JOSE_INTERNAL_API_URL ?? env.NEXT_PUBLIC_API_URL;
+  if (explicit?.trim()) return explicit.replace(/\/$/, "");
+  return env.NODE_ENV === "production"
+    ? "https://api.jose.gelolaus.com"
+    : "http://127.0.0.1:3001";
+}

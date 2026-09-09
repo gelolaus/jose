@@ -3,7 +3,7 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { loadRootEnvFile, webRootEnvPath } from "./root-env";
+import { loadRootEnvFile, resolveWebApiOrigin, webRootEnvPath } from "./root-env";
 
 describe("root web environment", () => {
   it("loads root values without replacing deployment environment values", async () => {
@@ -26,5 +26,14 @@ describe("root web environment", () => {
   it("resolves the single local file at the repository root", () => {
     expect(webRootEnvPath()).toMatch(/[\\/]jose[\\/]\.env$/);
     expect(webRootEnvPath()).not.toMatch(/[\\/]apps[\\/]web[\\/]\.env$/);
+  });
+
+  it("uses Jose's stable API domain for production when Vercel has no env value", () => {
+    expect(resolveWebApiOrigin({ NODE_ENV: "production" })).toBe(
+      "https://api.jose.gelolaus.com",
+    );
+    expect(resolveWebApiOrigin({ NODE_ENV: "development" })).toBe(
+      "http://127.0.0.1:3001",
+    );
   });
 });
