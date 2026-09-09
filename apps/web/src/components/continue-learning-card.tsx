@@ -19,7 +19,7 @@ export function ContinueLearningCard({
       className="learn-next mb-8 flex flex-col gap-5 rounded-3xl border-2 p-5 sm:flex-row sm:items-center sm:p-7"
     >
       <span
-        className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-[var(--jose-green)] text-[#234b12] shadow-[0_4px_0_#46a302]"
+        className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-[var(--jose-gold)] text-[#1a1a3e] shadow-[0_4px_0_var(--jose-gold-deep)]"
         aria-hidden
       >
         <Icon className="size-8" strokeWidth={2.5} />

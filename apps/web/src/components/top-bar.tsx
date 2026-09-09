@@ -13,7 +13,7 @@ export function TopBar({ courseTitle, streak, hearts, xp }: TopBarProps) {
     <header className="border-b border-[var(--jose-rule)] bg-[var(--jose-paper)]">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-teal-800 lg:hidden">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--jose-ink)] lg:hidden">
             Jose
           </p>
           <p className="truncate text-sm font-extrabold text-[var(--jose-ink)] sm:text-base">
@@ -55,9 +55,9 @@ function Chip({
   title?: string;
 }) {
   const tones = {
-    sky: "bg-cyan-100 text-cyan-900",
-    coral: "bg-orange-100 text-orange-900",
-    rose: "bg-rose-100 text-rose-900",
+    sky: "bg-[#e8dcc0] text-[#c9a84c]",
+    coral: "bg-[#f0d4c4] text-[#a0522d]",
+    rose: "bg-[#f0d8de] text-[#7a1a2e]",
   };
   return (
     <span
