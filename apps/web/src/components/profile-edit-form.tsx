@@ -164,7 +164,7 @@ function ProfileEditFields({
         <button
           type="submit"
           disabled={saving}
-          className="rounded-full bg-rose-500 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm disabled:opacity-60"
+          className="rounded-full bg-[#f0d8de]0 px-6 py-3 text-base font-extrabold text-white shadow-md transition active:translate-y-0.5 active:shadow-sm disabled:opacity-60"
         >
           {saving ? "Saving…" : "Save"}
         </button>

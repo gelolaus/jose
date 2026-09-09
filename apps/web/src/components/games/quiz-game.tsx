@@ -258,13 +258,13 @@ function QuizPlay({
         })}
       </ul>
       {correctPanel ? (
-        <div className="motion-artifact rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-950 ring-1 ring-emerald-200">
-          <p className="text-[10px] font-extrabold uppercase tracking-wide text-emerald-700">
+        <div className="motion-artifact rounded-2xl bg-[#e8dcc0] px-4 py-3 text-sm font-semibold text-[#0a0a1a] ring-1 ring-emerald-200">
+          <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#1a1a3e]">
             {correctPanel.title}
           </p>
           <p className="mt-1 whitespace-pre-line">{correctPanel.body}</p>
           {correctPanel.sourceLabel ? (
-            <p className="mt-2 text-xs font-bold text-emerald-800">
+            <p className="mt-2 text-xs font-bold text-[#1a1a3e]">
               Source: {correctPanel.sourceLabel}
             </p>
           ) : null}
@@ -313,7 +313,7 @@ function QuizBuild({
             type="button"
             onClick={() => setIndex(i)}
             className={`rounded-full px-3 py-1.5 text-xs font-extrabold ${
-              i === index ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600"
+              i === index ? "bg-[#1a2a5e] text-white" : "bg-slate-100 text-slate-600"
             }`}
           >
             Q{i + 1}
@@ -321,7 +321,7 @@ function QuizBuild({
         ))}
       </div>
       <label className="block rounded-[1.8rem] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-5 py-6">
-        <span className="text-xs font-extrabold uppercase tracking-wide text-violet-100">
+        <span className="text-xs font-extrabold uppercase tracking-wide text-[#f0e8d8]">
           Prompt
         </span>
         <textarea
@@ -350,7 +350,7 @@ function QuizBuild({
               onClick={() => patch({ ...question, correctChoiceId: choice.id })}
               className={`size-10 shrink-0 rounded-full text-xs font-extrabold ring-2 ${
                 question.correctChoiceId === choice.id
-                  ? "bg-emerald-500 text-white ring-emerald-600"
+                  ? "bg-[#e8dcc0]0 text-white ring-emerald-600"
                   : "bg-white text-slate-500 ring-black/10"
               }`}
             >
@@ -371,7 +371,7 @@ function QuizBuild({
       </ul>
       <button
         type="button"
-        className="text-xs font-extrabold text-violet-700"
+        className="text-xs font-extrabold text-[#1a2a5e]"
         onClick={() => {
           const id = `${question.id}-c${question.choices.length + 1}`;
           patch({
@@ -439,7 +439,7 @@ function QuizBuild({
               ],
             });
           }}
-          className="inline-flex items-center gap-1 text-sm font-extrabold text-violet-700"
+          className="inline-flex items-center gap-1 text-sm font-extrabold text-[#1a2a5e]"
         >
           <Plus className="size-4" /> Add question
         </button>
@@ -451,7 +451,7 @@ function QuizBuild({
             onChange({ ...game, questions });
             setIndex(Math.max(0, index - 1));
           }}
-          className="ml-auto inline-flex items-center gap-1 text-sm font-extrabold text-rose-700 disabled:opacity-40"
+          className="ml-auto inline-flex items-center gap-1 text-sm font-extrabold text-[#7a1a2e] disabled:opacity-40"
         >
           <Trash2 className="size-4" /> Remove
         </button>

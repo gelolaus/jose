@@ -67,7 +67,7 @@ export default async function PlayLevelPage({ params }: Props) {
             <p className="truncate font-display text-lg font-semibold tracking-tight text-[var(--jose-ink)] md:text-xl">
               {data.level.sectionTitle}
             </p>
-            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-teal-800">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#12122e]">
               Unlimited learning
             </span>
           </div>

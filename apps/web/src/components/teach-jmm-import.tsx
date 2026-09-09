@@ -132,7 +132,7 @@ export function TeachJmmImport({
       {result && !result.ok ? (
         <ul className="space-y-1 rounded-2xl bg-white p-4 ring-1 ring-black/10">
           {result.errors.map((e, i) => (
-            <li key={i} className="text-sm font-semibold text-rose-700">
+            <li key={i} className="text-sm font-semibold text-[#7a1a2e]">
               Line {e.line}, col {e.column}: {e.message}
             </li>
           ))}
@@ -169,7 +169,7 @@ export function TeachJmmImport({
         </div>
       ) : null}
       {created ? (
-        <p className="text-sm font-bold text-emerald-700">
+        <p className="text-sm font-bold text-[#1a1a3e]">
           Draft created: {created.title} ·{" "}
           <Link href={`/teach/modules/${created.moduleId}`} className="underline">
             Open workspace

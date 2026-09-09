@@ -86,7 +86,7 @@ export function JournalView() {
             onClick={() => setTab(id)}
             className={`min-h-11 rounded-full px-4 py-2 text-sm font-extrabold ${
               tab === id
-                ? "bg-violet-600 text-white"
+                ? "bg-[#1a2a5e] text-white"
                 : "bg-slate-100 text-slate-700"
             }`}
           >
@@ -149,7 +149,7 @@ export function JournalView() {
             <button
               type="button"
               onClick={onExportPrivate}
-              className="min-h-11 rounded-full bg-violet-100 px-4 py-2 text-sm font-extrabold text-violet-800"
+              className="min-h-11 rounded-full bg-[#e0d0f0] px-4 py-2 text-sm font-extrabold text-[#1a1a3e]"
             >
               Export private notes
             </button>
@@ -217,7 +217,7 @@ function JournalEntryCard({
       {entry.source ? (
         <Link
           href={entry.source.href}
-          className="mt-3 inline-flex min-h-11 items-center text-sm font-extrabold text-violet-700"
+          className="mt-3 inline-flex min-h-11 items-center text-sm font-extrabold text-[#1a2a5e]"
         >
           Open source
           {entry.source.levelTitle ? ` · ${entry.source.levelTitle}` : ""}
@@ -261,7 +261,7 @@ function CatalogPanel({ kind }: { kind: JournalCatalogEntityKind }) {
           {item.href ? (
             <Link
               href={item.href}
-              className="mt-3 inline-flex min-h-11 items-center text-sm font-extrabold text-violet-700"
+              className="mt-3 inline-flex min-h-11 items-center text-sm font-extrabold text-[#1a2a5e]"
             >
               Quick return
             </Link>

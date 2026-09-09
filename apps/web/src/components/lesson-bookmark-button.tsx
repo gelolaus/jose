@@ -66,8 +66,8 @@ export function LessonBookmarkButton({
         onClick={() => void toggle()}
         className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 py-2 text-sm font-extrabold ${
           pressed
-            ? "bg-[var(--jose-green)] text-[#234b12]"
-            : "bg-amber-100 text-amber-900"
+            ? "bg-[var(--jose-gold)] text-[#1a1a3e]"
+            : "bg-[#e8dcc0] text-[#1a1a3e]"
         } disabled:opacity-60`}
       >
         <Bookmark className="size-4" strokeWidth={2.4} aria-hidden />

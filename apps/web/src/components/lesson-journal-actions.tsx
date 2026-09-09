@@ -85,7 +85,7 @@ export function LessonJournalActions({
       </button>
       <a
         href="/journal"
-        className="min-h-11 inline-flex items-center rounded-full px-3 py-2 text-sm font-extrabold text-violet-700"
+        className="min-h-11 inline-flex items-center rounded-full px-3 py-2 text-sm font-extrabold text-[#1a2a5e]"
       >
         Open journal
       </a>

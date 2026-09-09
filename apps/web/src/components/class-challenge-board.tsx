@@ -74,7 +74,7 @@ export function ClassChallengeBoard({
         <button
           type="submit"
           disabled={joining}
-          className="rounded-full bg-teal-700 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-60"
+          className="rounded-full bg-[#1a1a3e] px-5 py-3 text-sm font-extrabold text-white disabled:opacity-60"
         >
           Join class
         </button>
@@ -106,7 +106,7 @@ export function ClassChallengeBoard({
                   {item.participation !== "opted_in" ? (
                     <button
                       type="button"
-                      className="rounded-full bg-teal-700 px-3 py-1.5 text-xs font-extrabold text-white"
+                      className="rounded-full bg-[#1a1a3e] px-3 py-1.5 text-xs font-extrabold text-white"
                       onClick={() => onOptIn(item.id, "alias")}
                     >
                       Opt in
@@ -123,7 +123,7 @@ export function ClassChallengeBoard({
         <section className="mt-8 rounded-[1.5rem] bg-white p-4 ring-1 ring-black/10">
           <h2 className="font-display text-2xl font-semibold text-slate-800">{selected.title}</h2>
           <p className="mt-2 text-sm font-semibold text-slate-600">{selected.prompt}</p>
-          <p className="mt-3 text-sm font-extrabold text-teal-800">
+          <p className="mt-3 text-sm font-extrabold text-[#12122e]">
             {selected.progress.uniqueEvidenceCount} of {selected.progress.goalCount} unique sources
             {selected.progress.goalReached ? " · class goal reached" : ""}
           </p>
@@ -229,7 +229,7 @@ export function ClassChallengeBoard({
               </form>
               <button
                 type="button"
-                className="mt-3 text-sm font-extrabold text-teal-800"
+                className="mt-3 text-sm font-extrabold text-[#12122e]"
                 onClick={() =>
                   onSetDisplayMode(
                     selected.id,
@@ -245,7 +245,7 @@ export function ClassChallengeBoard({
           ) : (
             <button
               type="button"
-              className="mt-5 rounded-full bg-teal-700 px-4 py-2 text-sm font-extrabold text-white"
+              className="mt-5 rounded-full bg-[#1a1a3e] px-4 py-2 text-sm font-extrabold text-white"
               onClick={() => onOptIn(selected.id, "alias")}
             >
               Opt in

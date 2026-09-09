@@ -380,9 +380,9 @@ function PathList({
                 }`}
               >
                 {node.status === "completed" ? (
-                  <Check className="size-4 shrink-0 text-emerald-600" aria-hidden />
+                  <Check className="size-4 shrink-0 text-[#1a2a5e]" aria-hidden />
                 ) : (
-                  <Compass className="size-4 shrink-0 text-teal-700" aria-hidden />
+                  <Compass className="size-4 shrink-0 text-[#1a1a3e]" aria-hidden />
                 )}
                 {content}
               </Link>
@@ -481,7 +481,7 @@ function PathAside({
           <button
             type="button"
             onClick={onJumpCurrent}
-            className="text-xs font-semibold text-teal-800"
+            className="text-xs font-semibold text-[#12122e]"
           >
             Jump to current
           </button>
@@ -556,14 +556,14 @@ function PathAside({
 function StatusBadge({ done, current }: { done: boolean; current: boolean }) {
   if (done) {
     return (
-      <span className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700">
+      <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#1a1a3e]">
         <Check className="size-4" strokeWidth={2.5} aria-hidden />
         Done
       </span>
     );
   }
   if (current) {
-    return <span className="text-sm font-semibold text-teal-800">Now</span>;
+    return <span className="text-sm font-semibold text-[#12122e]">Now</span>;
   }
   return (
     <span className="inline-flex items-center gap-1 text-sm font-semibold text-stone-400">

@@ -74,7 +74,7 @@ export function ChestPlayer({
           </p>
         ) : null}
         {error ? (
-          <p className="text-sm font-semibold text-rose-700" role="alert">
+          <p className="text-sm font-semibold text-[#7a1a2e]" role="alert">
             {error}
           </p>
         ) : null}
@@ -115,7 +115,7 @@ export function ChestPlayer({
         Provenance: {chest.artifact.provenance}
       </p>
       {chest.journalCoverId ? (
-        <p className="rounded-2xl bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-900">
+        <p className="rounded-2xl bg-[#f0e8f8] px-3 py-2 text-xs font-semibold text-[#0e0e24]">
           Cosmetic journal cover unlocked: {chest.journalCoverId} (no loot box,
           no paywall).
         </p>
@@ -126,7 +126,7 @@ export function ChestPlayer({
           duplicate rewards.
         </p>
       ) : (
-        <p className="text-sm font-semibold text-emerald-800" role="status">
+        <p className="text-sm font-semibold text-[#1a1a3e]" role="status">
           Saved to your journal. Revisit it anytime from Profile.
         </p>
       )}

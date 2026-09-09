@@ -15,8 +15,8 @@ import {
 import { PlaceGhost, usePlaceDrag } from "./use-place-drag";
 import { GameBoard } from "./game-board";
 
-const CHEST_BODY = ["#dcf3ff", "#dff5ce", "#fff2be", "#ffe1e7"] as const;
-const CHEST_SHADOW = ["#1cb0f6", "#83ce54", "#ebc653", "#ed97aa"] as const;
+const CHEST_BODY = ["#d4daf0", "#f0d8de", "#f5e6b8", "#f0d4c4"] as const;
+const CHEST_SHADOW = ["#1a2a5e", "#7a1a2e", "#b8860b", "#a0522d"] as const;
 
 function useWideScreen() {
   const [wide, setWide] = useState(false);
@@ -206,11 +206,11 @@ function SortPlay({
                     if (isLocked) {
                       return (
                         <li key={item.id}>
-                          <span className="block rounded-full bg-emerald-50 px-3 py-1.5 text-left text-xs font-extrabold text-emerald-900 ring-2 ring-emerald-300 sm:text-sm">
+                          <span className="block rounded-full bg-[#e8dcc0] px-3 py-1.5 text-left text-xs font-extrabold text-[#0e0e24] ring-2 ring-[#c9a84c] sm:text-sm">
                             {item.label}
                           </span>
                           {chipSource(item)?.citation || chipSource(item)?.label ? (
-                            <p className="mt-1 px-2 text-[10px] font-bold text-emerald-800/80">
+                            <p className="mt-1 px-2 text-[10px] font-bold text-[#1a1a3e]/80">
                               Source: {chipSource(item)?.citation || chipSource(item)?.label}
                             </p>
                           ) : null}
@@ -232,7 +232,7 @@ function SortPlay({
                           }}
                           className={`w-full rounded-xl px-3 py-2.5 text-left text-xs font-extrabold ring-2 sm:text-sm ${
                             on
-                              ? "bg-[#dcf3ff] text-[#096d9b] ring-[#1cb0f6]"
+                              ? "bg-[#e8dcc0] text-[#1a1a3e] ring-[#c9a84c]"
                               : "bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)]"
                           }`}
                         >
@@ -276,9 +276,9 @@ function SortPlay({
                     }}
                     className={`min-h-12 shrink-0 whitespace-nowrap touch-manipulation select-none rounded-xl px-4 text-sm font-extrabold ring-2 ${
                       lifting
-                        ? "cursor-grabbing bg-violet-100 text-violet-400 opacity-40 ring-violet-200"
+                        ? "cursor-grabbing bg-[#e0d0f0] text-[#5a5570] opacity-40 ring-[#d4c9a8]"
                         : on
-                          ? "cursor-grab bg-[#dcf3ff] text-[#096d9b] ring-[#1cb0f6]"
+                          ? "cursor-grab bg-[#e8dcc0] text-[#1a1a3e] ring-[#c9a84c]"
                           : "cursor-grab bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)]"
                     }`}
                   >
@@ -419,7 +419,7 @@ function SortBuild({
       {game.buckets.length < 4 ? (
         <button
           type="button"
-          className="inline-flex min-h-12 items-center gap-1 text-sm font-extrabold text-violet-700"
+          className="inline-flex min-h-12 items-center gap-1 text-sm font-extrabold text-[#1a2a5e]"
           onClick={() =>
             onChange({
               ...game,
@@ -477,7 +477,7 @@ function SortChest({
         onClick={onChoose}
         onKeyDown={onKeyDown}
         className={`overflow-hidden rounded-[1.15rem] outline-none ${active ? "scale-[1.03]" : ""} ${
-          inviting ? "ring-4 ring-[#1cb0f6]" : ""
+          inviting ? "ring-4 ring-[#c9a84c]" : ""
         }`}
         style={{ boxShadow: `0 3px 0 ${shadow}` }}
       >

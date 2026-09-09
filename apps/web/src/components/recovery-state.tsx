@@ -62,7 +62,7 @@ export function RecoveryState({
       <div className="flex flex-wrap items-center justify-center gap-2">
         <Link
           href={href}
-          className="inline-flex min-h-11 items-center rounded-full bg-violet-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-md"
+          className="inline-flex min-h-11 items-center rounded-full bg-[#1a2a5e] px-5 py-2.5 text-sm font-extrabold text-white shadow-md"
         >
           Try again
         </Link>
@@ -93,7 +93,7 @@ export function RouteLoading({ label = "Loading…" }: { label?: string }) {
       role="status"
       aria-live="polite"
     >
-      <div className="size-10 animate-pulse rounded-full bg-violet-200" aria-hidden />
+      <div className="size-10 animate-pulse rounded-full bg-[#d4c9a8]" aria-hidden />
       <p className="text-sm font-extrabold text-slate-600">{label}</p>
     </div>
   );

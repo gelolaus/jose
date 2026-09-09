@@ -2,7 +2,7 @@
 
 @theme inline {
   --font-sans: var(--font-jose-sans), Nunito, ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-jose-sans), Nunito, ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-jose-display), "Playfair Display", ui-serif, Georgia, serif;
   --color-jose-ink: var(--jose-ink);
   --color-jose-cream: var(--jose-cream);
   --color-jose-gold: var(--jose-gold);
@@ -232,7 +232,7 @@ html[data-theme="dark"] .jose-sidebar-nav-active {
 }
 
 .jose-prose a {
-  color: #0f766e;
+  color: #1a2a5e;
   font-weight: 600;
   text-decoration: underline;
 }
@@ -245,7 +245,7 @@ html[data-theme="dark"] .jose-sidebar-nav-active {
 
 .jose-prose blockquote {
   margin: 1em 0;
-  border-left: 3px solid #0f766e;
+  border-left: 3px solid #1a2a5e;
   padding-left: 1rem;
   color: #44403c;
   font-style: italic;
@@ -841,7 +841,7 @@ html[data-theme="dark"] .game-board__how-text {
 }
 .learning-card:hover {
   transform: translateY(-2px);
-  border-color: #1cb0f6;
+  border-color: var(--jose-gold);
 }
 .learning-card:active {
   transform: translateY(2px);
@@ -895,7 +895,7 @@ html[data-theme="dark"] .game-board__how-text {
 }
 .quiz-answer--idle:hover:not(:disabled) {
   background: var(--jose-surface-control);
-  border-color: #1cb0f6;
+  border-color: var(--jose-gold);
 }
 .quiz-answer--correct {
   background: #dff5ce;

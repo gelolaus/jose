@@ -130,11 +130,11 @@ function CaseFilesPlay({
               const tone = !pickedId
                 ? "bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)]"
                 : selected && correctPick
-                  ? "bg-emerald-100 text-emerald-950 ring-emerald-400"
+                  ? "bg-[#e8dcc0] text-[#0a0a1a] ring-[#c9a84c]"
                   : selected
-                    ? "bg-rose-100 text-rose-950 ring-rose-300"
+                    ? "bg-[#f0d8de] text-[#3a0a18] ring-[#b08090]"
                     : strongest.has(source.id)
-                      ? "bg-emerald-50 text-emerald-950 ring-emerald-200"
+                      ? "bg-[#e8dcc0] text-[#0a0a1a] ring-emerald-200"
                       : "bg-[var(--jose-surface-control)] text-[var(--jose-text-muted)] ring-[var(--jose-rule)]";
               return (
                 <li key={source.id}>
@@ -169,7 +169,7 @@ function CaseFilesPlay({
               <button
                 type="button"
                 onClick={() => setPhase("case")}
-                className="mt-3 min-h-11 w-full rounded-full bg-teal-800 px-4 py-3 text-sm font-extrabold text-white"
+                className="mt-3 min-h-11 w-full rounded-full bg-[#12122e] px-4 py-3 text-sm font-extrabold text-white"
               >
                 Next file
               </button>
@@ -212,7 +212,7 @@ function CaseFilesPlay({
                   type="button"
                   className={`flex-1 rounded-2xl px-3 py-3 text-left text-sm font-extrabold ring-2 ${
                     active
-                      ? "bg-emerald-50 ring-emerald-400 text-emerald-950"
+                      ? "bg-[#e8dcc0] ring-[#c9a84c] text-[#0a0a1a]"
                       : "bg-[var(--jose-surface-elevated)] ring-[var(--jose-rule)] text-[var(--jose-text)]"
                   }`}
                   onClick={() => setOpenId(source.id)}
@@ -229,7 +229,7 @@ function CaseFilesPlay({
                   onClick={() => toggleEvidence(source.id)}
                   className={`rounded-2xl px-3 py-2 text-xs font-extrabold disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)] ${
                     tagged
-                      ? "bg-violet-700 text-white"
+                      ? "bg-[#1a1a3e] text-white"
                       : "bg-[var(--jose-surface-control)] text-[var(--jose-text)]"
                   }`}
                 >
@@ -267,11 +267,11 @@ function CaseFilesPlay({
         </div>
       </div>
 
-      <div className="rounded-[1.4rem] bg-violet-50 px-4 py-3 ring-1 ring-violet-200">
-        <p className="text-xs font-extrabold uppercase tracking-wide text-violet-800">
+      <div className="rounded-[1.4rem] bg-[#f0e8f8] px-4 py-3 ring-1 ring-[#d4c9a8]">
+        <p className="text-xs font-extrabold uppercase tracking-wide text-[#1a1a3e]">
           Evidence tray
         </p>
-        <p className="mt-1 text-sm font-bold text-violet-950">
+        <p className="mt-1 text-sm font-bold text-[#0a0a1a]">
           {evidenceIds.length
             ? evidenceIds
                 .map((id) => game.sources.find((s) => s.id === id)?.title ?? id)
@@ -320,7 +320,7 @@ function CaseFilesPlay({
         type="button"
         disabled={disabled || done || !conclusionId || evidenceIds.length === 0}
         onClick={() => void submit()}
-        className="w-full rounded-full bg-emerald-700 px-5 py-3 text-sm font-extrabold text-white disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
+        className="w-full rounded-full bg-[#1a2a5e] px-5 py-3 text-sm font-extrabold text-white disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
       >
         Submit case
       </button>
@@ -419,7 +419,7 @@ function CaseFilesBuild({
                 <button
                   type="button"
                   aria-label="Remove source"
-                  className="self-end rounded-full bg-rose-50 p-2 text-rose-700"
+                  className="self-end rounded-full bg-[#f0d8de] p-2 text-[#7a1a2e]"
                   onClick={() =>
                     onChange({
                       ...game,

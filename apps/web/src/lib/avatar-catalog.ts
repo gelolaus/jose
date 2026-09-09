@@ -35,8 +35,8 @@ export const AVATAR_CATALOG: AvatarOption[] = [
   {
     id: "book",
     label: "Book",
-    bubbleClass: "bg-violet-100",
-    iconClass: "text-violet-600",
+    bubbleClass: "bg-[#e0d0f0]",
+    iconClass: "text-[#1a2a5e]",
     icon: BookOpen,
   },
   {
@@ -49,14 +49,14 @@ export const AVATAR_CATALOG: AvatarOption[] = [
   {
     id: "leaf",
     label: "Leaf",
-    bubbleClass: "bg-emerald-100",
-    iconClass: "text-emerald-600",
+    bubbleClass: "bg-[#e8dcc0]",
+    iconClass: "text-[#1a2a5e]",
     icon: Leaf,
   },
   {
     id: "ship",
     label: "Ship",
-    bubbleClass: "bg-rose-100",
+    bubbleClass: "bg-[#f0d8de]",
     iconClass: "text-rose-600",
     icon: Ship,
   },

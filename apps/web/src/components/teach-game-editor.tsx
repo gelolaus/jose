@@ -112,7 +112,7 @@ export function GameEditor({
                 {why.title}
               </span>
               {why.body}
-              <span className="mt-2 block text-xs font-extrabold text-violet-700">Got it</span>
+              <span className="mt-2 block text-xs font-extrabold text-[#1a2a5e]">Got it</span>
             </button>
           ) : null}
         </GameFrame>

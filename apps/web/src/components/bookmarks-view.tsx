@@ -107,7 +107,7 @@ export function BookmarksView() {
                     {item.available ? item.moduleTitle : "This lesson is no longer available."}
                   </p>
                   {item.completed ? (
-                    <p className="mt-1 inline-flex items-center gap-1 text-sm font-bold text-emerald-700">
+                    <p className="mt-1 inline-flex items-center gap-1 text-sm font-bold text-[#1a1a3e]">
                       <Check className="size-4" aria-hidden />
                       Completed
                     </p>

@@ -153,7 +153,7 @@ export function LessonPlayer({
         <section>
           <button
             type="button"
-            className="text-sm font-semibold text-teal-800 underline"
+            className="text-sm font-semibold text-[#12122e] underline"
             onClick={() => setShowDeeper((v) => !v)}
           >
             {showDeeper ? "Hide deeper analysis" : "Optional deeper analysis"}
@@ -186,7 +186,7 @@ export function LessonPlayer({
         <YoutubeEmbed videoId={lesson.youtubeVideoId} />
       ) : null}
       {error ? (
-        <p className="text-sm font-semibold text-rose-700">{error}</p>
+        <p className="text-sm font-semibold text-[#7a1a2e]">{error}</p>
       ) : null}
       <div className="flex flex-wrap gap-3">
         <button
