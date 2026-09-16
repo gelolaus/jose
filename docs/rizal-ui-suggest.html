@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jose UI - Parchment &amp; Indigo Palette</title>
+<style>
+  @font-face { font-family:'Swansea'; src:local('Swansea'),local('Swansea Regular'); font-weight:400; }
+  @font-face { font-family:'Swansea'; src:local('Swansea Bold'); font-weight:500; }
+  @font-face { font-family:'Arena'; src:local('ARENA'),local('Arena'),local('Arena Regular'); }
+
+  *{margin:0;padding:0;box-sizing:border-box;text-shadow:none !important;}
+  body{font-family:'Arena','Impact','Arial Black','Swansea',Calibri,sans-serif;overflow:hidden;height:100vh;}
+
+  .app{display:flex;height:100vh;transition:background .4s,color .4s;}
+
+  /* ===== SIDEBAR ===== */
+  .sidebar{width:260px;min-width:260px;padding:0;display:flex;flex-direction:column;position:relative;transition:background .4s;overflow:hidden;}
+  .sidebar-inner{padding:20px 22px 10px;flex:1;display:flex;flex-direction:column;position:relative;z-index:2;}
+  .sidebar-logo{margin-bottom:4px;cursor:default;display:flex;align-items:center;}
+  .jose-title-img{height:auto;display:block;object-fit:contain;cursor:pointer;transition:transform .2s ease;}
+  .jose-title-img:hover{animation:shake .5s ease;}
+  @keyframes shake{0%{transform:rotate(0)}15%{transform:rotate(-5deg)}30%{transform:rotate(5deg)}45%{transform:rotate(-4deg)}60%{transform:rotate(3deg)}75%{transform:rotate(-2deg)}90%{transform:rotate(1deg)}100%{transform:rotate(0)}}
+  .sidebar-logo .jose-title-img{width:190px;}
+  .username.brand{display:flex;align-items:center;}
+  .username.brand .jose-title-img{width:220px;}
+  .login-logo{display:flex;justify-content:center;}
+  .login-logo .jose-title-img{width:260px;}
+  .sidebar-sub{font-size:11px;margin-bottom:16px;letter-spacing:.5px;}
+  .nav-list{list-style:none;flex:1;}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:11px 16px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:4px;transition:all .2s;border:1px solid transparent;letter-spacing:.5px;text-transform:uppercase;}
+  .nav-icon{width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+
+  /* Sidebar ornate border (right edge) */
+  .sidebar-border{position:absolute;right:0;top:0;bottom:0;width:20px;z-index:3;}
+  .sidebar-border::before{content:'';position:absolute;right:8px;top:0;bottom:0;width:2px;}
+  .sidebar-border::after{content:'';position:absolute;right:12px;top:0;bottom:0;width:1px;}
+
+  /* Sidebar filigree decorations */
+  .sidebar-filigree-top,.sidebar-filigree-bottom{position:absolute;left:0;right:0;height:40px;z-index:3;display:flex;align-items:center;justify-content:center;font-size:18px;letter-spacing:8px;}
+  .sidebar-filigree-top{top:0;padding-top:4px;}
+  .sidebar-filigree-bottom{bottom:0;padding-bottom:4px;}
+
+  /* Sidebar map illustration area */
+  .sidebar-map{margin-top:auto;height:80px;border-radius:8px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;margin:auto 0 4px;}
+  .sidebar-map-lines{position:absolute;inset:0;opacity:.15;}
+  .sidebar-map-lines::before{content:'';position:absolute;inset:8px;border:1px solid;border-radius:4px;}
+  .sidebar-map-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;opacity:.4;z-index:1;}
+
+  .sidebar-bottom{display:flex;flex-direction:column;gap:4px;margin-top:8px;}
+  .sidebar-bottom-item{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:6px 4px;border-radius:6px;transition:color .2s;}
+  .sidebar-stats{display:flex;align-items:center;gap:12px;margin-top:10px;padding-top:10px;}
+  .sidebar-stat{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:14px;letter-spacing:.3px;text-transform:uppercase;}
+
+  /* ===== MAIN ===== */
+  .main{flex:1;overflow-y:auto;overflow-x:hidden;padding:32px 24px;transition:background .4s,color .4s;position:relative;}
+  .page{display:none;}
+  .page.active{display:block;}
+
+  /* ===== SHARED ===== */
+  .top-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+  .username{font-size:16px;font-weight:500;letter-spacing:.3px;text-transform:uppercase;}
+  .username.brand{font-family:'Arena','Impact','Arial Black',sans-serif;font-size:22px;font-weight:500;font-style:normal;letter-spacing:1.5px;text-transform:uppercase;}
+  .stats-row{display:flex;gap:10px;}
+  .stat-badge{display:flex;align-items:center;gap:5px;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:600;transition:all .2s ease;letter-spacing:.3px;text-transform:uppercase;cursor:pointer;}
+  .stat-badge:hover{transform:translateY(-2px) scale(1.05);filter:brightness(1.1);}
+  .stat-badge:active{transform:translateY(1px) scale(.97);}
+  .hero-heading{font-size:24px;font-weight:500;margin:8px 0 4px;letter-spacing:.3px;text-transform:uppercase;}
+  .hero-sub{font-size:14px;font-style:italic;margin-bottom:24px;}
+
+  .section-title{font-size:16px;font-weight:500;margin-bottom:12px;letter-spacing:.3px;text-transform:uppercase;}
+  .section-link{font-size:12px;font-weight:500;cursor:pointer;transition:color .2s;letter-spacing:.3px;text-transform:uppercase;}
+
+  /* ===== MODULE CARDS — BOOK COVER IMAGES ===== */
+  .modules-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px;width:100%;}
+
+  .module-wrapper{display:flex;flex-direction:column;align-items:center;gap:0;}
+  .module-card{position:relative;width:100%;aspect-ratio:470/610;cursor:pointer;transition:transform .2s ease,filter .2s ease;background-size:100% 100%;background-position:center;background-repeat:no-repeat;filter:drop-shadow(3px 5px 6px rgba(0,0,0,.35));}
+  .module-card:hover{transform:translateY(-6px) scale(1.05);filter:drop-shadow(4px 8px 10px rgba(0,0,0,.5));}
+  .module-card:active{transform:translateY(0) scale(.97);filter:drop-shadow(2px 3px 3px rgba(0,0,0,.3));}
+  .module-progress{display:inline-block;margin-top:2px;padding:4px 14px;border-radius:12px;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;background:rgba(0,0,0,.12);cursor:default;}
+
+  /* Book cover images */
+  .module-card.m1{background-image:url('assets/book-rizal-law.png');}
+  .module-card.m2{background-image:url('assets/book-hero-then-now.png');}
+  .module-card.m3{background-image:url('assets/book-19th-century.png');}
+  .module-card.m4{background-image:url('assets/book-family-childhood.png');}
+  .module-card.m5{background-image:url('assets/book-travels-abroad.png');}
+  .module-card.m6{background-image:url('assets/book-noli-me-tangere.png');}
+  .module-card.m7{background-image:url('assets/book-martyrdom.png');}
+  .module-card.m8{background-image:url('assets/book-la-solidaridad.png');}
+  .module-card.m9{background-image:url('assets/book-dapitan-exile.png');}
+  .module-card.m10{background-image:url('assets/book-false-trial.png');}
+  .module-card.m11{background-image:url('assets/book-retraction.png');}
+  .module-card.m12{background-image:url('assets/book-eternal-legacy.png');}
+
+  /* Nav button images */
+  .nav-btn-img{width:150px;height:auto;display:block;pointer-events:none;transition:transform .15s ease,filter .15s ease;}
+  .nav-item-img{padding:0 8px;margin:0 0 20px;background:none !important;border:none !important;box-shadow:none !important;height:auto !important;overflow:visible;display:flex !important;align-items:center;justify-content:center;cursor:pointer;}
+  .nav-item-img:hover .nav-btn-img{transform:scale(1.08);filter:brightness(1.15);}
+  .nav-item-img:active .nav-btn-img{transform:scale(.95);filter:brightness(.85);}
+
+  /* Wooden image buttons */
+  .btn-wood{background:none;border:none;padding:0;cursor:pointer;transition:transform .15s ease,filter .15s ease;width:160px;}
+  .btn-wood:hover{transform:scale(1.08);filter:brightness(1.15) drop-shadow(2px 3px 4px rgba(0,0,0,.3));}
+  .btn-wood:active{transform:scale(.93);filter:brightness(.8);}
+  .btn-wood img{width:100%;height:auto;object-fit:contain;display:block;}
+
+  /* Activity badge images */
+  .activity-badge-img{width:80px;height:80px;object-fit:contain;margin:0 auto 8px;display:block;}
+
+  /* Next step */
+  .next-step{border-radius:12px;padding:18px 22px;margin-bottom:24px;display:flex;align-items:center;gap:16px;cursor:pointer;transition:all .15s ease;position:relative;overflow:hidden;}
+  .next-step:hover{transform:translateY(-3px) scale(1.01);filter:brightness(1.05);}
+  .next-step:active{transform:translateY(1px) scale(.99);filter:brightness(.95);}
+  .next-step::before{content:'';position:absolute;inset:0;border-radius:12px;pointer-events:none;}
+  .next-step-icon{width:52px;height:52px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;position:relative;}
+  .next-step-info{flex:1;}
+  .next-step-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;}
+  .next-step-title{font-size:15px;font-weight:600;margin-bottom:2px;letter-spacing:.3px;}
+  .next-step-meta{font-size:12px;}
+  .next-step-btn{padding:10px 22px;border-radius:8px;font-weight:600;font-size:12px;border:none;cursor:pointer;font-family:inherit;transition:all .15s ease;letter-spacing:.5px;text-transform:uppercase;}
+  .next-step-btn:hover{transform:scale(1.05);filter:brightness(1.1);}
+  .next-step-btn:active{transform:scale(.95);filter:brightness(.85);}
+
+  /* Buttons */
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:8px;font-weight:600;font-size:13px;font-family:inherit;border:none;cursor:pointer;text-decoration:none;transition:all .15s ease;letter-spacing:.5px;text-transform:uppercase;}
+  .btn:hover{transform:translateY(-2px) scale(1.04);filter:brightness(1.1);}
+  .btn:active{transform:translateY(2px) scale(.96);filter:brightness(.85);}
+
+  /* Search */
+  .search-input{width:100%;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600;font-family:inherit;border:2px solid;outline:none;transition:all .3s;}
+  .search-input:focus{box-shadow:0 0 0 3px #c9a84c33;}
+
+  /* Cards */
+  .card{border-radius:12px;padding:18px 20px;display:flex;align-items:start;justify-content:space-between;gap:12px;transition:all .15s ease;cursor:pointer;}
+  .card:hover{transform:translateY(-3px);filter:brightness(1.03);}
+  .card:active{transform:translateY(1px);filter:brightness(.97);}
+  .card-title{font-size:15px;font-weight:600;margin-bottom:4px;letter-spacing:.3px;}
+  .card-sub{font-size:13px;}
+
+  /* Tabs */
+  .tab-bar{display:flex;gap:6px;margin:16px 0;}
+  .tab{padding:8px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid transparent;font-family:inherit;transition:all .2s;letter-spacing:.5px;text-transform:uppercase;}
+  .tab:hover{opacity:.85;}
+
+  /* Avatar */
+  .avatar{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:600;letter-spacing:1px;text-transform:uppercase;transition:all .3s;}
+
+  /* Stat chips */
+  .stat-chip{display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:14px;padding:14px 8px;font-size:13px;font-weight:600;min-height:70px;transition:all .2s;letter-spacing:.5px;text-transform:uppercase;}
+  .stat-chip:hover{transform:scale(1.03);}
+
+  /* Level nodes */
+  .level-path{display:flex;flex-direction:column;align-items:center;gap:8px;}
+  .level-node{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:16px;cursor:pointer;border:3px solid;transition:all .2s;}
+  .level-node:hover{transform:scale(1.08);}
+  .level-connector{width:3px;height:24px;border-radius:2px;}
+
+  /* Game board */
+  .game-board{border-radius:12px;padding:24px;transition:all .3s;}
+  .game-question{font-size:17px;font-weight:600;margin-bottom:20px;letter-spacing:.3px;}
+  .game-option{display:block;width:100%;padding:14px 18px;border-radius:10px;margin-bottom:10px;font-size:14px;font-weight:600;border:2px solid;cursor:pointer;text-align:left;font-family:inherit;transition:all .15s;letter-spacing:.3px;}
+  .game-progress{display:flex;gap:4px;margin-bottom:20px;}
+  .game-dot{width:8px;height:8px;border-radius:50%;transition:all .3s;}
+
+  /* Activities */
+  .activity-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .activity-card{border-radius:12px;padding:18px 14px;text-align:center;cursor:pointer;transition:all .15s ease;}
+  .activity-card:hover{transform:translateY(-4px) scale(1.03);filter:brightness(1.05);}
+  .activity-card:active{transform:translateY(1px) scale(.97);}
+  .activity-icon{width:40px;height:40px;margin:0 auto 10px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;transition:all .3s;}
+  .activity-card:hover .activity-icon{box-shadow:0 0 12px #c9a84c44;}
+  .activity-name{font-size:13px;font-weight:600;margin-bottom:5px;letter-spacing:.5px;text-transform:uppercase;}
+  .activity-desc{font-size:11px;line-height:1.5;margin-bottom:10px;}
+  .activity-link{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;cursor:pointer;}
+
+  .review-hint{font-size:13px;margin-bottom:16px;padding:12px 16px;border-radius:10px;}
+
+  /* Teach */
+  .teach-card{border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:16px;cursor:pointer;transition:all .2s;}
+  .teach-card:hover{transform:translateY(-2px);}
+  .teach-color{width:8px;height:48px;border-radius:4px;flex-shrink:0;}
+
+  /* Prefs */
+  .pref-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;font-size:14px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;}
+  .pref-toggle{width:48px;height:28px;border-radius:14px;position:relative;cursor:pointer;transition:background .3s;}
+  .pref-toggle::after{content:'';position:absolute;width:22px;height:22px;border-radius:50%;top:3px;background:white;transition:all .3s;}
+  .pref-toggle.on::after{right:3px;}
+  .pref-toggle.off::after{left:3px;}
+
+  /* Breadcrumb */
+  .breadcrumb{font-size:11px;font-weight:600;margin-bottom:8px;display:flex;gap:6px;align-items:center;letter-spacing:.5px;text-transform:uppercase;}
+  .breadcrumb a{text-decoration:none;cursor:pointer;}
+  .breadcrumb .sep{opacity:.4;}
+
+  /* Lesson */
+  .lesson-content{max-width:680px;line-height:1.8;font-size:16px;}
+  .lesson-content h2{font-size:20px;font-weight:600;margin:24px 0 12px;letter-spacing:.5px;text-transform:uppercase;}
+  .lesson-content p{margin-bottom:16px;}
+  .lesson-content blockquote{border-left:3px solid #c9a84c;padding:12px 16px;margin:16px 0;font-style:italic;border-radius:0 8px 8px 0;}
+
+  /* Login */
+  .login-wrapper{display:flex;align-items:center;justify-content:center;min-height:100%;padding:40px;}
+  .login-card{max-width:420px;width:100%;border-radius:16px;padding:40px 36px;text-align:center;transition:all .4s;}
+  .login-logo{font-family:'Arena','Impact','Arial Black',sans-serif;font-size:48px;font-weight:600;margin-bottom:8px;font-style:normal;letter-spacing:3px;text-transform:uppercase;}
+  .login-title{font-size:22px;font-weight:600;margin-bottom:12px;letter-spacing:.5px;text-transform:uppercase;}
+  .login-desc{font-size:14px;margin-bottom:24px;}
+
+  /* Toast */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);padding:12px 24px;border-radius:12px;font-size:14px;font-weight:500;z-index:100;transition:transform .3s;pointer-events:none;}
+  .toast.show{transform:translateX(-50%) translateY(0);}
+
+  /* Theme toggle — removed */
+
+  /* Footer */
+  .footer-row{display:flex;justify-content:space-between;align-items:center;padding-top:16px;font-size:13px;}
+
+  /* Quill pen decoration */
+  .quill-decor{position:absolute;bottom:20px;right:30px;font-size:42px;opacity:.15;transform:rotate(-25deg);pointer-events:none;z-index:0;}
+
+  /* =======================================
+     LIGHT THEME — Ornate Antique Book Style
+     ======================================= */
+  .app.light{background:#ece3d0;color:#2a1810;}
+
+  /* Parchment texture via layered gradients */
+  .light .main{
+    background:
+      radial-gradient(ellipse at 20% 50%,#f2eadb 0%,transparent 50%),
+      radial-gradient(ellipse at 80% 20%,#e8dcc0 0%,transparent 40%),
+      radial-gradient(ellipse at 50% 80%,#ddd2be 0%,transparent 50%),
+      linear-gradient(180deg,#efe7d6 0%,#e5dbc8 50%,#ddd2be 100%);
+    position:relative;
+  }
+
+  /* Ornate top border on main area */
+  .light .main::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,transparent,#c9a84c44,#c9a84c,#c9a84c44,transparent);z-index:1;pointer-events:none;}
+
+  /* Sidebar — dark navy with ornate gold border */
+  .light .sidebar{background:linear-gradient(180deg,#1a1a3e,#10102a,#0c0c22);}
+  .light .sidebar-border::before{background:linear-gradient(180deg,#c9a84c88,#c9a84c44,#c9a84c88);}
+  .light .sidebar-border::after{background:linear-gradient(180deg,#c9a84c44,#c9a84c22,#c9a84c44);}
+  .light .sidebar-filigree-top,.light .sidebar-filigree-bottom{color:#c9a84c55;}
+  .light .sidebar-logo{}
+  .light .sidebar-sub{color:#8a82a0;}
+  .light .nav-item{color:#a09ab0;}
+  .light .nav-item:hover{color:#d4c9a8;background:#ffffff0a;}
+  .light .nav-item.active{background:linear-gradient(135deg,#232358,#2a2a68);color:#f5efe0;border-color:#c9a84c44;box-shadow:inset 0 0 12px rgba(201,168,76,.1);text-shadow:1px 1px 0 rgba(0,0,0,.4),2px 2px 2px rgba(0,0,0,.2);}
+  .light .nav-icon{color:#c9a84c;}
+  .light .sidebar-map{background:#0e0e24;border:1px solid #c9a84c22;}
+  .light .sidebar-map-lines::before{border-color:#c9a84c33;}
+  .light .sidebar-map-label{color:#c9a84c;}
+  .light .sidebar-bottom-item{color:#8a82a0;}
+  .light .sidebar-bottom-item:hover{color:#c9a84c;}
+  .light .sidebar-stats{border-top:1px solid #c9a84c22;}
+  .light .sidebar-stat{color:#d4c9a8;background:#ffffff0a;border:1px solid #c9a84c22;}
+
+  /* Top bar / stats */
+  .light .username{color:#3a2818;text-shadow:none;}
+  .light .stat-badge{border:1px solid #c9a84c55;color:#5a4228;background:linear-gradient(135deg,#f5ecd4,#ede4cc);box-shadow:0 2px 4px rgba(0,0,0,.08);text-shadow:none;}
+  .light .hero-heading{color:#2a1810;text-shadow:1px 1px 2px rgba(0,0,0,.08);}
+  .light .hero-sub{color:#6b3a28;}
+
+  /* Next step — dark book-themed card */
+  .light .next-step{background:linear-gradient(135deg,#1a1a3e,#12122e);border:2px solid #c9a84c55;box-shadow:0 4px 16px rgba(0,0,0,.15);}
+  .light .next-step::before{border:1px solid #c9a84c22;margin:4px;}
+  .light .next-step-icon{background:#c9a84c22;border:2px solid #c9a84c55;color:#c9a84c;}
+  .light .next-step-label{color:#c9a84c;}
+  .light .next-step-title{color:#f5efe0;text-shadow:1px 1px 2px rgba(0,0,0,.25);}
+  .light .next-step-meta{color:#a09ab0;}
+  .light .next-step-btn{background:linear-gradient(135deg,#c9a84c,#b8960a);color:#1a1a3e;box-shadow:0 4px 0 #8a7a0a,0 6px 8px rgba(0,0,0,.25);text-shadow:1px 1px 0 rgba(255,255,255,.3);}
+
+  .light .section-title{color:#2a1810;text-shadow:none;}
+  .light .section-link{color:#8b2240;}
+
+  /* Module cards — 3D books */
+  .light .module-progress{background:#c9a84c33;color:#4a3728;}
+  .light .book-border{border-color:rgba(255,255,255,.45);}
+  .light .bookmark{background:linear-gradient(180deg,#d4af37,#b8960a);}
+
+  .light .footer-row{border-top:2px solid #c9a84c33;color:#8a7a60;}
+  .light .footer-accent{color:#c9a84c;font-style:italic;}
+
+  /* Cards / search */
+  .light .card{background:linear-gradient(135deg,#f8f2e4,#f0e8d4);border:1px solid #c9a84c33;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+  .light .card:hover{box-shadow:0 4px 12px rgba(0,0,0,.1);}
+  .light .card-title{color:#2a1810;text-shadow:1px 1px 0 #c9a84c33,2px 2px 2px rgba(0,0,0,.06);}
+  .light .card-sub{color:#5a4a38;}
+  .light .search-input{background:#f8f2e4;border-color:#c9a84c55;color:#2a1810;}
+  .light .tab.active{background:#1a1a3e;color:#f5efe0;box-shadow:0 3px 0 #0a0a1e,0 5px 6px rgba(0,0,0,.15);text-shadow:1px 1px 0 rgba(0,0,0,.3);}
+  .light .tab{background:#e8dcc0;color:#5a4a38;border-color:#c9a84c33;}
+  .light .avatar{background:linear-gradient(135deg,#e8dcc0,#d4c9a8);color:#c9a84c;border:3px solid #c9a84c55;}
+  .light .stat-chip.gold{background:linear-gradient(135deg,#f5ecd4,#e8dcc0);color:#c9a84c;border:2px solid #c9a84c44;}
+  .light .stat-chip.terracotta{background:linear-gradient(135deg,#f5e0d0,#e8d0bc);color:#a0522d;border:2px solid #a0522d33;}
+  .light .stat-chip.burgundy{background:linear-gradient(135deg,#f5d8de,#e8c8d0);color:#7a1a2e;border:2px solid #7a1a2e33;}
+  .light .level-node{background:#f8f2e4;border-color:#c9a84c;color:#c9a84c;}
+  .light .level-node.done{background:linear-gradient(135deg,#c9a84c,#a08030);border-color:#c9a84c;color:#2a1810;}
+  .light .level-node.locked{background:#e8dcc0;border-color:#c9a84c44;color:#8a7a60;}
+  .light .level-connector{background:#c9a84c55;}
+  .light .game-board{background:#f8f2e4;box-shadow:0 4px 20px rgba(0,0,0,.1);border:2px solid #c9a84c33;border-top:4px solid #c9a84c;}
+  .light .game-question{color:#2a1810;text-shadow:1px 1px 0 #c9a84c44,2px 2px 0 #c9a84c22,3px 3px 2px rgba(0,0,0,.08);}
+  .light .game-option{background:#f8f2e4;border-color:#c9a84c44;color:#2a1810;box-shadow:0 3px 0 #c9a84c55,0 5px 6px rgba(0,0,0,.08);text-shadow:1px 1px 0 rgba(201,168,76,.2);}
+  .light .game-option:hover{border-color:#c9a84c;background:#f5ecd4;}
+  .light .game-option.selected{border-color:#1a1a3e;background:#e8dcc0;}
+  .light .game-dot{background:#c9a84c44;}
+  .light .game-dot.filled{background:#c9a84c;}
+  .light .teach-card{background:linear-gradient(135deg,#f8f2e4,#f0e8d4);border:1px solid #c9a84c33;}
+  .light .pref-row{border-bottom:1px solid #c9a84c33;color:#2a1810;}
+  .light .pref-toggle.on{background:#c9a84c;}
+  .light .pref-toggle.off{background:#d4c9a8;}
+  .light .breadcrumb{color:#5a4a38;}
+  .light .breadcrumb a{color:#8b2240;}
+  .light .lesson-content{color:#2a1810;}
+  .light .lesson-content h2{color:#2a1810;text-shadow:1px 1px 0 #c9a84c44,2px 2px 0 #c9a84c22,3px 3px 2px rgba(0,0,0,.08);}
+  .light .lesson-content blockquote{background:#f5ecd4;color:#5a4a38;border-left-color:#c9a84c;}
+  .light .review-hint{background:#f5ecd4;border:1px solid #c9a84c33;color:#5a4a38;}
+  .light .activity-card{background:linear-gradient(135deg,#f8f2e4,#f0e8d4);border:1px solid #c9a84c33;}
+  .light .activity-icon{background:linear-gradient(135deg,#c9a84c22,#c9a84c11);color:#c9a84c;border:2px solid #c9a84c55;}
+  .light .activity-name{color:#2a1810;text-shadow:1px 1px 0 #c9a84c33,2px 2px 2px rgba(0,0,0,.06);}
+  .light .activity-desc{color:#5a4a38;}
+  .light .activity-link{color:#8b2240;}
+  .light .login-card{background:linear-gradient(135deg,#f8f2e4,#efe7d6);border:2px solid #c9a84c44;box-shadow:0 8px 40px rgba(0,0,0,.12);}
+  .light .login-logo{color:#1a1a3e;text-shadow:1px 1px 0 #c9a84c88,2px 2px 0 #b8960a66,3px 3px 0 #a0850a55,4px 4px 0 #8a7a0a44,5px 5px 4px rgba(0,0,0,.2);}
+  .light .login-title{color:#2a1810;text-shadow:1px 1px 0 #c9a84c44,2px 2px 0 #c9a84c22,3px 3px 2px rgba(0,0,0,.1);}
+  .light .login-desc{color:#5a4a38;}
+  .light .toast{background:#1a1a3e;color:#f5efe0;}
+  .light .btn-primary{background:linear-gradient(135deg,#1a1a3e,#22225a);color:#f5efe0;box-shadow:0 4px 0 #0a0a1e,0 6px 8px rgba(0,0,0,.2);text-shadow:1px 1px 0 rgba(0,0,0,.4);}
+  .light .btn-secondary{background:#e8dcc0;color:#2a1810;border:1px solid #c9a84c44;box-shadow:0 3px 0 #c9a84c55,0 5px 6px rgba(0,0,0,.08);text-shadow:1px 1px 0 rgba(201,168,76,.25);}
+  .light .btn-gold{background:linear-gradient(135deg,#c9a84c,#b8960a);color:#2a1810;box-shadow:0 4px 0 #8a7a0a,0 6px 8px rgba(0,0,0,.15);text-shadow:1px 1px 0 rgba(201,168,76,.5);}
+  .light .btn-burgundy{background:linear-gradient(135deg,#8b2240,#6a1830);color:#f5efe0;box-shadow:0 4px 0 #4a1020,0 6px 8px rgba(0,0,0,.2);text-shadow:1px 1px 0 rgba(0,0,0,.4);}
+  .light .quill-decor{color:#2a1810;}
+
+  /* ===== DARK THEME ===== */
+  .app.dark{background:#10102e;color:#f5efe0;}
+  .dark .sidebar{background:linear-gradient(180deg,#161640,#10102e);}
+  .dark .sidebar-border::before{background:linear-gradient(180deg,#c9a84c44,#c9a84c22,#c9a84c44);}
+  .dark .sidebar-border::after{background:linear-gradient(180deg,#c9a84c22,#c9a84c11,#c9a84c22);}
+  .dark .sidebar-filigree-top,.dark .sidebar-filigree-bottom{color:#c9a84c33;}
+  .dark .sidebar-logo{}
+  .dark .sidebar-sub{color:#8a82a0;}
+  .dark .nav-item{color:#8a82a0;}
+  .dark .nav-item:hover{color:#d4c9a8;background:#ffffff08;}
+  .dark .nav-item.active{background:linear-gradient(135deg,#1a2a5e44,#2a3a6e44);color:#c9a84c;border-color:#c9a84c33;text-shadow:1px 1px 0 rgba(0,0,0,.5),2px 2px 2px rgba(0,0,0,.25);}
+  .dark .nav-icon{color:#c9a84c;}
+  .dark .sidebar-map{background:#0c0c28;border:1px solid #c9a84c22;}
+  .dark .sidebar-map-lines::before{border-color:#c9a84c22;}
+  .dark .sidebar-map-label{color:#c9a84c;}
+  .dark .sidebar-bottom-item{color:#8a82a0;}
+  .dark .sidebar-bottom-item:hover{color:#c9a84c;}
+  .dark .sidebar-stats{border-top:1px solid #c9a84c22;}
+  .dark .sidebar-stat{color:#c9a84c;background:#c9a84c11;border:1px solid #c9a84c33;}
+  .dark .main{background:linear-gradient(180deg,#141438,#0e0e2c);}
+  .dark .main::before{background:linear-gradient(90deg,transparent,#c9a84c22,#c9a84c44,#c9a84c22,transparent);}
+  .dark .username{color:#f5efe0;text-shadow:1px 1px 0 #0a0a1e,2px 2px 2px rgba(0,0,0,.25);}
+  .dark .stat-badge{border:1px solid #c9a84c33;color:#d4c9a8;background:#ffffff08;}
+  .dark .hero-heading{color:#f5efe0;text-shadow:1px 1px 0 #0a0a1e,2px 2px 0 #080818,3px 3px 0 #060614,4px 4px 3px rgba(0,0,0,.3);}
+  .dark .hero-sub{color:#c9a84c;}
+  .dark .next-step{background:linear-gradient(135deg,#1a1a3e,#12122e);border:1px solid #c9a84c33;}
+  .dark .next-step::before{border:1px solid #c9a84c11;margin:4px;}
+  .dark .next-step-icon{background:#c9a84c22;border:1px solid #c9a84c44;color:#c9a84c;}
+  .dark .next-step-label{color:#c9a84c;}
+  .dark .next-step-title{color:#f5efe0;text-shadow:1px 1px 0 rgba(0,0,0,.5),2px 2px 0 rgba(0,0,0,.3),3px 3px 2px rgba(0,0,0,.2);}
+  .dark .next-step-meta{color:#8a82a0;}
+  .dark .next-step-btn{background:#c9a84c;color:#0a0a1e;box-shadow:0 4px 0 #8a7a0a,0 6px 8px rgba(0,0,0,.3);text-shadow:1px 1px 0 rgba(255,255,255,.25);}
+  .dark .section-title{color:#f5efe0;text-shadow:1px 1px 0 #0a0a1e,2px 2px 0 #080818,3px 3px 2px rgba(0,0,0,.25);}
+  .dark .section-link{color:#c9a84c;}
+  .dark .module-progress{background:rgba(255,255,255,.12);color:#e8dcc8;}
+  .dark .book-border{border-color:rgba(255,255,255,.25);}
+  .dark .bookmark{background:linear-gradient(180deg,#c9a84c,#8a7a0a);}
+  .dark .footer-row{border-top:1px solid #c9a84c22;color:#8a82a0;}
+  .dark .footer-accent{color:#c9a84c;font-style:italic;}
+  .dark .card{background:#ffffff06;border:1px solid #c9a84c22;}
+  .dark .card-title{color:#f5efe0;text-shadow:1px 1px 0 #0a0a1e,2px 2px 2px rgba(0,0,0,.2);}
+  .dark .card-sub{color:#8a82a0;}
+  .dark .search-input{background:#ffffff08;border-color:#c9a84c33;color:#f5efe0;}
+  .dark .tab.active{background:#c9a84c;color:#0a0a1e;box-shadow:0 3px 0 #8a7a0a,0 5px 6px rgba(0,0,0,.25);text-shadow:1px 1px 0 rgba(255,255,255,.2);}
+  .dark .tab{background:#ffffff08;color:#8a82a0;border-color:#c9a84c22;}
+  .dark .avatar{background:#1a2a5e;color:#c9a84c;border:2px solid #c9a84c44;}
+  .dark .stat-chip.gold{background:#c9a84c22;color:#c9a84c;border:1px solid #c9a84c33;}
+  .dark .stat-chip.terracotta{background:#a0522d33;color:#e08040;border:1px solid #a0522d44;}
+  .dark .stat-chip.burgundy{background:#7a1a2e44;color:#cc6677;border:1px solid #7a1a2e55;}
+  .dark .level-node{background:#161640;border-color:#c9a84c;color:#c9a84c;}
+  .dark .level-node.done{background:#c9a84c;border-color:#c9a84c;color:#10102e;}
+  .dark .level-node.locked{background:#161640;border-color:#ffffff22;color:#8a82a0;}
+  .dark .level-connector{background:#c9a84c44;}
+  .dark .game-board{background:#161640;box-shadow:0 4px 20px #00000044;border:1px solid #c9a84c22;border-top:4px solid #c9a84c;}
+  .dark .game-question{color:#f5efe0;text-shadow:1px 1px 0 #0a0a1e,2px 2px 0 #080818,3px 3px 2px rgba(0,0,0,.25);}
+  .dark .game-option{background:#161640;border-color:#c9a84c33;color:#f5efe0;box-shadow:0 3px 0 #0a0a20,0 5px 6px rgba(0,0,0,.25);text-shadow:1px 1px 0 rgba(0,0,0,.3);}
+  .dark .game-option:hover{border-color:#c9a84c;background:#1e1e50;}
+  .dark .game-option.selected{border-color:#c9a84c;background:#c9a84c22;}
+  .dark .game-dot{background:#ffffff22;}
+  .dark .game-dot.filled{background:#c9a84c;}
+  .dark .teach-card{background:#ffffff06;border:1px solid #c9a84c22;}
+  .dark .teach-card .teach-title{color:#f5efe0;}
+  .dark .teach-card .teach-meta{color:#8a82a0;}
+  .dark .pref-row{border-bottom:1px solid #c9a84c22;color:#f5efe0;}
+  .dark .pref-toggle.on{background:#c9a84c;}
+  .dark .pref-toggle.off{background:#ffffff22;}
+  .dark .breadcrumb{color:#8a82a0;}
+  .dark .breadcrumb a{color:#c9a84c;}
+  .dark .lesson-content{color:#d4c9a8;}
+  .dark .lesson-content h2{color:#f5efe0;text-shadow:1px 1px 0 #0a0a1e,2px 2px 0 #080818,3px 3px 2px rgba(0,0,0,.25);}
+  .dark .lesson-content blockquote{background:#ffffff06;color:#8a82a0;}
+  .dark .review-hint{background:#ffffff06;border:1px solid #c9a84c11;color:#8a82a0;}
+  .dark .activity-card{background:#161640;border:1px solid #c9a84c22;}
+  .dark .activity-icon{background:#c9a84c15;border:2px solid #c9a84c33;color:#c9a84c;}
+  .dark .activity-name{color:#f5efe0;text-shadow:1px 1px 0 #0a0a1e,2px 2px 2px rgba(0,0,0,.2);}
+  .dark .activity-desc{color:#8a82a0;}
+  .dark .activity-link{color:#c9a84c;}
+  .dark .login-card{background:#161640;border:1px solid #c9a84c22;box-shadow:0 8px 40px #00000044;}
+  .dark .login-logo{color:#c9a84c;text-shadow:1px 1px 0 #0a0a1e,2px 2px 0 #080818,3px 3px 0 #060614,4px 4px 0 #040410,5px 5px 4px rgba(0,0,0,.4);}
+  .dark .login-title{color:#f5efe0;text-shadow:1px 1px 0 #0a0a1e,2px 2px 0 #080818,3px 3px 2px rgba(0,0,0,.25);}
+  .dark .login-desc{color:#8a82a0;}
+  .dark .toast{background:#c9a84c;color:#10102e;}
+  .dark .btn-primary{background:#c9a84c;color:#10102e;box-shadow:0 4px 0 #8a7a0a,0 6px 8px rgba(0,0,0,.3);text-shadow:1px 1px 0 rgba(255,255,255,.2);}
+  .dark .btn-secondary{background:#ffffff11;color:#d4c9a8;}
+  .dark .btn-gold{background:#c9a84c;color:#10102e;box-shadow:0 4px 0 #8a7a0a,0 6px 8px rgba(0,0,0,.3);text-shadow:1px 1px 0 rgba(255,255,255,.2);}
+  .dark .btn-burgundy{background:linear-gradient(135deg,#7a1a2e,#9a2a3e);color:#f5efe0;box-shadow:0 4px 0 #4a1020,0 6px 8px rgba(0,0,0,.3);text-shadow:1px 1px 0 rgba(0,0,0,.4);}
+  .dark .quill-decor{color:#c9a84c;}
+
+  /* ===== MOBILE RESPONSIVE ===== */
+  @media(max-width:768px){
+    .app{flex-direction:column;height:100vh;}
+
+    /* Sidebar → bottom nav bar */
+    .sidebar{width:100%;min-width:unset;order:2;flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:0;height:auto;flex-shrink:0;}
+    .sidebar-inner{padding:6px 8px;flex-direction:row;align-items:center;gap:4px;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;}
+    .sidebar-logo{display:none;}
+    .sidebar-sub{display:none;}
+    .sidebar-border{display:none;}
+    .sidebar-filigree-top,.sidebar-filigree-bottom{display:none;}
+    .sidebar-map{display:none;}
+    .sidebar-bottom{display:none;}
+    .sidebar-stats{display:none;}
+    .nav-list{display:flex;flex-direction:row;gap:4px;flex:unset;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .nav-item-img{margin:0 !important;padding:2px 4px !important;}
+    .nav-btn-img{width:65px !important;}
+
+    /* Main content fills screen */
+    .main{flex:1;padding:16px 12px;order:1;overflow-y:auto;}
+
+    /* JOSE title in main area */
+    .username.brand .jose-title-img{width:140px;}
+    .top-bar{flex-direction:column;align-items:flex-start;gap:8px;}
+    .stats-row{gap:6px;}
+    .stat-badge{padding:4px 10px;font-size:10px;}
+
+    /* Headings */
+    .hero-heading{font-size:18px;}
+    .hero-sub{font-size:12px;margin-bottom:16px;}
+    .section-title{font-size:14px;}
+
+    /* Next step card */
+    .next-step{flex-direction:column;gap:12px;padding:14px;}
+    .next-step-btn{align-self:stretch;text-align:center;}
+
+    /* Books grid → 2 columns */
+    .modules-grid{grid-template-columns:repeat(2,1fr);gap:8px;}
+    .module-progress{font-size:10px;padding:3px 10px;}
+
+    /* Cards */
+    .card{flex-direction:column;gap:10px;}
+    .btn-wood{width:120px;}
+
+    /* Game board */
+    .game-board{padding:16px;}
+    .game-question{font-size:15px;}
+    .game-option{padding:12px 14px;font-size:13px;}
+
+    /* Profile */
+    .stat-chip{min-height:50px;padding:10px 6px;font-size:11px;}
+
+    /* Login */
+    .login-card{margin:20px;padding:28px 20px;}
+    .login-logo .jose-title-img{width:180px;}
+
+    /* Lesson content */
+    .lesson-content{font-size:14px;}
+    .lesson-content h2{font-size:17px;}
+
+    /* Preferences */
+    .pref-row{font-size:13px;}
+
+    /* Breadcrumb */
+    .breadcrumb{font-size:10px;}
+
+    /* Search */
+    .search-input{font-size:13px;}
+  }
+
+  /* Small phones */
+  @media(max-width:380px){
+    .modules-grid{grid-template-columns:repeat(2,1fr);gap:6px;}
+    .nav-btn-img{width:55px !important;}
+    .main{padding:12px 8px;}
+    .hero-heading{font-size:16px;}
+    .username.brand .jose-title-img{width:120px;}
+    .btn-wood{width:100px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<div class="app light" id="app">
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-filigree-top"></div>
+    <div class="sidebar-border"></div>
+    <div class="sidebar-inner">
+      <div class="sidebar-logo"><img class="jose-title-img" src="assets/jose-title.png" alt="Jose" /></div>
+      <div class="sidebar-sub" id="sidebar-sub">Learn something new today</div>
+      <ul class="nav-list" id="nav-list"></ul>
+      <div class="sidebar-map">
+        <div class="sidebar-map-lines"></div>
+        <span class="sidebar-map-label">Archipelago</span>
+      </div>
+      <div class="sidebar-bottom" id="sidebar-bottom-extra"></div>
+      <div class="sidebar-stats">
+        <span class="sidebar-stat"><span style="color:#c9a84c">&#10040;</span> 0 XP</span>
+        <span class="sidebar-stat"><span style="color:#cc3344">&#9829;</span> 5</span>
+      </div>
+    </div>
+    <div class="sidebar-filigree-bottom"></div>
+  </div>
+
+  <!-- Main content -->
+  <div class="main" id="main">
+
+    <!-- LEARN PAGE -->
+    <div class="page active" id="page-learn">
+      <div class="top-bar">
+        <span class="username brand"><img class="jose-title-img" src="assets/jose-title.png" alt="Jose" /></span>
+        <div class="stats-row">
+          <span class="stat-badge xp"><span class="icon" style="color:#c9a84c">&#10040;</span> 0 XP</span>
+          <span class="stat-badge streak"><span class="icon" style="color:#e08040">&#9878;</span> 0</span>
+          <span class="stat-badge hearts"><span class="icon" style="color:#cc3344">&#9829;</span> 5</span>
+        </div>
+      </div>
+      <h2 class="hero-heading">Let's make some progress!</h2>
+      <p class="hero-sub">A little Rizal, a little discovery, every day.</p>
+      <div class="next-step" onclick="navigate('lesson')">
+        <div class="next-step-icon">&#9783;</div>
+        <div class="next-step-info">
+          <div class="next-step-label">Your next step</div>
+          <div class="next-step-title">Why the law was enacted</div>
+          <div class="next-step-meta">The Rizal Law and the Rizal Course &middot; The Rizal Law</div>
+          <div class="next-step-meta">&#9200; About 5 min</div>
+        </div>
+        <button class="next-step-btn" onclick="event.stopPropagation();navigate('lesson')">Continue learning &rarr;</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <span class="section-title" style="margin:0;">Your learning path</span>
+        <span class="section-link" onclick="navigate('practice')">Practice &rarr;</span>
+      </div>
+      <div class="modules-grid">
+        <div class="module-wrapper"><div class="module-card m1" onclick="navigate('levels')" title="Module 1: Rizal Law"></div><div class="module-progress">0/6</div></div>
+        <div class="module-wrapper"><div class="module-card m2" onclick="navigate('levels')" title="Module 2: Hero Then and Now"></div><div class="module-progress">0/6</div></div>
+        <div class="module-wrapper"><div class="module-card m3" onclick="navigate('levels')" title="Module 3: 19th Century"></div><div class="module-progress">0/6</div></div>
+        <div class="module-wrapper"><div class="module-card m4" onclick="navigate('levels')" title="Module 4: Family Childhood"></div><div class="module-progress">0/6</div></div>
+        <div class="module-wrapper"><div class="module-card m5" onclick="navigate('levels')" title="Module 5: Travels Abroad"></div><div class="module-progress">0/6</div></div>
+        <div class="module-wrapper"><div class="module-card m6" onclick="navigate('levels')" title="Module 6: Noli Me Tangere"></div><div class="module-progress">0/6</div></div>
+        <div class="module-wrapper"><div class="module-card m7" onclick="navigate('levels')" title="Module 7: Martyrdom"></div><div class="module-progress">0/6</div></div>
+        <div class="module-wrapper"><div class="module-card m8" onclick="navigate('levels')" title="Module 8: La Solidaridad"></div><div class="module-progress">0/6</div></div>
+        <div class="module-wrapper"><div class="module-card m9" onclick="navigate('levels')" title="Module 9: Dapitan Exile"></div><div class="module-progress">0/6</div></div>
+        <div class="module-wrapper"><div class="module-card m10" onclick="navigate('levels')" title="Module 10: The False Trial"></div><div class="module-progress">0/6</div></div>
+        <div class="module-wrapper"><div class="module-card m11" onclick="navigate('levels')" title="Module 11: The Retraction"></div><div class="module-progress">0/6</div></div>
+        <div class="module-wrapper"><div class="module-card m12" onclick="navigate('levels')" title="Module 12: Eternal Legacy"></div><div class="module-progress">0/6</div></div>
+      </div>
+      <div class="footer-row">
+        <span><span style="color:#c9a84c">&#10040;</span> XP &nbsp;&nbsp; <span style="color:#cc3344">&#9829;</span> 0</span>
+        <span class="footer-accent">Refined hearts</span>
+      </div>
+      <div class="quill-decor">&#10002;</div>
+    </div>
+
+    <!-- PRACTICE PAGE -->
+    <div class="page" id="page-practice">
+      <h2 class="hero-heading">A little practice, a lot of discovery.</h2>
+      <p class="hero-sub">Review what you've seen, then jump into a game.</p>
+      <div class="section-title">Your review set</div>
+      <div class="review-hint">Complete a path game or make a mistake to unlock personalized practice.</div>
+      <div class="modules-grid">
+        <div class="module-wrapper"><div class="module-card m1" onclick="navigate('quiz')" title="Rizal Law"></div><div class="module-progress">0/6</div></div>
+        <div class="module-wrapper"><div class="module-card m2" onclick="navigate('quiz')" title="Hero Then and Now"></div><div class="module-progress">0/6</div></div>
+        <div class="module-wrapper"><div class="module-card m3" onclick="navigate('quiz')" title="19th Century"></div><div class="module-progress">0/6</div></div>
+        <div class="module-wrapper"><div class="module-card m4" onclick="navigate('quiz')" title="Family Childhood"></div><div class="module-progress">0/6</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+        <span style="color:#c9a84c;font-size:18px;">&#9734;</span>
+        <span class="section-title" style="margin:0;">Let's play</span>
+      </div>
+      <p class="hero-sub">Play for practice. No grades, no pressure.</p>
+      <div class="activity-grid">
+        <div class="activity-card" onclick="navigate('quiz')"><img class="activity-badge-img" src="assets/badge-timeline.jpg" alt="Timeline" /><div class="activity-name">Timeline</div><div class="activity-desc">Put the events in the right order.</div><div class="activity-link">Play a round</div></div>
+        <div class="activity-card" onclick="navigate('quiz')"><img class="activity-badge-img" src="assets/badge-quiz.jpg" alt="Quiz" /><div class="activity-name">Quiz</div><div class="activity-desc">Pick the right answer.</div><div class="activity-link">Play a round</div></div>
+        <div class="activity-card" onclick="navigate('quiz')"><img class="activity-badge-img" src="assets/badge-matching.jpg" alt="Matching" /><div class="activity-name">Matching</div><div class="activity-desc">Find every pair before time runs out.</div><div class="activity-link">Beat the clock</div></div>
+        <div class="activity-card" onclick="navigate('quiz')"><img class="activity-badge-img" src="assets/badge-fillblank.jpg" alt="Fill in the Blank" /><div class="activity-name">Fill in the Blank</div><div class="activity-desc">Choose the missing word.</div><div class="activity-link">Play a round</div></div>
+      </div>
+    </div>
+
+    <!-- BOOKMARKS PAGE -->
+    <div class="page" id="page-bookmarks">
+      <div class="breadcrumb"><a onclick="navigate('learn')">Learn</a> <span class="sep">/</span> Bookmarks</div>
+      <h2 class="hero-heading" style="margin-bottom:16px;">Bookmarks</h2>
+      <input class="search-input" placeholder="Search lessons" />
+      <div style="margin-top:16px;display:flex;flex-direction:column;gap:12px;">
+        <div class="card" onclick="navigate('lesson')"><div style="flex:1;"><div class="card-title">Why the law was enacted</div><div class="card-sub">The Rizal Law</div><div style="margin-top:6px;font-size:12px;font-weight:500;color:#c9a84c;">&#10003; Completed</div></div><div style="display:flex;gap:8px;align-items:center;"><button class="btn-wood" onclick="event.stopPropagation();navigate('lesson')"><img src="assets/btn-open.png" alt="Open" /></button><button class="btn-wood" onclick="event.stopPropagation();showToast('Bookmark removed')"><img src="assets/btn-remove.png" alt="Remove" /></button></div></div>
+        <div class="card" onclick="navigate('lesson')"><div style="flex:1;"><div class="card-title">Rizal's family and childhood</div><div class="card-sub">Family Childhood</div></div><div style="display:flex;gap:8px;align-items:center;"><button class="btn-wood" onclick="event.stopPropagation();navigate('lesson')"><img src="assets/btn-open.png" alt="Open" /></button><button class="btn-wood" onclick="event.stopPropagation();showToast('Bookmark removed')"><img src="assets/btn-remove.png" alt="Remove" /></button></div></div>
+        <div class="card" onclick="navigate('lesson')"><div style="flex:1;"><div class="card-title">The propaganda movement</div><div class="card-sub">19th Century Philippines</div></div><div style="display:flex;gap:8px;align-items:center;"><button class="btn-wood" onclick="event.stopPropagation();navigate('lesson')"><img src="assets/btn-open.png" alt="Open" /></button><button class="btn-wood" onclick="event.stopPropagation();showToast('Bookmark removed')"><img src="assets/btn-remove.png" alt="Remove" /></button></div></div>
+      </div>
+    </div>
+
+    <!-- PROFILE PAGE -->
+    <div class="page" id="page-profile">
+      <div style="max-width:480px;margin:0 auto;text-align:center;padding-top:10px;">
+        <div class="avatar" style="margin:0 auto 16px;">&#9786;</div>
+        <h2 class="hero-heading" style="margin:0 0 4px;">Explorer</h2>
+        <p style="font-size:13px;opacity:.6;margin-bottom:16px;">student@apc.edu.ph</p>
+        <button class="btn btn-primary" style="margin-bottom:24px;" onclick="showToast('Edit profile coming soon')">Edit profile</button>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;">
+          <div class="stat-chip gold"><span style="font-size:22px;margin-bottom:4px;">&#10040;</span> 0 XP</div>
+          <div class="stat-chip terracotta"><span style="font-size:22px;margin-bottom:4px;">&#9878;</span> 0</div>
+          <div class="stat-chip burgundy"><span style="font-size:22px;margin-bottom:4px;">&#9829;</span> 5</div>
+        </div>
+        <div style="text-align:left;">
+          <p style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:2px;opacity:.5;margin-bottom:8px;">Settings</p>
+          <div class="card" style="margin-bottom:8px;cursor:pointer;" onclick="navigate('preferences')"><div class="card-title" style="font-size:15px;margin:0;">Reading settings</div></div>
+          <div class="card" style="margin-bottom:8px;cursor:pointer;" onclick="showToast('My classes')"><div class="card-title" style="font-size:15px;margin:0;">My classes</div></div>
+        </div>
+        <button class="btn btn-secondary" style="margin-top:16px;width:100%;justify-content:center;" onclick="navigate('login')">Sign out</button>
+      </div>
+    </div>
+
+    <!-- MODULE LEVELS PAGE -->
+    <div class="page" id="page-levels">
+      <div style="max-width:480px;margin:0 auto;text-align:center;padding-top:8px;">
+        <div class="breadcrumb" style="justify-content:center;"><a onclick="navigate('learn')">Learn</a> <span class="sep">/</span> Rizal Law</div>
+        <div class="module-card m1" style="margin:0 auto 24px;max-width:180px;" title="Rizal Law"></div>
+        <div class="level-path">
+          <div class="level-node done" onclick="navigate('lesson')">&#10003;</div>
+          <div class="level-connector"></div>
+          <div class="level-node" onclick="navigate('lesson')">2</div>
+          <div class="level-connector"></div>
+          <div class="level-node locked">3</div>
+          <div class="level-connector"></div>
+          <div class="level-node locked">4</div>
+          <div class="level-connector"></div>
+          <div class="level-node locked">5</div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:24px;" onclick="navigate('learn')">&#8592; Back to modules</button>
+      </div>
+    </div>
+
+    <!-- LESSON PAGE -->
+    <div class="page" id="page-lesson">
+      <div style="max-width:720px;">
+        <div class="breadcrumb"><a onclick="navigate('learn')">Learn</a> <span class="sep">/</span> <a onclick="navigate('levels')">Rizal Law</a> <span class="sep">/</span> Why the law was enacted</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <span class="username">Why the law was enacted</span>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-gold" style="font-size:12px;padding:6px 14px;" onclick="showToast('Bookmarked!')">&#9733; Bookmark</button>
+            <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px;" onclick="navigate('journal')">&#9998; Journal</button>
+          </div>
+        </div>
+        <div class="lesson-content">
+          <h2>The Rizal Law (Republic Act 1425)</h2>
+          <p>Signed on June 12, 1956, the Rizal Law mandates all educational institutions in the Philippines to offer courses about Jose Rizal, particularly the study of his life, works, and writings.</p>
+          <blockquote>"It is the duty of every citizen to study the life and works of Jose Rizal, not merely to honor a national hero, but to draw from his example the strength and wisdom needed for nation-building."</blockquote>
+          <p>The law was authored by Senator Claro M. Recto, who believed that a deep understanding of Rizal's ideals would inspire patriotism among Filipino youth. The legislation faced opposition from the Catholic Church, which objected to the mandatory reading of Rizal's novels.</p>
+          <h2>Why does it matter today?</h2>
+          <p>The Rizal Course remains part of the college curriculum because Rizal's advocacy for education, critical thinking, and peaceful reform continues to resonate with contemporary challenges facing the Philippines.</p>
+        </div>
+        <div style="margin-top:24px;display:flex;gap:12px;">
+          <button class="btn btn-burgundy" onclick="showToast('Next lesson loading...')">Next lesson &rarr;</button>
+          <button class="btn btn-secondary" onclick="navigate('quiz')">Start the game</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUIZ PAGE -->
+    <div class="page" id="page-quiz">
+      <div style="max-width:600px;margin:0 auto;">
+        <div class="breadcrumb"><a onclick="navigate('practice')">Practice</a> <span class="sep">/</span> Quiz</div>
+        <div class="game-board">
+          <div class="game-progress"><div class="game-dot filled"></div><div class="game-dot filled"></div><div class="game-dot"></div><div class="game-dot"></div><div class="game-dot"></div></div>
+          <div class="game-question">Who authored the Rizal Law (Republic Act 1425)?</div>
+          <button class="game-option" onclick="selectOption(this)">Jose P. Laurel</button>
+          <button class="game-option" onclick="selectOption(this)">Claro M. Recto</button>
+          <button class="game-option" onclick="selectOption(this)">Manuel L. Quezon</button>
+          <button class="game-option" onclick="selectOption(this)">Carlos P. Garcia</button>
+          <div style="margin-top:20px;display:flex;justify-content:space-between;">
+            <button class="btn btn-secondary" onclick="navigate('practice')">&#8592; Back</button>
+            <button class="btn btn-primary" onclick="checkAnswer()">Check answer &rarr;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- JOURNAL PAGE -->
+    <div class="page" id="page-journal">
+      <div style="max-width:720px;">
+        <div class="breadcrumb"><a onclick="navigate('learn')">Learn</a> <span class="sep">/</span> Journal</div>
+        <h2 class="hero-heading" style="margin-bottom:4px;">Journal</h2>
+        <p style="font-size:13px;opacity:.6;margin-bottom:12px;">Private notes stay on this device.</p>
+        <div class="tab-bar">
+          <button class="tab active" onclick="selectTab(this)">Notes</button>
+          <button class="tab" onclick="selectTab(this)">Glossary</button>
+          <button class="tab" onclick="selectTab(this)">Books</button>
+          <button class="tab" onclick="selectTab(this)">Characters</button>
+          <button class="tab" onclick="selectTab(this)">Places</button>
+        </div>
+        <input class="search-input" placeholder="Search journal" style="margin-bottom:16px;" />
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="card" style="flex-direction:column;align-items:stretch;"><div class="card-title">Private reflection</div><p class="card-sub" style="margin-top:6px;">Rizal's insistence on education over violence reminds me of modern advocacy movements...</p><div style="margin-top:8px;font-size:11px;opacity:.5;">Sep 8, 2026 &middot; Private</div></div>
+          <div class="card" style="flex-direction:column;align-items:stretch;"><div class="card-title">Noli Me Tangere notes</div><p class="card-sub" style="margin-top:6px;">Crisostomo Ibarra represents the idealism of the educated Filipino...</p><div style="margin-top:8px;font-size:11px;opacity:.5;">Sep 7, 2026 &middot; Private</div></div>
+        </div>
+        <div style="margin-top:20px;">
+          <textarea class="search-input" rows="3" placeholder="Write a new reflection..." style="resize:vertical;"></textarea>
+          <button class="btn btn-primary" style="margin-top:8px;" onclick="showToast('Reflection saved!')">Add reflection</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOGIN PAGE -->
+    <div class="page" id="page-login">
+      <div class="login-wrapper">
+        <div class="login-card">
+          <div class="login-logo"><img class="jose-title-img" src="assets/jose-title.png" alt="Jose" /></div>
+          <div class="login-title">School sign-in</div>
+          <div class="login-desc">Sign in with your APC Microsoft account to access Jose.</div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:12px;" onclick="showToast('Redirecting to Microsoft...')">Sign in with Microsoft</button>
+          <button class="btn btn-secondary" style="width:100%;justify-content:center;" onclick="navigate('learn')">Back to learn path</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PREFERENCES PAGE -->
+    <div class="page" id="page-preferences">
+      <div style="max-width:560px;">
+        <div class="breadcrumb"><a onclick="navigate('profile')">Profile</a> <span class="sep">/</span> Reading settings</div>
+        <h2 class="hero-heading" style="margin-bottom:20px;">Reading settings</h2>
+        <div class="pref-row">Dark mode <div class="pref-toggle" id="dark-pref" onclick="togglePref(this);toggleTheme()"></div></div>
+        <div class="pref-row">Filipino translations <div class="pref-toggle on" onclick="togglePref(this)"></div></div>
+        <div class="pref-row">Larger text <div class="pref-toggle off" onclick="togglePref(this)"></div></div>
+        <div class="pref-row">Reduced motion <div class="pref-toggle off" onclick="togglePref(this)"></div></div>
+        <div class="pref-row">Sound effects <div class="pref-toggle on" onclick="togglePref(this)"></div></div>
+        <button class="btn btn-secondary" style="margin-top:20px;" onclick="navigate('profile')">&#8592; Back to profile</button>
+      </div>
+    </div>
+
+    <!-- TEACH PAGE -->
+    <div class="page" id="page-teach">
+      <div style="max-width:720px;">
+        <p style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:2px;color:#c9a84c;margin-bottom:4px;">Teacher</p>
+        <h2 class="hero-heading" style="margin-bottom:20px;">Modules</h2>
+        <div style="display:flex;gap:8px;margin-bottom:20px;">
+          <button class="btn btn-primary" onclick="showToast('Create module coming soon')">+ New module</button>
+          <button class="btn btn-secondary" onclick="showToast('Import coming soon')">Import .jmm</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="teach-card" onclick="showToast('Opening Rizal Law editor...')"><div class="teach-color" style="background:#8b2240;"></div><div><div class="teach-title">Rizal Law</div><div class="teach-meta" style="font-size:12px;">5 levels &middot; Published</div></div></div>
+          <div class="teach-card" onclick="showToast('Opening editor...')"><div class="teach-color" style="background:#1e3268;"></div><div><div class="teach-title">Hero Then and Now</div><div class="teach-meta" style="font-size:12px;">6 levels &middot; Published</div></div></div>
+          <div class="teach-card" onclick="showToast('Opening editor...')"><div class="teach-color" style="background:#b8860b;"></div><div><div class="teach-title">19th Century Philippines</div><div class="teach-meta" style="font-size:12px;">6 levels &middot; Draft</div></div></div>
+          <div class="teach-card" onclick="showToast('Opening editor...')"><div class="teach-color" style="background:#8b5e3c;"></div><div><div class="teach-title">Family and Childhood</div><div class="teach-meta" style="font-size:12px;">6 levels &middot; Published</div></div></div>
+        </div>
+        <button class="btn btn-secondary" style="margin-top:20px;" onclick="navigate('learn')">&#8592; Back to learning</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const app = document.getElementById('app');
+let isDark = false;
+let currentPage = 'learn';
+
+const navImgMap = {learn:'nav-learn',practice:'nav-practice',bookmarks:'nav-bookmarks',profile:'nav-profile',preferences:'nav-settings',teach:'nav-learn','teach-classes':'nav-profile'};
+const navConfigs = {
+  student: [
+    {id:'learn', label:'Learn'},
+    {id:'practice', label:'Practice'},
+    {id:'bookmarks', label:'Bookmarks'},
+    {id:'profile', label:'Profile'},
+    {id:'preferences', label:'Settings'},
+  ],
+  teach: [
+    {id:'teach', label:'Modules'},
+    {id:'teach-classes', label:'Classes'},
+  ]
+};
+
+function buildNav(type, activeId) {
+  const nav = document.getElementById('nav-list');
+  const sub = document.getElementById('sidebar-sub');
+  const extra = document.getElementById('sidebar-bottom-extra');
+  nav.innerHTML = '';
+  const items = navConfigs[type] || navConfigs.student;
+  items.forEach(item => {
+    const li = document.createElement('li');
+    const imgName = navImgMap[item.id] || 'nav-learn';
+    li.className = 'nav-item nav-item-img' + (item.id === activeId ? ' active' : '');
+    li.innerHTML = '<img class="nav-btn-img" src="assets/' + imgName + '.png" alt="' + item.label + '" />';
+    li.onclick = () => navigate(item.id);
+    nav.appendChild(li);
+  });
+  sub.textContent = type === 'teach' ? 'Teach' : 'Learn something new today';
+  extra.innerHTML = type === 'teach'
+    ? '<div class="sidebar-bottom-item" onclick="navigate(\'learn\')">&#9783; Learn</div>'
+    : '';
+}
+
+function navigate(pageId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const page = document.getElementById('page-' + pageId);
+  if (page) { page.classList.add('active'); currentPage = pageId; }
+  const navType = pageId === 'teach' ? 'teach' : 'student';
+  const navActive = ['learn','levels','lesson'].includes(pageId) ? 'learn'
+    : ['practice','quiz'].includes(pageId) ? 'practice'
+    : ['journal'].includes(pageId) ? 'learn'
+    : pageId === 'teach' ? 'teach'
+    : pageId;
+  buildNav(navType, navActive);
+  document.getElementById('main').scrollTop = 0;
+  document.getElementById('sidebar').style.display = pageId === 'login' ? 'none' : '';
+}
+
+function toggleTheme() {
+  isDark = !isDark;
+  app.className = 'app ' + (isDark ? 'dark' : 'light');
+  const pref = document.getElementById('dark-pref');
+  if (pref) pref.className = 'pref-toggle ' + (isDark ? 'on' : 'off');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function selectOption(el) {
+  el.closest('.game-board').querySelectorAll('.game-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function checkAnswer() {
+  const board = document.querySelector('#page-quiz .game-board');
+  const opts = board.querySelectorAll('.game-option');
+  const selected = board.querySelector('.game-option.selected');
+  if (!selected) { showToast('Pick an answer first'); return; }
+  if (selected === opts[1]) {
+    selected.classList.add('correct');
+    showToast('Correct! Claro M. Recto authored the Rizal Law.');
+  } else {
+    showToast('Not quite. The correct answer is Claro M. Recto.');
+    opts[1].classList.add('correct');
+  }
+}
+
+function selectTab(el) {
+  el.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function togglePref(el) {
+  el.classList.toggle('on');
+  el.classList.toggle('off');
+}
+
+buildNav('student', 'learn');
+</script>
+
+</body>
+</html>
