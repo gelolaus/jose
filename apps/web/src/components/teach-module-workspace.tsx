@@ -275,8 +275,8 @@ export function TeachModuleWorkspace({
         />
         {error ? <p className="mt-2 text-sm font-bold text-[var(--jose-coral)]">{error}</p> : null}
         {publishIssues.length > 0 ? (
-          <div className="mt-3 rounded-2xl bg-rose-50 p-3 ring-1 ring-rose-100">
-            <p className="text-sm font-extrabold text-rose-900">Could not publish yet</p>
+          <div className="mt-3 rounded-2xl bg-[#f0d8de] p-3 ring-1 ring-[#d4b0ba]">
+            <p className="text-sm font-extrabold text-[#5a0a1e]">Could not publish yet</p>
             <ul className="mt-2 space-y-2">
               {publishIssues.map((issue) => (
                 <li key={`${issue.code}-${issue.path}`}>
@@ -289,7 +289,7 @@ export function TeachModuleWorkspace({
                         applySelection({ type: "module" });
                       }
                     }}
-                    className="w-full rounded-xl bg-[var(--jose-paper)] px-3 py-2 text-left text-sm font-semibold text-rose-800"
+                    className="w-full rounded-xl bg-[var(--jose-paper)] px-3 py-2 text-left text-sm font-semibold text-[#5a0a1e]"
                   >
                     {issue.message}
                   </button>
@@ -595,7 +595,7 @@ function ModuleEditorPane({
                 onClick={() => {
                   if (issue.levelId) onJumpToLevel(issue.levelId);
                 }}
-                className="w-full rounded-xl bg-rose-50 px-3 py-2 text-left text-sm font-semibold text-rose-800"
+                className="w-full rounded-xl bg-[#f0d8de] px-3 py-2 text-left text-sm font-semibold text-[#5a0a1e]"
               >
                 {issue.message}
               </button>
@@ -710,7 +710,7 @@ function SectionEditorPane({
               if (result.ok) onChange(result.data);
               else setError(result.error);
             }}
-            className="min-h-11 rounded-full bg-rose-50 px-4 py-2 text-sm font-extrabold text-rose-700"
+            className="min-h-11 rounded-full bg-[#f0d8de] px-4 py-2 text-sm font-extrabold text-[#7a1a2e]"
           >
             Delete section
           </button>

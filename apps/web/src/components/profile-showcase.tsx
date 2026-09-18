@@ -141,9 +141,9 @@ function StatChip({
   name: string;
 }) {
   const tones = {
-    sky: "bg-cyan-100 text-cyan-900",
-    coral: "bg-amber-100 text-amber-950",
-    rose: "bg-rose-100 text-rose-900",
+    sky: "bg-[#e8dcc0] text-[#c9a84c]",
+    coral: "bg-[#f0d4c4] text-[#a0522d]",
+    rose: "bg-[#f0d8de] text-[#7a1a2e]",
   };
   return (
     <span

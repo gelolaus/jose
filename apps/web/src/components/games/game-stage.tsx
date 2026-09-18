@@ -94,7 +94,7 @@ export function WhySheet({
           <p className="mt-3 text-sm font-bold text-[var(--jose-text-muted)]">
             Source:{" "}
             {why.sourceHref ? (
-              <a href={why.sourceHref} className="text-violet-700 underline" target="_blank" rel="noreferrer">
+              <a href={why.sourceHref} className="text-[#1a2a5e] underline" target="_blank" rel="noreferrer">
                 {why.sourceLabel}
               </a>
             ) : (
@@ -231,7 +231,7 @@ export function HeartsBreak({
       </p>
       <Link
         href={`/learn/${moduleId}`}
-        className="mt-2 w-full rounded-full bg-violet-600 px-5 py-3 text-center text-sm font-extrabold text-white shadow-md"
+        className="mt-2 w-full rounded-full bg-[#1a2a5e] px-5 py-3 text-center text-sm font-extrabold text-white shadow-md"
       >
         Back to the path
       </Link>

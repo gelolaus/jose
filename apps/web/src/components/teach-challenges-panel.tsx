@@ -53,7 +53,7 @@ export function TeachChallengesPanel({
           aria-label="Cooperative challenges"
           onClick={() => onToggleEnabled(!challengesEnabled)}
           className={`rounded-full px-3 py-1.5 text-xs font-extrabold ${
-            challengesEnabled ? "bg-teal-700 text-white" : "bg-white text-slate-600 ring-1 ring-black/10"
+            challengesEnabled ? "bg-[#1a1a3e] text-white" : "bg-white text-slate-600 ring-1 ring-black/10"
           }`}
         >
           {challengesEnabled ? "On" : "Off"}
@@ -153,7 +153,7 @@ export function TeachChallengesPanel({
                   <span className="ml-2 inline-flex gap-1">
                     <button
                       type="button"
-                      className="rounded-full bg-teal-700 px-2 py-0.5 text-[10px] font-extrabold text-white"
+                      className="rounded-full bg-[#1a1a3e] px-2 py-0.5 text-[10px] font-extrabold text-white"
                       onClick={() => onModerate(detail.id, row.id, "accepted")}
                     >
                       Accept

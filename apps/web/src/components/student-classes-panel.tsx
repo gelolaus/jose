@@ -85,7 +85,7 @@ export function StudentClassesPanel({
         </button>
       </form>
       {status ? (
-        <p className="mt-2 text-sm font-semibold text-emerald-800" role="status">
+        <p className="mt-2 text-sm font-semibold text-[#1a1a3e]" role="status">
           {status}
         </p>
       ) : null}

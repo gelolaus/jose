@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Nunito } from "next/font/google";
+import { Nunito, Playfair_Display } from "next/font/google";
 import { ToastProvider } from "@/components/toast";
 import { PreferencesBoot } from "@/components/preferences-boot";
 import "./globals.css";
@@ -7,6 +7,13 @@ import "./globals.css";
 const sans = Nunito({
   subsets: ["latin"],
   variable: "--font-jose-sans",
+  display: "swap",
+  preload: true,
+});
+
+const display = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-jose-display",
   display: "swap",
   preload: true,
 });
@@ -22,7 +29,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#58cc02",
+  themeColor: "#1a1a3e",
 };
 
 export default function RootLayout({
@@ -34,7 +41,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-theme="light"
-      className={`${sans.variable} h-full`}
+      className={`${sans.variable} ${display.variable} h-full`}
     >
       <body className="min-h-full antialiased">
         <PreferencesBoot />

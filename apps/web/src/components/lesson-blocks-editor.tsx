@@ -285,7 +285,7 @@ function BlockFields({
                 terms: [...block.terms, { term: "", definition: "" }],
               })
             }
-            className="text-xs font-extrabold text-teal-700"
+            className="text-xs font-extrabold text-[#1a1a3e]"
           >
             Add term
           </button>
@@ -436,7 +436,7 @@ function AssetPicker({
         className="mt-2 block w-full text-sm"
         onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
       />
-      {progress ? <p className="mt-1 text-xs font-bold text-teal-700">{progress}</p> : null}
+      {progress ? <p className="mt-1 text-xs font-bold text-[#1a1a3e]">{progress}</p> : null}
       {error ? <p className="mt-1 text-xs font-bold text-rose-600">{error}</p> : null}
       {assets.length > 0 ? (
         <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">

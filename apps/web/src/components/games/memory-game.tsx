@@ -282,7 +282,7 @@ function MemoryBuild({
         Add pairs for students to match. They have 15 seconds per pair, with at least one minute to play.
       </p>
       {game.pairs.map((pair, i) => (
-        <div key={pair.id} className="space-y-2 rounded-[1.5rem] bg-violet-50 p-3 ring-1 ring-violet-100">
+        <div key={pair.id} className="space-y-2 rounded-[1.5rem] bg-[#f0e8f8] p-3 ring-1 ring-[#d4c9a8]">
           <div className="grid gap-2 sm:grid-cols-2">
             <SideFields
               label={`Pair ${i + 1} · Side A`}
@@ -311,7 +311,7 @@ function MemoryBuild({
       ))}
       <button
         type="button"
-        className="inline-flex items-center gap-1 text-sm font-extrabold text-violet-700"
+        className="inline-flex items-center gap-1 text-sm font-extrabold text-[#1a2a5e]"
         onClick={() =>
           onChange({
             ...game,

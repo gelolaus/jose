@@ -118,12 +118,12 @@ function DapitanPlay({
               Draft workshop — approve scenario and sourced debrief before publish.
             </p>
           ) : null}
-          <section className="rounded-[1.5rem] bg-teal-950 px-4 py-4 text-teal-50">
-            <p className="text-xs font-extrabold uppercase tracking-wide text-teal-200">
+          <section className="rounded-[1.5rem] bg-[#0a0a1a] px-4 py-4 text-[#f0e8d8]">
+            <p className="text-xs font-extrabold uppercase tracking-wide text-[#d4c9a8]">
               The community needs…
             </p>
             <p className="mt-1 font-display text-xl font-semibold">{game.scenario}</p>
-            <p className="mt-2 text-sm font-semibold text-teal-100">
+            <p className="mt-2 text-sm font-semibold text-[#e8dcc0]">
               Choose the action that best helps the community.
             </p>
           </section>
@@ -154,7 +154,7 @@ function DapitanPlay({
             </ul>
           ) : (
             <div className="space-y-3 rounded-[1.3rem] bg-[var(--jose-surface-elevated)] px-4 py-4 ring-1 ring-[var(--jose-rule)]">
-              <p className="text-xs font-extrabold uppercase tracking-wide text-teal-800">
+              <p className="text-xs font-extrabold uppercase tracking-wide text-[#12122e]">
                 What will this help?
               </p>
               <p className="text-sm font-semibold text-[var(--jose-text)]">{lastNote}</p>
@@ -164,7 +164,7 @@ function DapitanPlay({
               <button
                 type="button"
                 onClick={continueIntro}
-                className="min-h-11 w-full rounded-full bg-teal-800 px-4 py-3 text-sm font-extrabold text-white"
+                className="min-h-11 w-full rounded-full bg-[#12122e] px-4 py-3 text-sm font-extrabold text-white"
               >
                 Continue the work
               </button>
@@ -184,10 +184,10 @@ function DapitanPlay({
         </p>
       ) : null}
       <div
-        className="rounded-[1.5rem] bg-teal-950 px-4 py-4 text-teal-50"
+        className="rounded-[1.5rem] bg-[#0a0a1a] px-4 py-4 text-[#f0e8d8]"
         role="note"
       >
-        <p className="text-xs font-extrabold uppercase tracking-wide text-teal-300">
+        <p className="text-xs font-extrabold uppercase tracking-wide text-[#c9a84c]">
           Game assumptions
         </p>
         <p className="mt-1 text-sm font-semibold">{game.assumptionsNotice}</p>
@@ -227,7 +227,7 @@ function DapitanPlay({
                     Cost T{project.cost.time} · M{project.cost.materials} · G
                     {project.cost.goodwill}
                   </span>
-                  <span className="mt-1 block text-xs font-semibold text-teal-800">
+                  <span className="mt-1 block text-xs font-semibold text-[#12122e]">
                     {project.tradeoffNote}
                   </span>
                 </button>
@@ -236,27 +236,27 @@ function DapitanPlay({
           })}
         </ul>
       ) : (
-        <div className="space-y-3 rounded-[1.4rem] bg-teal-50 p-4 ring-1 ring-teal-200">
-          <p className="text-sm font-semibold text-teal-950">
+        <div className="space-y-3 rounded-[1.4rem] bg-[#f0e8d8] p-4 ring-1 ring-[#d4c9a8]">
+          <p className="text-sm font-semibold text-[#0a0a1a]">
             {game.debrief.historicalComparison}
           </p>
-          <ul className="list-disc space-y-1 pl-5 text-xs font-bold text-teal-900">
+          <ul className="list-disc space-y-1 pl-5 text-xs font-bold text-[#0e0e24]">
             {game.debrief.sourceReferences.map((ref) => (
               <li key={ref}>{ref}</li>
             ))}
           </ul>
           <label className="block space-y-1">
-            <span className="text-sm font-extrabold text-teal-950">
+            <span className="text-sm font-extrabold text-[#0a0a1a]">
               {game.reflectionPrompt}
             </span>
             <textarea
               value={reflection}
               onChange={(e) => setReflection(e.target.value)}
               rows={3}
-              className="w-full rounded-2xl bg-white px-3 py-2 text-sm font-semibold text-teal-950 ring-1 ring-teal-200"
+              className="w-full rounded-2xl bg-white px-3 py-2 text-sm font-semibold text-[#0a0a1a] ring-1 ring-[#d4c9a8]"
             />
           </label>
-          <ul className="space-y-1 text-xs font-semibold text-teal-900">
+          <ul className="space-y-1 text-xs font-semibold text-[#0e0e24]">
             {game.rubricPrompts.map((prompt) => (
               <li key={prompt}>• {prompt}</li>
             ))}
@@ -265,7 +265,7 @@ function DapitanPlay({
             type="button"
             disabled={reflection.trim().length < 20}
             onClick={finish}
-            className="w-full rounded-full bg-teal-800 px-5 py-3 text-sm font-extrabold text-white disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
+            className="w-full rounded-full bg-[#12122e] px-5 py-3 text-sm font-extrabold text-white disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
           >
             Save workshop reflection
           </button>

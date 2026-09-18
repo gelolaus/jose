@@ -33,7 +33,7 @@ export function AdminTeachersClient({
       </p>
       {error ? <p className="mt-3 text-sm font-bold text-rose-600">{error}</p> : null}
       {status ? (
-        <p className="mt-3 text-sm font-semibold text-emerald-800" role="status">
+        <p className="mt-3 text-sm font-semibold text-[#1a1a3e]" role="status">
           {status}
         </p>
       ) : null}

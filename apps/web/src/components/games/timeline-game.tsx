@@ -77,10 +77,10 @@ function StopBead({
 }) {
   const toneClass =
     tone === "locked"
-      ? "border-emerald-700 bg-emerald-600 text-white"
+      ? "border-[#1a1a3e] bg-[#1a2a5e] text-white"
       : tone === "empty"
-        ? "border-[#1cb0f6] bg-[#dcf3ff] text-[#096d9b]"
-        : "border-[#1596d2] bg-[#1cb0f6] text-[#083b54]";
+        ? "border-[#c9a84c] bg-[#e8dcc0] text-[#1a1a3e]"
+        : "border-[#1596d2] bg-[#c9a84c] text-[#083b54]";
   const beadClass = `relative z-[1] flex size-7 shrink-0 items-center justify-center rounded-full border-[3px] text-[11px] font-extrabold shadow-[0_2px_0_#4c1d95] ${toneClass}`;
   return (
     <div className="relative z-[1] col-start-1 row-start-1 row-span-3 mt-5 flex justify-center self-start sm:mt-0 sm:w-full">
@@ -344,9 +344,9 @@ function TimelinePlay({
                     }}
                     className={`min-h-12 shrink-0 touch-manipulation select-none whitespace-nowrap rounded-full px-4 text-sm font-extrabold ring-2 ${
                       lifting
-                        ? "cursor-grabbing bg-violet-100 text-violet-400 opacity-40 ring-violet-200"
+                        ? "cursor-grabbing bg-[#e0d0f0] text-[#5a5570] opacity-40 ring-[#d4c9a8]"
                         : on
-                          ? "cursor-grab bg-violet-700 text-white ring-violet-900"
+                          ? "cursor-grab bg-[#1a1a3e] text-white ring-violet-900"
                           : "cursor-grab bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)]"
                     }`}
                   >
@@ -408,7 +408,7 @@ function TimelineRail({
               <div className="col-start-2 row-start-3 min-w-0 w-full">
                 {shown ? (
                   isLocked ? (
-                    <div className="min-h-[4.5rem] w-full rounded-[1.05rem] border-2 border-emerald-300 bg-emerald-50 px-3 py-2.5 text-left text-sm font-extrabold leading-snug text-emerald-900 shadow-[0_4px_0_#a7f3d0]">
+                    <div className="min-h-[4.5rem] w-full rounded-[1.05rem] border-2 border-[#c9a84c] bg-[#e8dcc0] px-3 py-2.5 text-left text-sm font-extrabold leading-snug text-[#0e0e24] shadow-[0_4px_0_#a7f3d0]">
                       {shown.label}
                     </div>
                   ) : (
@@ -419,8 +419,8 @@ function TimelineRail({
                       onClick={() => onPlacedCard(shown.id)}
                       className={`min-h-[4.5rem] w-full rounded-[1.05rem] px-3 py-2.5 text-left text-sm font-extrabold leading-snug ring-2 ${
                         selectedId === shown.id
-                          ? "bg-violet-600 text-white ring-violet-700"
-                          : "bg-white text-slate-800 shadow-[0_4px_0_#ddd6fe] ring-violet-200"
+                          ? "bg-[#1a2a5e] text-white ring-violet-700"
+                          : "bg-white text-slate-800 shadow-[0_4px_0_#ddd6fe] ring-[#d4c9a8]"
                       }`}
                     >
                       {shown.label}
@@ -475,7 +475,7 @@ function EmptyWell({
       className={`flex min-h-[4.5rem] w-full items-center justify-center rounded-[1.05rem] text-[10px] font-extrabold uppercase tracking-wide ${
         hot
           ? "border-[3px] border-amber-400 bg-amber-50 text-amber-800 shadow-[0_0_0_4px_rgb(245_197_24/0.28)]"
-          : "border-[2.5px] border-dashed border-violet-300 bg-violet-50 text-violet-500"
+          : "border-[2.5px] border-dashed border-[#d4c9a8] bg-[#f0e8f8] text-[#5a5570]"
       }`}
     >
       Place here
@@ -611,7 +611,7 @@ function TimelineBuild({
             onChange({ ...game, items });
             setSelected(Math.max(0, selected - 1));
           }}
-          className="ml-auto inline-flex items-center gap-1 rounded-full bg-rose-50 px-3 py-1.5 text-xs font-extrabold text-rose-700 disabled:opacity-40"
+          className="ml-auto inline-flex items-center gap-1 rounded-full bg-[#f0d8de] px-3 py-1.5 text-xs font-extrabold text-[#7a1a2e] disabled:opacity-40"
         >
           <Trash2 className="size-3.5" strokeWidth={2.5} />
           Remove
@@ -626,7 +626,7 @@ function TimelineBuild({
             });
             setSelected(game.items.length);
           }}
-          className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-extrabold text-violet-700 disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-full bg-[#f0e8f8] px-3 py-1.5 text-xs font-extrabold text-[#1a2a5e] disabled:opacity-40"
         >
           <Plus className="size-3.5" strokeWidth={2.5} />
           Add event

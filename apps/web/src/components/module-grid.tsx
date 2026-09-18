@@ -29,7 +29,7 @@ export function ModuleGrid({
     <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-8 sm:py-10">
       <header className="mb-7 flex items-center gap-4">
         <div
-          className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[#fff2be] text-[#865600]"
+          className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[#e8dcc0] text-[#c9a84c]"
           aria-hidden
         >
           <Sparkles className="size-7" strokeWidth={2.5} />

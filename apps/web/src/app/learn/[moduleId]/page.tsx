@@ -60,7 +60,7 @@ export default async function ModulePathPage({ params }: Props) {
           <div className="border-b border-black/5 bg-white/90 px-4 py-2 sm:px-6 lg:px-8">
             <Link
               href="/learn"
-              className="inline-flex min-h-11 items-center gap-1.5 text-sm font-extrabold text-violet-700"
+              className="inline-flex min-h-11 items-center gap-1.5 text-sm font-extrabold text-[#1a2a5e]"
             >
               <ArrowLeft className="size-4" strokeWidth={2.5} aria-hidden />
               All modules

@@ -149,7 +149,7 @@ export function PlaceGhost({ ghost }: { ghost: PlaceGhost | null }) {
   if (!ghost) return null;
   return (
     <div
-      className="pointer-events-none fixed z-50 max-w-[14rem] rounded-2xl bg-violet-600 px-4 py-3 text-sm font-extrabold text-white shadow-lg ring-2 ring-violet-800"
+      className="pointer-events-none fixed z-50 max-w-[14rem] rounded-2xl bg-[#1a2a5e] px-4 py-3 text-sm font-extrabold text-white shadow-lg ring-2 ring-violet-800"
       style={{
         left: ghost.x,
         top: ghost.y,

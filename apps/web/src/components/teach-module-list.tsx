@@ -74,7 +74,7 @@ export function TeachModuleList({ initial }: { initial: TeachModule[] }) {
                     <button
                       type="button"
                       disabled={busyId === mod.id}
-                      className="flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-extrabold text-rose-700 disabled:opacity-50"
+                      className="flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-extrabold text-[#7a1a2e] disabled:opacity-50"
                       onClick={() => {
                         if (
                           !window.confirm(

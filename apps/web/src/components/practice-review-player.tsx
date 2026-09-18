@@ -98,7 +98,7 @@ export function PracticeReviewPlayer({
         wide
       >
         {error ? (
-          <p className="mb-4 text-sm font-semibold text-rose-700" role="alert">
+          <p className="mb-4 text-sm font-semibold text-[#7a1a2e]" role="alert">
             {error}
           </p>
         ) : null}

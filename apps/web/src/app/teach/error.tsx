@@ -15,7 +15,7 @@ export default function TeachError({ reset }: { reset: () => void }) {
       <button
         type="button"
         onClick={reset}
-        className="rounded-full bg-violet-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-md"
+        className="rounded-full bg-[#1a2a5e] px-5 py-2.5 text-sm font-extrabold text-white shadow-md"
       >
         Try again
       </button>

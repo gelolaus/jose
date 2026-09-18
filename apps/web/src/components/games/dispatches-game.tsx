@@ -155,9 +155,9 @@ function DispatchesPlay({
                 const tone = !pickedStopId
                   ? "bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)]"
                   : correct
-                    ? "bg-emerald-700 text-white ring-emerald-800"
+                    ? "bg-[#1a2a5e] text-white ring-[#1a1a3e]"
                     : selected
-                      ? "bg-rose-800 text-white ring-rose-900"
+                      ? "bg-[#5a0a1e] text-white ring-[#5a0a1e]"
                       : "bg-[var(--jose-surface-control)] text-[var(--jose-text-muted)] ring-[var(--jose-rule)]";
                 return (
                   <li key={stop.id}>
@@ -223,13 +223,13 @@ function DispatchesPlay({
               ))}
             </ul>
             {cleared[active.id] && !allDone ? (
-              <p className="text-sm font-extrabold text-teal-800">Continue the route</p>
+              <p className="text-sm font-extrabold text-[#12122e]">Continue the route</p>
             ) : null}
           </section>
         ) : null}
 
         {allDone ? (
-          <p className="rounded-2xl bg-emerald-50 px-3 py-3 text-sm font-semibold text-emerald-950 ring-1 ring-emerald-200">
+          <p className="rounded-2xl bg-[#e8dcc0] px-3 py-3 text-sm font-semibold text-[#0a0a1a] ring-1 ring-emerald-200">
             {game.debrief}
           </p>
         ) : null}

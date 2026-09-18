@@ -276,7 +276,7 @@ export function TeachClassesClient({
                   {invite ? (
                     <button
                       type="button"
-                      className="min-h-11 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-extrabold text-emerald-900"
+                      className="min-h-11 rounded-full bg-[#e8dcc0] px-3 py-1.5 text-xs font-extrabold text-[#0e0e24]"
                       onClick={() => void navigator.clipboard.writeText(invite)}
                     >
                       Copy invite
@@ -311,7 +311,7 @@ export function TeachClassesClient({
                   </button>
                   <button
                     type="button"
-                    className="min-h-11 rounded-full bg-rose-50 px-3 py-1.5 text-xs font-extrabold text-rose-800"
+                    className="min-h-11 rounded-full bg-[#f0d8de] px-3 py-1.5 text-xs font-extrabold text-[#5a0a1e]"
                     onClick={() => {
                       if (!window.confirm(`Archive “${klass.name}”? Past submissions stay.`)) {
                         return;
@@ -328,7 +328,7 @@ export function TeachClassesClient({
                 </div>
               </div>
               {invite ? (
-                <p className="mt-2 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
+                <p className="mt-2 rounded-2xl bg-[#e8dcc0] px-4 py-3 text-sm font-bold text-[#1a1a3e]">
                   Invite code: {invite}. Copy it now; Jose stores only a hash after refresh.
                 </p>
               ) : null}

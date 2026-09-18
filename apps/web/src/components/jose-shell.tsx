@@ -48,13 +48,13 @@ export function JoseShell({
     <div className="flex h-dvh overflow-hidden bg-transparent lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
       <SkipLink />
       <ThemeDocumentSync />
-      <aside className="hidden h-dvh flex-col border-r border-[var(--jose-rule)] bg-[var(--jose-paper)]/95 px-5 py-7 backdrop-blur-md lg:flex">
+      <aside className="jose-sidebar hidden h-dvh flex-col px-5 py-7 lg:flex">
         <div className="mb-8 px-2">
-          <p className="font-display text-4xl font-black tracking-tight text-[var(--jose-accent)]">
+          <p className="font-display text-4xl font-black tracking-tight text-[var(--jose-sidebar-brand)]">
             {brandTitle}
           </p>
           {brandSubtitle ? (
-            <p className="mt-1 text-sm text-[var(--jose-ink-muted)]">{brandSubtitle}</p>
+            <p className="mt-1 text-sm text-[var(--jose-sidebar-muted)]">{brandSubtitle}</p>
           ) : null}
         </div>
         <nav className="flex flex-1 flex-col gap-2" aria-label={navLabel}>
@@ -68,8 +68,8 @@ export function JoseShell({
                 aria-current={active ? "page" : undefined}
                 className={`flex min-h-11 items-center gap-3.5 rounded-2xl px-4 py-3.5 text-base font-extrabold transition ${
                   active
-                    ? activeClass
-                    : "text-[var(--jose-text-muted)] hover:bg-[var(--jose-surface-control)]"
+                    ? "jose-sidebar-nav-active"
+                    : "text-[var(--jose-sidebar-muted)] hover:text-[var(--jose-sidebar-text)] hover:bg-white/5"
                 }`}
               >
                 <Icon className="size-5 shrink-0" strokeWidth={2.25} aria-hidden />

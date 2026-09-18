@@ -187,9 +187,9 @@ function BlankPlay({
               : revealed !== null && normalizeBlankKey(word) === normalizeBlankKey(revealed);
           let tone =
             "bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)] motion-control";
-          if (picked && on && right) tone = "bg-emerald-700 text-white ring-emerald-800 motion-accept";
-          else if (picked && on && !right) tone = "bg-rose-800 text-white ring-rose-900";
-          else if (picked && right) tone = "bg-emerald-700/20 text-emerald-950 ring-emerald-700";
+          if (picked && on && right) tone = "bg-[#1a2a5e] text-white ring-[#1a1a3e] motion-accept";
+          else if (picked && on && !right) tone = "bg-[#5a0a1e] text-white ring-[#5a0a1e]";
+          else if (picked && right) tone = "bg-[#1a2a5e]/20 text-[#0a0a1a] ring-[#1a2a5e]";
           return (
             <button
               key={word}
@@ -204,13 +204,13 @@ function BlankPlay({
         })}
       </div>
       {rightPick ? (
-        <div className="motion-artifact rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-950 ring-1 ring-emerald-200">
+        <div className="motion-artifact rounded-2xl bg-[#e8dcc0] px-4 py-3 text-sm font-semibold text-[#0a0a1a] ring-1 ring-emerald-200">
           <p>
             {(authoredItem?.whyCorrect || authoredItem?.why)?.trim() ||
               (revealed ? `“${revealed}” restores the passage.` : "Correct.")}
           </p>
           {authoredItem?.source ? (
-            <p className="mt-2 text-xs font-bold text-emerald-800">
+            <p className="mt-2 text-xs font-bold text-[#1a1a3e]">
               Source: {authoredItem.source.citation || authoredItem.source.label}
             </p>
           ) : null}
@@ -331,7 +331,7 @@ function BlankBuild({
       ))}
       <button
         type="button"
-        className="inline-flex items-center gap-1 text-sm font-extrabold text-violet-700"
+        className="inline-flex items-center gap-1 text-sm font-extrabold text-[#1a2a5e]"
         onClick={() =>
           onChange({
             ...game,

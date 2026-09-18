@@ -81,7 +81,7 @@ function LessonBlockView({ block }: { block: LessonBlock }) {
       );
     case "quote":
       return (
-        <blockquote className="rounded-2xl border-l-4 border-teal-600 bg-teal-50/70 px-4 py-3">
+        <blockquote className="rounded-2xl border-l-4 border-[#1a2a5e] bg-[#f0e8d8]/70 px-4 py-3">
           <p className="font-semibold text-slate-800">{block.text}</p>
           <footer className="mt-2 text-sm font-bold text-slate-600">
             — {block.source}

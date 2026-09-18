@@ -18,7 +18,7 @@ export function PracticeHub({ review }: { review: PracticeReviewResponse }) {
           Your review set
         </h2>
         {review.items.length === 0 ? (
-          <p className="mt-3 rounded-xl border border-dashed border-[var(--jose-rule)] bg-white/70 px-4 py-5 text-[var(--jose-ink-muted)]">
+          <p className="mt-3 rounded-xl border border-dashed border-[var(--jose-rule)] bg-[var(--jose-surface-elevated)]/70 px-4 py-5 text-[var(--jose-ink-muted)]">
             {review.emptyMessage}
           </p>
         ) : (
@@ -28,7 +28,7 @@ export function PracticeHub({ review }: { review: PracticeReviewResponse }) {
             ))}
           </ul>
         )}
-        <details className="mt-4 rounded-xl border border-[var(--jose-rule)] bg-white/80 px-4 py-3 text-sm text-[var(--jose-ink-muted)]">
+        <details className="mt-4 rounded-xl border border-[var(--jose-rule)] bg-[var(--jose-surface-elevated)]/80 px-4 py-3 text-sm text-[var(--jose-ink-muted)]">
           <summary className="cursor-pointer font-semibold text-[var(--jose-ink)]">
             Why these activities?
           </summary>
@@ -42,7 +42,7 @@ export function PracticeHub({ review }: { review: PracticeReviewResponse }) {
 
       <section className="border-t border-[var(--jose-rule)] pt-8">
         <div className="mb-4 flex items-center gap-2">
-          <Sparkles className="size-5 text-teal-800" aria-hidden />
+          <Sparkles className="size-5 text-[var(--jose-gold)]" aria-hidden />
           <h2 className="font-display text-2xl font-semibold text-[var(--jose-ink)] sm:text-3xl">
             Let’s play
           </h2>
@@ -61,10 +61,10 @@ function PracticeCard({ item }: { item: PracticeItem }) {
     <li>
       <Link
         href={item.href}
-        className="flex h-full flex-col justify-between rounded-2xl border border-[var(--jose-rule)] bg-white/90 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        className="flex h-full flex-col justify-between rounded-2xl border border-[var(--jose-rule)] bg-[var(--jose-surface-elevated)]/90 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
       >
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-teal-800">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--jose-gold)]">
             {item.reasonKind.replaceAll("_", " ")}
           </p>
           <p className="mt-2 font-display text-xl font-semibold text-[var(--jose-ink)]">

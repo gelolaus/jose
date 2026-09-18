@@ -146,8 +146,8 @@ function EditorialPlay({
             Draft editorial — approve briefing and pieces before publish.
           </p>
         ) : null}
-        <div className="rounded-[1.5rem] bg-orange-950 px-4 py-4 text-orange-50">
-          <p className="text-xs font-extrabold uppercase tracking-wide text-orange-200">
+        <div className="rounded-[1.5rem] bg-[#1a1a3e] px-4 py-4 text-[#f0e8d8]">
+          <p className="text-xs font-extrabold uppercase tracking-wide text-[#d4c9a8]">
             Build the article
           </p>
           <p className="mt-1 text-sm font-semibold leading-relaxed">
@@ -178,7 +178,7 @@ function EditorialPlay({
                   }
                 }}
                 className={`min-h-28 rounded-[1.4rem] bg-[var(--jose-surface-elevated)] p-3 ring-2 ${
-                  focused ? "ring-orange-500 slot-glow" : "ring-[var(--jose-rule)]"
+                  focused ? "ring-[#f0e8d8]0 slot-glow" : "ring-[var(--jose-rule)]"
                 }`}
               >
                 <p className="text-xs font-extrabold uppercase tracking-wide text-[var(--jose-text-muted)]">
@@ -192,7 +192,7 @@ function EditorialPlay({
                     type="button"
                     disabled={disabled || done}
                     onClick={() => returnPiece(piece.id)}
-                    className="mt-2 w-full rounded-2xl bg-orange-50 px-3 py-3 text-left text-sm font-bold text-orange-950"
+                    className="mt-2 w-full rounded-2xl bg-[#f0e8d8] px-3 py-3 text-left text-sm font-bold text-[#1a1a3e]"
                   >
                     {piece.text}
                   </button>
@@ -225,7 +225,7 @@ function EditorialPlay({
                 }}
                 className={`max-w-full rounded-2xl px-3 py-2 text-left text-sm font-bold ring-2 ${
                   selected
-                    ? "bg-orange-200 text-orange-950 ring-orange-500"
+                    ? "bg-[#d4c9a8] text-[#1a1a3e] ring-[#f0e8d8]0"
                     : "bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)]"
                 }`}
               >
@@ -244,7 +244,7 @@ function EditorialPlay({
               <button
                 key={slot.id}
                 type="button"
-                className="rounded-full bg-orange-950 px-3 py-2 text-xs font-extrabold text-orange-50"
+                className="rounded-full bg-[#1a1a3e] px-3 py-2 text-xs font-extrabold text-[#f0e8d8]"
                 onClick={() => place(slot.id)}
               >
                 Put in {slot.label}
@@ -257,7 +257,7 @@ function EditorialPlay({
           type="button"
           disabled={!filled || disabled || done}
           onClick={() => void check()}
-          className="w-full rounded-full bg-orange-700 px-5 py-3 text-sm font-extrabold text-white disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
+          className="w-full rounded-full bg-[#7a1a2e] px-5 py-3 text-sm font-extrabold text-white disabled:bg-[var(--jose-surface-control)] disabled:text-[var(--jose-text-disabled)]"
         >
           Check the story
         </button>
