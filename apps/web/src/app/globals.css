@@ -202,6 +202,114 @@ html[data-theme="dark"] .jose-sidebar-nav-active {
   color: #c9a84c;
 }
 
+/* Image-led navigation and Jose brand */
+.jose-title-img {
+  display: block;
+  height: auto;
+  object-fit: contain;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.jose-title-img:hover {
+  animation: jose-title-shake 0.5s ease;
+}
+
+.jose-title-img--sidebar {
+  width: 190px;
+}
+
+.jose-title-img--topbar {
+  width: 220px;
+  max-width: 100%;
+}
+
+.jose-title-img--login {
+  width: 260px;
+  max-width: 100%;
+}
+
+.login-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.35rem;
+}
+
+@keyframes jose-title-shake {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(-5deg); }
+  30% { transform: rotate(5deg); }
+  45% { transform: rotate(-4deg); }
+  60% { transform: rotate(3deg); }
+  75% { transform: rotate(-2deg); }
+  90% { transform: rotate(1deg); }
+}
+
+.nav-image-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-item-img {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0.25rem;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 0.9rem;
+  box-shadow: none;
+}
+
+.nav-item-img.active {
+  background: rgba(201, 168, 76, 0.13);
+  border-color: var(--jose-gold);
+}
+
+.nav-image-link {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.7rem;
+  cursor: pointer;
+}
+
+.nav-btn-img {
+  width: clamp(90px, 12vw, 150px);
+  height: auto;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 5px rgb(0 0 0 / 24%));
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.nav-image-link:hover .nav-btn-img {
+  transform: scale(1.08);
+  filter: brightness(1.15) drop-shadow(0 6px 7px rgb(0 0 0 / 28%));
+}
+
+.nav-image-link:active .nav-btn-img {
+  transform: scale(0.95);
+  filter: brightness(0.85) drop-shadow(0 2px 3px rgb(0 0 0 / 20%));
+}
+
+.nav-image-fallback {
+  color: var(--jose-sidebar-text);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-align: center;
+}
+
 .jose-surface {
   background-image: none;
 }
@@ -535,6 +643,215 @@ html[data-theme="dark"] .jose-sidebar-nav-active {
   font-weight: 700;
   letter-spacing: -0.03em;
   color: #1a1a3e;
+}
+
+/* Book-cover module controls */
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(clamp(120px, 22vw, 200px), 1fr));
+  align-items: start;
+  gap: clamp(1rem, 3vw, 2rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.module-wrapper {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.module-cover-link {
+  display: block;
+  min-width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.book-cover {
+  width: 100%;
+  min-width: 44px;
+  min-height: 44px;
+  aspect-ratio: 470 / 610;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  cursor: pointer;
+  filter: drop-shadow(0 8px 7px rgb(32 19 10 / 28%));
+  transform-origin: 50% 85%;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.module-cover-link:hover .book-cover {
+  transform: translateY(-8px) scale(1.035);
+  filter: brightness(1.08) drop-shadow(0 15px 11px rgb(32 19 10 / 34%));
+}
+
+.module-cover-link:active .book-cover {
+  transform: translateY(2px) scale(0.97);
+  filter: brightness(0.88) drop-shadow(0 4px 4px rgb(32 19 10 / 24%));
+}
+
+.book-cover.m1 { background-image: url("/assets/book-rizal-law.png"); }
+.book-cover.m2 { background-image: url("/assets/book-hero-then-now.png"); }
+.book-cover.m3 { background-image: url("/assets/book-19th-century.png"); }
+.book-cover.m4 { background-image: url("/assets/book-family-childhood.png"); }
+.book-cover.m5 { background-image: url("/assets/book-travels-abroad.png"); }
+.book-cover.m6 { background-image: url("/assets/book-noli-me-tangere.png"); }
+.book-cover.m7 { background-image: url("/assets/book-martyrdom.png"); }
+.book-cover.m8 { background-image: url("/assets/book-la-solidaridad.png"); }
+.book-cover.m9 { background-image: url("/assets/book-dapitan-exile.png"); }
+.book-cover.m10 { background-image: url("/assets/book-false-trial.png"); }
+.book-cover.m11 { background-image: url("/assets/book-retraction.png"); }
+.book-cover.m12 { background-image: url("/assets/book-eternal-legacy.png"); }
+
+.module-progress-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.65rem;
+  color: var(--jose-text);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.module-progress-track {
+  height: 0.45rem;
+  margin-top: 0.35rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--jose-surface-control);
+}
+
+.module-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--jose-gold);
+}
+
+/* Image-only bookmark actions */
+.bookmark-card-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.bookmark-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-left: auto;
+}
+
+.wood-action-btn {
+  display: inline-flex;
+  width: clamp(90px, 12vw, 160px);
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.wood-action-btn img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.wood-action-btn:hover:not(:disabled) {
+  transform: scale(1.08);
+  filter: brightness(1.15) drop-shadow(0 7px 7px rgb(0 0 0 / 28%));
+}
+
+.wood-action-btn:active:not(:disabled) {
+  transform: scale(0.93);
+  filter: brightness(0.82) drop-shadow(0 2px 3px rgb(0 0 0 / 18%));
+}
+
+.wood-action-btn:disabled {
+  cursor: wait;
+  filter: grayscale(0.4) opacity(0.6);
+}
+
+.activity-badge-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(56px, 10vw, 80px);
+  height: clamp(56px, 10vw, 80px);
+  margin: 0 auto 1rem;
+  padding: clamp(6px, 1vw, 10px);
+  box-sizing: border-box;
+  flex: 0 0 auto;
+}
+
+.activity-badge-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+@media (max-width: 767px) {
+  .jose-title-img--topbar {
+    width: clamp(110px, 30vw, 160px);
+  }
+
+  .jose-title-img--login {
+    width: clamp(140px, 40vw, 200px);
+  }
+
+  .jose-shell-main {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  .jose-bottom-nav {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 50;
+  }
+
+  .nav-image-list--mobile {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-evenly;
+    gap: 0.15rem;
+    width: 100%;
+    padding: 0.35rem 0.25rem;
+  }
+
+  .nav-image-list--mobile .nav-item-img {
+    width: auto;
+    flex: 1 1 0;
+    padding: 0.15rem;
+  }
+
+  .nav-image-list--mobile .nav-btn-img {
+    width: clamp(52px, 14vw, 72px);
+  }
+
+  .bookmark-actions {
+    width: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
+  }
 }
 
 .jose-login__card h1 {
@@ -913,8 +1230,20 @@ html[data-theme="dark"] .game-board__how-text {
   transform: translateY(2px);
 }
 .path-section {
-  background: var(--jose-surface);
+  background-color: var(--jose-surface);
+  background-image:
+    linear-gradient(rgb(245 239 224 / 68%), rgb(245 239 224 / 76%)),
+    url("/assets/path-philippines-pixel-map.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
   border-bottom: 2px solid var(--jose-rule);
+  image-rendering: pixelated;
+}
+html[data-theme="dark"] .path-section {
+  background-image:
+    linear-gradient(rgb(18 18 46 / 72%), rgb(18 18 46 / 80%)),
+    url("/assets/path-philippines-pixel-map.png");
 }
 .path-heading {
   background: var(--jose-wash);
@@ -930,9 +1259,10 @@ html[data-theme="dark"] .game-board__how-text {
   color: var(--jose-text-muted);
 }
 .path-section .path-spine {
-  stroke: var(--jose-rule);
+  stroke: rgb(250 231 174 / 92%);
   stroke-width: 9;
   stroke-dasharray: 2 14;
+  filter: drop-shadow(0 2px 0 rgb(37 31 23 / 25%));
 }
 .level-disc {
   background: var(--jose-gold);
@@ -951,6 +1281,55 @@ html[data-theme="dark"] .game-board__how-text {
 }
 .level-disc:active {
   transform: translateY(4px);
+}
+.path-node-icon-frame {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 16%;
+}
+.path-node-pixel-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.level-disc--locked .path-node-pixel-icon,
+.path-node-shell--locked .path-node-pixel-icon {
+  filter: grayscale(1) opacity(0.46);
+}
+.path-node-complete-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  width: 1.35rem;
+  height: 1.35rem;
+  align-items: center;
+  justify-content: center;
+  color: #1a2a5e;
+  background: #fff7dc;
+  border: 2px solid #1a2a5e;
+  border-radius: 999px;
+  box-shadow: 0 2px 0 rgb(14 26 62 / 22%);
+}
+.path-node-label {
+  padding: 0.18rem 0.45rem;
+  background: rgb(245 239 224 / 88%);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 0 rgb(26 26 62 / 10%);
+}
+html[data-theme="dark"] .path-node-label {
+  background: rgb(18 18 46 / 88%);
 }
 .game-celebration-stars {
   padding: 2rem;
