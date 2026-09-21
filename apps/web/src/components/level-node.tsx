@@ -1,10 +1,30 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import type { LevelNode as LevelNodeType } from "@jose/shared";
-import { BookOpen, Check, Gift, Puzzle, Star } from "lucide-react";
+import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "@/components/toast";
+
+const GAME_NODE_SPRITES: Partial<
+  Record<NonNullable<LevelNodeType["gameType"]>, string>
+> = {
+  timeline: "/assets/path-game-timeline-pixel.png",
+  quiz: "/assets/path-game-quiz-pixel.png",
+  memory: "/assets/path-game-memory-pixel.png",
+  sort: "/assets/path-game-sort-pixel.png",
+  blank: "/assets/path-game-blank-pixel.png",
+};
+
+function nodeSprite(node: LevelNodeType): string {
+  if (node.kind === "lesson") return "/assets/path-book-pixel.png";
+  if (node.kind === "chest") return "/assets/path-chest-pixel.png";
+  if (node.gameType) {
+    return GAME_NODE_SPRITES[node.gameType] ?? "/assets/path-game-quiz-pixel.png";
+  }
+  return "/assets/path-game-quiz-pixel.png";
+}
 
 /** Circle/chest sits on the path point; title hangs below without shifting alignment. */
 export function LevelNode({
@@ -47,15 +67,11 @@ export function LevelNode({
     >
       {node.kind === "chest" ? (
         <span
-          className={`flex h-20 w-24 items-center justify-center rounded-[1.75rem] bg-white/90 shadow-md ring-2 md:h-24 md:w-28 md:rounded-[2rem] ${
-            locked ? "opacity-45 grayscale ring-white/40" : "ring-amber-200"
+          className={`path-node-shell flex h-20 w-24 items-center justify-center rounded-[1.75rem] bg-white/90 shadow-md ring-2 md:h-24 md:w-28 md:rounded-[2rem] ${
+            locked ? "path-node-shell--locked ring-white/40" : "ring-amber-200"
           } ${current ? "node-pulse" : ""}`}
         >
-          <Gift
-            className="size-10 text-amber-600 md:size-12"
-            strokeWidth={2.25}
-            aria-hidden
-          />
+          <NodeGlyph node={node} />
         </span>
       ) : (
         <span
@@ -63,7 +79,7 @@ export function LevelNode({
             locked ? "level-disc--locked" : node.status === "completed" ? "level-disc--completed" : ""
           } ${current ? "ring-4 ring-white/80" : ""}`}
         >
-          <NodeGlyph icon={node.icon} status={node.status} />
+          <NodeGlyph node={node} />
         </span>
       )}
       <span className="absolute left-1/2 top-[calc(100%+0.65rem)] w-max max-w-[10.5rem] -translate-x-1/2 text-center text-base font-extrabold leading-snug path-node-label md:max-w-[13rem] md:text-lg">
@@ -74,26 +90,23 @@ export function LevelNode({
 }
 
 function NodeGlyph({
-  icon,
-  status,
+  node,
 }: {
-  icon: LevelNodeType["icon"];
-  status: LevelNodeType["status"];
+  node: LevelNodeType;
 }) {
-  const className = "size-9 md:size-11";
-  const stroke = 2.6;
-
-  if (status === "completed" || icon === "check") {
-    return <Check className={className} strokeWidth={stroke} aria-hidden />;
-  }
-  if (icon === "star") {
-    return <Star className={className} strokeWidth={stroke} aria-hidden />;
-  }
-  if (icon === "chest") {
-    return <Gift className={className} strokeWidth={stroke} aria-hidden />;
-  }
-  if (icon === "game") {
-    return <Puzzle className={className} strokeWidth={stroke} aria-hidden />;
-  }
-  return <BookOpen className={className} strokeWidth={stroke} aria-hidden />;
+  return (
+    <span className="path-node-icon-frame">
+      <img
+        src={nodeSprite(node)}
+        alt=""
+        aria-hidden
+        className="path-node-pixel-icon"
+      />
+      {node.status === "completed" ? (
+        <span className="path-node-complete-badge" aria-hidden>
+          <Check className="size-3 md:size-3.5" strokeWidth={3} />
+        </span>
+      ) : null}
+    </span>
+  );
 }

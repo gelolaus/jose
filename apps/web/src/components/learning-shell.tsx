@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { JoseShell } from "@/components/jose-shell";
@@ -9,7 +10,6 @@ import type { ReactNode } from "react";
 import {
   BookMarked,
   Map,
-  Settings,
   Sparkles,
   UserRound,
   Wrench,
@@ -79,9 +79,14 @@ function AppShellBody({
       footer={
         <Link
           href="/profile/preferences"
-          className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-[var(--jose-text-muted)]"
+          className="nav-image-link"
+          aria-label="Settings"
         >
-          <Settings className="size-5" aria-hidden /> Settings
+          <img
+            src="/assets/nav-settings.png"
+            alt="Settings"
+            className="nav-btn-img"
+          />
         </Link>
       }
     >

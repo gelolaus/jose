@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { GameSwitch } from "@/components/game-player";
@@ -28,6 +29,13 @@ const ICONS: Record<LabGame["type"], LucideIcon> = {
   dapitan: Wrench,
 };
 
+const ACTIVITY_BADGES: Partial<Record<LabGame["type"], string>> = {
+  timeline: "/assets/badge-timeline-clean.png",
+  quiz: "/assets/badge-quiz-clean.png",
+  memory: "/assets/badge-matching-clean.png",
+  blank: "/assets/badge-fillblank-clean.png",
+};
+
 export function GameLabHub({ embedded = false }: { embedded?: boolean }) {
   return (
     <div
@@ -41,6 +49,7 @@ export function GameLabHub({ embedded = false }: { embedded?: boolean }) {
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {LAB_GAMES.map((entry, index) => {
           const Icon = ICONS[entry.type];
+          const badge = ACTIVITY_BADGES[entry.type];
           return (
             <li key={entry.type}>
               <Link
@@ -50,17 +59,27 @@ export function GameLabHub({ embedded = false }: { embedded?: boolean }) {
                 <div
                   className="relative flex min-h-[12rem] flex-col justify-between overflow-hidden p-5 sm:min-h-[13rem] sm:p-6"
                 >
-                  <span className={`lesson-icon lesson-icon--${index % 4} mb-5 flex size-14 items-center justify-center rounded-2xl transition group-hover:-rotate-6`}>
-                    <Icon className="size-6" strokeWidth={2.25} aria-hidden />
+                  <span className="activity-badge-frame">
+                    {badge ? (
+                      <img
+                        src={badge}
+                        alt={`${entry.title} activity`}
+                        className="activity-badge-img"
+                      />
+                    ) : (
+                      <span className={`lesson-icon lesson-icon--${index % 4} flex size-full items-center justify-center rounded-2xl transition group-hover:-rotate-6`}>
+                        <Icon className="size-6" strokeWidth={2.25} aria-hidden />
+                      </span>
+                    )}
                   </span>
                   <div>
-                    <p className="font-display text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
+                    <p className="text-center font-display text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
                       {entry.title}
                     </p>
-                    <p className="mt-1 text-sm text-[var(--jose-text-muted)] sm:text-base">
+                    <p className="mt-1 text-center text-sm text-[var(--jose-text-muted)] sm:text-base">
                       {entry.blurb}
                     </p>
-                    <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-[var(--jose-text-muted)]">
+                    <p className="mt-3 text-center text-xs font-bold uppercase tracking-[0.12em] text-[var(--jose-text-muted)]">
                       {entry.type === "memory" ? "Beat the clock" : "Play a round"}
                     </p>
                   </div>

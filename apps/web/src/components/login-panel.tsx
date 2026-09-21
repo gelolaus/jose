@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import Link from "next/link";
@@ -71,7 +72,13 @@ function LoginPanelBody({ reason, signedIn }: Props) {
     <main className="jose-login">
       <div className="jose-login__glow" aria-hidden />
       <section className="jose-login__card">
-        <p className="jose-login__brand">Jose</p>
+        <div className="login-logo">
+          <img
+            src="/assets/jose-title.png"
+            alt="Jose"
+            className="jose-title-img jose-title-img--login"
+          />
+        </div>
         <h1>School sign-in</h1>
         <p className="jose-login__lead">
           Sign in with your APC Microsoft account to access Jose.

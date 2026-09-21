@@ -1,7 +1,9 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { BookmarkX, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { deleteBookmark, fetchBookmarks } from "@/lib/path-api";
@@ -10,6 +12,7 @@ import { useJoseSession } from "@/lib/use-jose-session";
 import type { BookmarkItem } from "@jose/shared";
 
 export function BookmarksView() {
+  const router = useRouter();
   const { authenticated, loading, learner, user } = useJoseSession();
   const accountId = learner?.id ?? user?.id ?? null;
   const [items, setItems] = useState<BookmarkItem[]>([]);
@@ -98,7 +101,7 @@ export function BookmarksView() {
               key={item.levelId}
               className="rounded-3xl border border-[var(--jose-rule)] bg-[var(--jose-paper)] p-4"
             >
-              <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="bookmark-card-layout">
                 <div className="min-w-0">
                   <p className="text-lg font-extrabold">
                     {item.available ? item.title : "Unavailable lesson"}
@@ -113,14 +116,20 @@ export function BookmarksView() {
                     </p>
                   ) : null}
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="bookmark-actions">
                   {item.available && item.href ? (
-                    <Link href={item.href} className="jose-button min-h-11 px-4 py-2 text-sm">
-                      Open lesson
-                    </Link>
+                    <button
+                      type="button"
+                      className="wood-action-btn"
+                      aria-label={`Open ${item.title}`}
+                      onClick={() => router.push(item.href!)}
+                    >
+                      <img src="/assets/btn-open.png" alt="Open" />
+                    </button>
                   ) : null}
                   <button
                     type="button"
+                    aria-label={`Remove ${item.title ?? "bookmark"}`}
                     disabled={busyId === item.levelId}
                     onClick={() => {
                       setBusyId(item.levelId);
@@ -131,10 +140,9 @@ export function BookmarksView() {
                         )
                         .finally(() => setBusyId(null));
                     }}
-                    className="inline-flex min-h-11 items-center gap-1 rounded-full bg-slate-100 px-4 py-2 text-sm font-extrabold text-slate-700 disabled:opacity-60"
+                    className="wood-action-btn"
                   >
-                    <BookmarkX className="size-4" aria-hidden />
-                    Remove bookmark
+                    <img src="/assets/btn-remove.png" alt="Remove" />
                   </button>
                 </div>
               </div>

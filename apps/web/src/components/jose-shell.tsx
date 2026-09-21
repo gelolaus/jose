@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { SkipLink } from "@/components/skip-link";
@@ -17,6 +18,18 @@ export type JoseShellTab = {
 function tabIsActive(pathname: string, tab: JoseShellTab) {
   if (tab.isActive) return tab.isActive(pathname);
   return pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+}
+
+const navImageByPath: Record<string, string> = {
+  "/learn": "/assets/nav-learn.png",
+  "/practice": "/assets/nav-practice.png",
+  "/bookmarks": "/assets/nav-bookmarks.png",
+  "/profile": "/assets/nav-profile.png",
+  "/profile/preferences": "/assets/nav-settings.png",
+};
+
+function navImageFor(href: string) {
+  return navImageByPath[href];
 }
 
 export function JoseShell({
@@ -41,42 +54,52 @@ export function JoseShell({
   navLabel?: string;
 }) {
   const pathname = usePathname();
-  const activeClass = accent === "teach" ? "jose-nav-active-teach" : "jose-nav-active";
   const allTabs = [...tabs, ...extraTabs];
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-transparent lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
+    <div
+      className="flex h-dvh overflow-hidden bg-transparent md:grid md:grid-cols-[15rem_minmax(0,1fr)]"
+      data-accent={accent}
+    >
       <SkipLink />
       <ThemeDocumentSync />
-      <aside className="jose-sidebar hidden h-dvh flex-col px-5 py-7 lg:flex">
-        <div className="mb-8 px-2">
-          <p className="font-display text-4xl font-black tracking-tight text-[var(--jose-sidebar-brand)]">
-            {brandTitle}
-          </p>
+      <aside className="jose-sidebar hidden h-dvh flex-col px-5 py-7 md:flex">
+        <div className="sidebar-logo mb-5 px-2">
+          <img
+            src="/assets/jose-title.png"
+            alt={brandTitle}
+            className="jose-title-img jose-title-img--sidebar"
+          />
           {brandSubtitle ? (
             <p className="mt-1 text-sm text-[var(--jose-sidebar-muted)]">{brandSubtitle}</p>
           ) : null}
         </div>
-        <nav className="flex flex-1 flex-col gap-2" aria-label={navLabel}>
+        <nav className="flex flex-1 flex-col" aria-label={navLabel}>
+          <ul className="nav-image-list">
           {allTabs.map((tab) => {
             const active = tabIsActive(pathname, tab);
-            const Icon = tab.icon;
+            const imageSrc = navImageFor(tab.href);
             return (
-              <Link
+              <li
                 key={`${tab.href}-${tab.label}`}
-                href={tab.href}
-                aria-current={active ? "page" : undefined}
-                className={`flex min-h-11 items-center gap-3.5 rounded-2xl px-4 py-3.5 text-base font-extrabold transition ${
-                  active
-                    ? "jose-sidebar-nav-active"
-                    : "text-[var(--jose-sidebar-muted)] hover:text-[var(--jose-sidebar-text)] hover:bg-white/5"
-                }`}
+                className={`nav-item-img ${active ? "active" : ""}`}
               >
-                <Icon className="size-5 shrink-0" strokeWidth={2.25} aria-hidden />
-                {tab.label}
-              </Link>
+                <Link
+                  href={tab.href}
+                  aria-current={active ? "page" : undefined}
+                  aria-label={tab.label}
+                  className="nav-image-link"
+                >
+                  {imageSrc ? (
+                    <img src={imageSrc} alt={tab.label} className="nav-btn-img" />
+                  ) : (
+                    <span className="nav-image-fallback">{tab.label}</span>
+                  )}
+                </Link>
+              </li>
             );
           })}
+          </ul>
         </nav>
         {footer ? <div className="space-y-3 px-2">{footer}</div> : null}
       </aside>
@@ -85,35 +108,39 @@ export function JoseShell({
         <main
           id="main-content"
           tabIndex={-1}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain outline-none"
+          className="jose-shell-main min-h-0 flex-1 overflow-y-auto overscroll-y-contain outline-none"
         >
           {children}
         </main>
         <nav
-          className="shrink-0 border-t border-[var(--jose-rule)] bg-[var(--jose-paper)]/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] backdrop-blur-md lg:hidden"
+          className="jose-bottom-nav shrink-0 border-t border-[var(--jose-rule)] bg-[var(--jose-paper)]/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] backdrop-blur-md md:hidden"
           aria-label={navLabel}
         >
-          <div className="mx-auto flex w-full max-w-3xl items-stretch justify-around px-2 pt-2.5">
+          <ul className="nav-image-list nav-image-list--mobile">
             {allTabs.map((tab) => {
               const active = tabIsActive(pathname, tab);
-              const Icon = tab.icon;
+              const imageSrc = navImageFor(tab.href);
               return (
-                <Link
+                <li
                   key={`bottom-${tab.href}-${tab.label}`}
-                  href={tab.href}
-                  aria-current={active ? "page" : undefined}
-                  className={`flex min-h-11 min-w-[4.5rem] flex-col items-center gap-1 rounded-xl px-2 py-2.5 text-xs font-semibold transition sm:text-sm ${
-                    active
-                      ? activeClass
-                      : "text-[var(--jose-text-muted)] hover:bg-[var(--jose-surface-control)]"
-                  }`}
+                  className={`nav-item-img ${active ? "active" : ""}`}
                 >
-                  <Icon className="size-5" strokeWidth={2.25} aria-hidden />
-                  {tab.label}
-                </Link>
+                  <Link
+                    href={tab.href}
+                    aria-current={active ? "page" : undefined}
+                    aria-label={tab.label}
+                    className="nav-image-link"
+                  >
+                    {imageSrc ? (
+                      <img src={imageSrc} alt={tab.label} className="nav-btn-img" />
+                    ) : (
+                      <span className="nav-image-fallback">{tab.label}</span>
+                    )}
+                  </Link>
+                </li>
               );
             })}
-          </div>
+          </ul>
         </nav>
       </div>
     </div>

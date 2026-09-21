@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import { Flame, Heart, Zap, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -13,9 +14,11 @@ export function TopBar({ courseTitle, streak, hearts, xp }: TopBarProps) {
     <header className="border-b border-[var(--jose-rule)] bg-[var(--jose-paper)]">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--jose-ink)] lg:hidden">
-            Jose
-          </p>
+          <img
+            src="/assets/jose-title.png"
+            alt="Jose"
+            className="jose-title-img jose-title-img--topbar"
+          />
           <p className="truncate text-sm font-extrabold text-[var(--jose-ink)] sm:text-base">
             {courseTitle}
           </p>
