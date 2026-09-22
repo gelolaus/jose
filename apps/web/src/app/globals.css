@@ -176,6 +176,69 @@ html[data-theme="dark"] textarea::placeholder {
 .jose-sidebar {
   background: linear-gradient(180deg, #1a1a3e 0%, #12122e 100%);
   border-right: 1px solid rgba(201, 168, 76, 0.15);
+  transition: transform 240ms ease, opacity 180ms ease;
+}
+
+.jose-sidebar-toggle {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .jose-shell {
+    grid-template-columns: 15rem minmax(0, 1fr);
+    transition: grid-template-columns 240ms ease;
+  }
+
+  .jose-shell[data-sidebar-collapsed="true"] {
+    grid-template-columns: 0 minmax(0, 1fr);
+  }
+
+  .jose-shell[data-sidebar-collapsed="true"] .jose-sidebar {
+    transform: translateX(-100%);
+    opacity: 0;
+    border-right: 0;
+  }
+
+  .jose-sidebar-toggle {
+    position: absolute;
+    z-index: 60;
+    top: 50%;
+    left: calc(15rem - 1.2rem);
+    display: flex;
+    width: 2.75rem;
+    height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--jose-gold);
+    border-radius: 999px;
+    background: var(--jose-paper);
+    color: var(--jose-ink);
+    box-shadow: 0 2px 7px rgb(0 0 0 / 15%);
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition: left 240ms ease, transform 150ms ease;
+  }
+
+  .jose-sidebar-toggle:hover {
+    transform: translateY(-50%) scale(1.08);
+  }
+
+  .jose-sidebar-toggle:focus-visible {
+    outline: 3px solid var(--jose-gold);
+    outline-offset: 3px;
+  }
+
+  .jose-shell[data-sidebar-collapsed="true"] .jose-sidebar-toggle {
+    left: 0.6rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jose-shell,
+  .jose-sidebar,
+  .jose-sidebar-toggle {
+    transition: none;
+  }
 }
 
 html[data-theme="dark"] .jose-sidebar {
@@ -219,9 +282,97 @@ html[data-theme="dark"] .jose-sidebar-nav-active {
   width: 190px;
 }
 
-.jose-title-img--topbar {
-  width: 220px;
-  max-width: 100%;
+.jose-topbar {
+  flex: none;
+  border-bottom: 1px solid var(--jose-rule);
+  background: var(--jose-paper);
+}
+
+.jose-topbar__inner {
+  display: flex;
+  width: 100%;
+  min-height: 5.5rem;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0.35rem clamp(1rem, 2.5vw, 2rem);
+}
+
+/* Each image is a standalone transparent wooden panel; values remain live text. */
+.jose-status-hud {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: clamp(0.1rem, 0.6vw, 0.5rem);
+  width: min(100%, 34rem);
+}
+
+.jose-status-hud--header {
+  width: min(100%, 34rem);
+}
+
+.jose-status-hud--profile {
+  width: min(100%, 25rem);
+  margin-inline: auto;
+}
+
+.jose-status-hud__item {
+  position: relative;
+  display: block;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.jose-status-hud__panel {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.jose-status-hud__value {
+  position: absolute;
+  top: 50%;
+  right: 16%;
+  left: 43%;
+  display: flex;
+  height: 28%;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transform: translateY(-50%);
+}
+
+.jose-status-hud__glyph {
+  display: block;
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.jose-status-hud__space {
+  flex: 0.4 1 0;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .jose-status-hud {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: min(100%, 22rem);
+  }
+
+  .jose-status-hud--profile {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: min(100%, 25rem);
+  }
+
+  .jose-topbar__inner {
+    min-height: 0;
+    padding-block: 0.4rem;
+  }
 }
 
 .jose-title-img--login {
@@ -285,7 +436,7 @@ html[data-theme="dark"] .jose-sidebar-nav-active {
 }
 
 .nav-btn-img {
-  width: clamp(90px, 12vw, 150px);
+  width: clamp(100px, 14vw, 170px);
   height: auto;
   object-fit: contain;
   pointer-events: none;
@@ -303,11 +454,11 @@ html[data-theme="dark"] .jose-sidebar-nav-active {
   filter: brightness(0.85) drop-shadow(0 2px 3px rgb(0 0 0 / 20%));
 }
 
-.nav-image-fallback {
+.nav-fallback-icon {
+  width: clamp(44px, 6vw, 56px);
+  height: clamp(44px, 6vw, 56px);
+  padding: 0.6rem;
   color: var(--jose-sidebar-text);
-  font-size: 0.8rem;
-  font-weight: 800;
-  text-align: center;
 }
 
 .jose-surface {
@@ -670,42 +821,30 @@ html[data-theme="dark"] .jose-sidebar-nav-active {
   cursor: pointer;
 }
 
-.book-cover {
+.book-cover-img {
+  display: block;
   width: 100%;
+  height: auto;
   min-width: 44px;
   min-height: 44px;
   aspect-ratio: 470 / 610;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: contain;
+  object-fit: contain;
+  object-position: center;
   cursor: pointer;
   filter: drop-shadow(0 8px 7px rgb(32 19 10 / 28%));
   transform-origin: 50% 85%;
   transition: transform 0.15s ease, filter 0.15s ease;
 }
 
-.module-cover-link:hover .book-cover {
+.module-cover-link:hover .book-cover-img {
   transform: translateY(-8px) scale(1.035);
   filter: brightness(1.08) drop-shadow(0 15px 11px rgb(32 19 10 / 34%));
 }
 
-.module-cover-link:active .book-cover {
+.module-cover-link:active .book-cover-img {
   transform: translateY(2px) scale(0.97);
   filter: brightness(0.88) drop-shadow(0 4px 4px rgb(32 19 10 / 24%));
 }
-
-.book-cover.m1 { background-image: url("/assets/book-rizal-law.png"); }
-.book-cover.m2 { background-image: url("/assets/book-hero-then-now.png"); }
-.book-cover.m3 { background-image: url("/assets/book-19th-century.png"); }
-.book-cover.m4 { background-image: url("/assets/book-family-childhood.png"); }
-.book-cover.m5 { background-image: url("/assets/book-travels-abroad.png"); }
-.book-cover.m6 { background-image: url("/assets/book-noli-me-tangere.png"); }
-.book-cover.m7 { background-image: url("/assets/book-martyrdom.png"); }
-.book-cover.m8 { background-image: url("/assets/book-la-solidaridad.png"); }
-.book-cover.m9 { background-image: url("/assets/book-dapitan-exile.png"); }
-.book-cover.m10 { background-image: url("/assets/book-false-trial.png"); }
-.book-cover.m11 { background-image: url("/assets/book-retraction.png"); }
-.book-cover.m12 { background-image: url("/assets/book-eternal-legacy.png"); }
 
 .module-progress-label {
   display: flex;
@@ -808,10 +947,6 @@ html[data-theme="dark"] .jose-sidebar-nav-active {
 }
 
 @media (max-width: 767px) {
-  .jose-title-img--topbar {
-    width: clamp(110px, 30vw, 160px);
-  }
-
   .jose-title-img--login {
     width: clamp(140px, 40vw, 200px);
   }
