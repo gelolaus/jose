@@ -1,6 +1,8 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { ContinueLearningCard } from "@/components/continue-learning-card";
+import { moduleBookImage } from "@/lib/ui-assets";
 import type { ContinueLearning, ModuleCard } from "@jose/shared";
 import { ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
@@ -71,9 +73,11 @@ export function ModuleGrid({
                 className="module-cover-link"
                 aria-label={`${mod.title}. ${completed ? "Completed" : `${mod.completedCount} of ${mod.totalCount} levels complete`}`}
               >
-                <div
-                  className={`book-cover m${Math.min(index + 1, 12)}`}
+                <img
+                  src={moduleBookImage(index)}
+                  alt=""
                   aria-hidden
+                  className="book-cover-img"
                 />
                 <span className="sr-only">{mod.title}</span>
               </Link>

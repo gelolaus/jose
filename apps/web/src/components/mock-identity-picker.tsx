@@ -4,6 +4,7 @@
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { completeMockLogin, fetchAuthStatus } from "@/lib/auth-api";
+import { JOSE_TITLE_IMAGE } from "@/lib/ui-assets";
 
 const PRESETS = [
   {
@@ -112,7 +113,7 @@ export function MockIdentityPicker() {
         <section className="jose-login__card">
           <div className="login-logo">
             <img
-              src="/assets/jose-title.png"
+              src={JOSE_TITLE_IMAGE}
               alt="Jose"
               className="jose-title-img jose-title-img--login"
             />
@@ -136,7 +137,7 @@ export function MockIdentityPicker() {
       <section className="jose-login__card">
         <div className="login-logo">
           <img
-            src="/assets/jose-title.png"
+            src={JOSE_TITLE_IMAGE}
             alt="Jose"
             className="jose-title-img jose-title-img--login"
           />

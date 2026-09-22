@@ -3,10 +3,12 @@
 
 import { SkipLink } from "@/components/skip-link";
 import { ThemeDocumentSync } from "@/lib/theme-mode";
+import { JOSE_TITLE_IMAGE, NAVIGATION_IMAGES } from "@/lib/ui-assets";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export type JoseShellTab = {
   href: string;
@@ -20,16 +22,8 @@ function tabIsActive(pathname: string, tab: JoseShellTab) {
   return pathname === tab.href || pathname.startsWith(`${tab.href}/`);
 }
 
-const navImageByPath: Record<string, string> = {
-  "/learn": "/assets/nav-learn.png",
-  "/practice": "/assets/nav-practice.png",
-  "/bookmarks": "/assets/nav-bookmarks.png",
-  "/profile": "/assets/nav-profile.png",
-  "/profile/preferences": "/assets/nav-settings.png",
-};
-
 function navImageFor(href: string) {
-  return navImageByPath[href];
+  return NAVIGATION_IMAGES[href];
 }
 
 export function JoseShell({
@@ -55,18 +49,25 @@ export function JoseShell({
 }) {
   const pathname = usePathname();
   const allTabs = [...tabs, ...extraTabs];
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
     <div
-      className="flex h-dvh overflow-hidden bg-transparent md:grid md:grid-cols-[15rem_minmax(0,1fr)]"
+      className="jose-shell relative flex h-dvh overflow-hidden bg-transparent md:grid"
       data-accent={accent}
+      data-sidebar-collapsed={sidebarCollapsed}
     >
       <SkipLink />
       <ThemeDocumentSync />
-      <aside className="jose-sidebar hidden h-dvh flex-col px-5 py-7 md:flex">
+      <aside
+        id="jose-sidebar"
+        className="jose-sidebar hidden h-dvh min-w-0 flex-col overflow-hidden px-5 py-7 md:flex"
+        aria-hidden={sidebarCollapsed}
+        inert={sidebarCollapsed}
+      >
         <div className="sidebar-logo mb-5 px-2">
           <img
-            src="/assets/jose-title.png"
+            src={JOSE_TITLE_IMAGE}
             alt={brandTitle}
             className="jose-title-img jose-title-img--sidebar"
           />
@@ -79,6 +80,7 @@ export function JoseShell({
           {allTabs.map((tab) => {
             const active = tabIsActive(pathname, tab);
             const imageSrc = navImageFor(tab.href);
+            const Icon = tab.icon;
             return (
               <li
                 key={`${tab.href}-${tab.label}`}
@@ -93,7 +95,7 @@ export function JoseShell({
                   {imageSrc ? (
                     <img src={imageSrc} alt={tab.label} className="nav-btn-img" />
                   ) : (
-                    <span className="nav-image-fallback">{tab.label}</span>
+                    <Icon className="nav-fallback-icon" aria-hidden />
                   )}
                 </Link>
               </li>
@@ -101,8 +103,19 @@ export function JoseShell({
           })}
           </ul>
         </nav>
-        {footer ? <div className="space-y-3 px-2">{footer}</div> : null}
+        {footer ? <div className="w-full space-y-3">{footer}</div> : null}
       </aside>
+      <button
+        type="button"
+        className="jose-sidebar-toggle"
+        onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+        aria-controls="jose-sidebar"
+        aria-expanded={!sidebarCollapsed}
+        aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        {sidebarCollapsed ? <ChevronRight aria-hidden="true" /> : <ChevronLeft aria-hidden="true" />}
+      </button>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {topBar ? <div className="shrink-0">{topBar}</div> : null}
         <main
@@ -120,6 +133,7 @@ export function JoseShell({
             {allTabs.map((tab) => {
               const active = tabIsActive(pathname, tab);
               const imageSrc = navImageFor(tab.href);
+              const Icon = tab.icon;
               return (
                 <li
                   key={`bottom-${tab.href}-${tab.label}`}
@@ -134,7 +148,7 @@ export function JoseShell({
                     {imageSrc ? (
                       <img src={imageSrc} alt={tab.label} className="nav-btn-img" />
                     ) : (
-                      <span className="nav-image-fallback">{tab.label}</span>
+                      <Icon className="nav-fallback-icon" aria-hidden />
                     )}
                   </Link>
                 </li>

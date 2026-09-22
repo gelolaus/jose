@@ -13,6 +13,7 @@ import {
 } from "@/lib/auth-api";
 import { JoseSessionProvider } from "@/lib/use-jose-session";
 import { clearSensitiveClientState } from "@/lib/explorer-identity";
+import { JOSE_TITLE_IMAGE } from "@/lib/ui-assets";
 
 type Props = {
   reason?: string;
@@ -74,7 +75,7 @@ function LoginPanelBody({ reason, signedIn }: Props) {
       <section className="jose-login__card">
         <div className="login-logo">
           <img
-            src="/assets/jose-title.png"
+            src={JOSE_TITLE_IMAGE}
             alt="Jose"
             className="jose-title-img jose-title-img--login"
           />

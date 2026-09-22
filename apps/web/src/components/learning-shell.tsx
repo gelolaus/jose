@@ -2,10 +2,13 @@
 "use client";
 
 import { JoseShell } from "@/components/jose-shell";
+import { TopBar } from "@/components/top-bar";
 import { t } from "@/lib/reading-preferences";
 import { JoseSessionProvider, useJoseSession } from "@/lib/use-jose-session";
 import { useReadingPreferences } from "@/lib/use-reading-preferences";
+import { NAVIGATION_IMAGES } from "@/lib/ui-assets";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   BookMarked,
@@ -53,11 +56,19 @@ function AppShellBody({
   topBar?: ReactNode;
 }) {
   const prefs = useReadingPreferences();
-  const { canTeach } = useJoseSession();
+  const { canTeach, learner } = useJoseSession();
+  const pathname = usePathname();
+  const showStatusHud = isActive(pathname, "/learn");
+  const statusBar = showStatusHud
+    ? (topBar ??
+      (learner ? (
+        <TopBar courseTitle="Jose" streak={learner.streak} hearts={learner.hearts} xp={learner.xp} />
+      ) : undefined))
+    : undefined;
 
   return (
     <JoseShell
-      topBar={topBar}
+      topBar={statusBar}
       brandSubtitle="Learn something new today"
       tabs={tabDefs.map((tab) => ({
         href: tab.href,
@@ -77,17 +88,20 @@ function AppShellBody({
           : []
       }
       footer={
-        <Link
-          href="/profile/preferences"
-          className="nav-image-link"
-          aria-label="Settings"
-        >
-          <img
-            src="/assets/nav-settings.png"
-            alt="Settings"
-            className="nav-btn-img"
-          />
-        </Link>
+        <div className={`nav-item-img ${isActive(pathname, "/profile/preferences") ? "active" : ""}`}>
+          <Link
+            href="/profile/preferences"
+            className="nav-image-link"
+            aria-label="Settings"
+            aria-current={isActive(pathname, "/profile/preferences") ? "page" : undefined}
+          >
+            <img
+              src={NAVIGATION_IMAGES["/profile/preferences"]}
+              alt="Settings"
+              className="nav-btn-img"
+            />
+          </Link>
+        </div>
       }
     >
       {children}

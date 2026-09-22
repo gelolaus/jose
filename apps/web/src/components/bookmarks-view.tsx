@@ -9,6 +9,7 @@ import { Breadcrumbs } from "@/components/breadcrumbs";
 import { deleteBookmark, fetchBookmarks } from "@/lib/path-api";
 import { migrateLocalBookmarks } from "@/lib/bookmark-migration";
 import { useJoseSession } from "@/lib/use-jose-session";
+import { BOOKMARK_ACTION_IMAGES } from "@/lib/ui-assets";
 import type { BookmarkItem } from "@jose/shared";
 
 export function BookmarksView() {
@@ -124,7 +125,7 @@ export function BookmarksView() {
                       aria-label={`Open ${item.title}`}
                       onClick={() => router.push(item.href!)}
                     >
-                      <img src="/assets/btn-open.png" alt="Open" />
+                      <img src={BOOKMARK_ACTION_IMAGES.open} alt="Open" />
                     </button>
                   ) : null}
                   <button
@@ -142,7 +143,7 @@ export function BookmarksView() {
                     }}
                     className="wood-action-btn"
                   >
-                    <img src="/assets/btn-remove.png" alt="Remove" />
+                    <img src={BOOKMARK_ACTION_IMAGES.remove} alt="Remove" />
                   </button>
                 </div>
               </div>

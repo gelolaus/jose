@@ -40,6 +40,17 @@ const stats = {
 
 describe("ProfileShowcase", () => {
   afterEach(() => cleanup());
+  it("places the learner HUD between Edit profile and Settings", () => {
+    render(<ProfileShowcase stats={stats} />);
+    const editProfile = screen.getByRole("link", { name: "Edit profile" });
+    const hud = screen.getByLabelText("Learner status");
+    const settings = screen.getByRole("heading", { name: "Settings" });
+
+    expect(hud).toHaveClass("jose-status-hud--profile");
+    expect(editProfile.compareDocumentPosition(hud) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(hud.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("never renders Teacher area for teachers; admins keep Manage teachers", () => {
     (session.value as { canTeach: boolean; canAdmin: boolean }).canTeach = true;
     (session.value as { canAdmin: boolean }).canAdmin = false;
