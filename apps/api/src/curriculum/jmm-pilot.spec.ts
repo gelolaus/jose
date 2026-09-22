@@ -31,6 +31,20 @@ function pilotSample(name: string): string {
   throw new Error(`Pilot sample missing: ${name}`);
 }
 
+function repoDocPath(...parts: string[]): string {
+  const candidates = [
+    join(process.cwd(), "..", "..", "docs", ...parts),
+    join(process.cwd(), "docs", ...parts),
+    `C:\\Users\\gelo\\Desktop\\dev\\jose\\docs\\${parts.join("\\")}`,
+  ];
+  for (const p of candidates) {
+    try {
+      if (existsSync(p)) return p;
+    } catch { /* try next */ }
+  }
+  throw new Error(`Doc missing: ${parts.join("/")}`);
+}
+
 describe("jmm pilot package (F)", () => {
   let app: INestApplication;
   let classroom: ClassroomService;
@@ -131,7 +145,7 @@ describe("jmm pilot package (F)", () => {
   });
 
   it("keeps authoring guide clear and defers into-existing + media upload", async () => {
-    const guidePath = `C:\\Users\\gelo\\Desktop\\dev\\jose\\docs\\authoring\\jose-module-markup-v1.md`;
+    const guidePath = repoDocPath("authoring", "jose-module-markup-v1.md");
     expect(existsSync(guidePath)).toBe(true);
     const guide = readFileSync(guidePath, "utf8");
     for (const t of ['type="quiz"', 'type="memory"', 'type="timeline"', 'type="blank"', 'type="sort"']) {
@@ -139,11 +153,11 @@ describe("jmm pilot package (F)", () => {
     }
     expect(guide).toContain("never modify an existing");
     // Deferred features are documented as out of scope until pilot passes.
-    const plan = readFileSync(`C:\\Users\\gelo\\Desktop\\dev\\jose\\docs\\pilot\\plan.md`, "utf8");
+    const plan = readFileSync(repoDocPath("pilot", "plan.md"), "utf8");
     expect(plan).toMatch(/defer/i);
     expect(plan).toMatch(/import-into-existing-module/i);
     expect(plan).toMatch(/media-upload/i);
-    const template = `C:\\Users\\gelo\\Desktop\\dev\\jose\\docs\\pilot\\results-template.md`;
+    const template = repoDocPath("pilot", "results-template.md");
     expect(existsSync(template)).toBe(true);
   });
 });
