@@ -1365,20 +1365,21 @@ html[data-theme="dark"] .game-board__how-text {
   transform: translateY(2px);
 }
 .path-section {
+  min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--jose-surface);
-  background-image:
-    linear-gradient(rgb(245 239 224 / 68%), rgb(245 239 224 / 76%)),
-    url("/assets/path-philippines-pixel-map.png");
-  background-position: center;
+  background-image: url("/assets/path-continuous-landmass-16bit.png");
+  background-position: center top;
   background-repeat: no-repeat;
+  /* Cover preserves the artwork's aspect ratio as the viewport or zoom changes. */
   background-size: cover;
   border-bottom: 2px solid var(--jose-rule);
   image-rendering: pixelated;
 }
 html[data-theme="dark"] .path-section {
   background-image:
-    linear-gradient(rgb(18 18 46 / 72%), rgb(18 18 46 / 80%)),
-    url("/assets/path-philippines-pixel-map.png");
+    linear-gradient(rgb(18 18 46 / 58%), rgb(18 18 46 / 68%)),
+    url("/assets/path-continuous-landmass-16bit.png");
 }
 .path-heading {
   background: var(--jose-wash);
@@ -1462,6 +1463,13 @@ html[data-theme="dark"] .path-section {
   background: rgb(245 239 224 / 88%);
   border-radius: 0.5rem;
   box-shadow: 0 1px 0 rgb(26 26 62 / 10%);
+}
+@media (max-width: 767px) {
+  .path-node-label {
+    max-width: clamp(4.5rem, 25vw, 9rem);
+    overflow-wrap: anywhere;
+    font-size: clamp(0.75rem, 3.5vw, 1rem);
+  }
 }
 html[data-theme="dark"] .path-node-label {
   background: rgb(18 18 46 / 88%);
