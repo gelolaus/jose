@@ -47,7 +47,7 @@ export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
   }
 
   return (
-    <main className="profile-sheet" aria-label="Character sheet">
+    <section className="profile-sheet" aria-label="Character sheet">
       <div className="profile-sheet__inner">
         <div className="profile-sheet__crest" aria-hidden="true">✦ Character Sheet ✦</div>
 
@@ -162,6 +162,6 @@ export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
           ) : null}
         </div>
       </div>
-    </main>
+    </section>
   );
 }
