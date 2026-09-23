@@ -4,13 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Jose UI - Parchment &amp; Indigo Palette</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-  @font-face { font-family:'Swansea'; src:local('Swansea'),local('Swansea Regular'); font-weight:400; }
-  @font-face { font-family:'Swansea'; src:local('Swansea Bold'); font-weight:500; }
-  @font-face { font-family:'Arena'; src:local('ARENA'),local('Arena'),local('Arena Regular'); }
-
-  *{margin:0;padding:0;box-sizing:border-box;text-shadow:none !important;}
-  body{font-family:'Arena','Impact','Arial Black','Swansea',Calibri,sans-serif;overflow:hidden;height:100vh;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Nunito',sans-serif;overflow:hidden;height:100vh;-webkit-font-smoothing:antialiased;}
 
   .app{display:flex;height:100vh;transition:background .4s,color .4s;}
 
@@ -60,19 +59,19 @@
   /* ===== SHARED ===== */
   .top-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
   .username{font-size:16px;font-weight:500;letter-spacing:.3px;text-transform:uppercase;}
-  .username.brand{font-family:'Arena','Impact','Arial Black',sans-serif;font-size:22px;font-weight:500;font-style:normal;letter-spacing:1.5px;text-transform:uppercase;}
+  .username.brand{font-family:'Quicksand',sans-serif;font-size:22px;font-weight:700;font-style:normal;letter-spacing:1.5px;text-transform:uppercase;}
   .stats-row{display:flex;gap:10px;}
   .stat-badge{display:flex;align-items:center;gap:5px;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:600;transition:all .2s ease;letter-spacing:.3px;text-transform:uppercase;cursor:pointer;}
   .stat-badge:hover{transform:translateY(-2px) scale(1.05);filter:brightness(1.1);}
   .stat-badge:active{transform:translateY(1px) scale(.97);}
-  .hero-heading{font-size:24px;font-weight:500;margin:8px 0 4px;letter-spacing:.3px;text-transform:uppercase;}
+  .hero-heading{font-family:'Quicksand',sans-serif;font-size:24px;font-weight:700;margin:8px 0 4px;letter-spacing:.3px;text-transform:uppercase;}
   .hero-sub{font-size:14px;font-style:italic;margin-bottom:24px;}
 
-  .section-title{font-size:16px;font-weight:500;margin-bottom:12px;letter-spacing:.3px;text-transform:uppercase;}
+  .section-title{font-family:'Quicksand',sans-serif;font-size:16px;font-weight:700;margin-bottom:12px;letter-spacing:.3px;text-transform:uppercase;}
   .section-link{font-size:12px;font-weight:500;cursor:pointer;transition:color .2s;letter-spacing:.3px;text-transform:uppercase;}
 
   /* ===== MODULE CARDS — BOOK COVER IMAGES ===== */
-  .modules-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px;width:100%;}
+  .modules-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(clamp(120px,22vw,200px),1fr));gap:10px;margin-bottom:24px;width:100%;}
 
   .module-wrapper{display:flex;flex-direction:column;align-items:center;gap:0;}
   .module-card{position:relative;width:100%;aspect-ratio:470/610;cursor:pointer;transition:transform .2s ease,filter .2s ease;background-size:100% 100%;background-position:center;background-repeat:no-repeat;filter:drop-shadow(3px 5px 6px rgba(0,0,0,.35));}
@@ -95,19 +94,19 @@
   .module-card.m12{background-image:url('assets/book-eternal-legacy.png');}
 
   /* Nav button images */
-  .nav-btn-img{width:150px;height:auto;display:block;pointer-events:none;transition:transform .15s ease,filter .15s ease;}
+  .nav-btn-img{width:clamp(90px,12vw,150px);height:auto;display:block;pointer-events:none;transition:transform .15s ease,filter .15s ease;}
   .nav-item-img{padding:0 8px;margin:0 0 20px;background:none !important;border:none !important;box-shadow:none !important;height:auto !important;overflow:visible;display:flex !important;align-items:center;justify-content:center;cursor:pointer;}
   .nav-item-img:hover .nav-btn-img{transform:scale(1.08);filter:brightness(1.15);}
   .nav-item-img:active .nav-btn-img{transform:scale(.95);filter:brightness(.85);}
 
   /* Wooden image buttons */
-  .btn-wood{background:none;border:none;padding:0;cursor:pointer;transition:transform .15s ease,filter .15s ease;width:160px;}
+  .btn-wood{background:none;border:none;padding:0;cursor:pointer;transition:transform .15s ease,filter .15s ease;width:clamp(90px,12vw,160px);}
   .btn-wood:hover{transform:scale(1.08);filter:brightness(1.15) drop-shadow(2px 3px 4px rgba(0,0,0,.3));}
   .btn-wood:active{transform:scale(.93);filter:brightness(.8);}
   .btn-wood img{width:100%;height:auto;object-fit:contain;display:block;}
 
   /* Activity badge images */
-  .activity-badge-img{width:80px;height:80px;object-fit:contain;margin:0 auto 8px;display:block;}
+  .activity-badge-img{width:clamp(56px,10vw,80px);height:clamp(56px,10vw,80px);object-fit:contain;margin:0 auto 8px;display:block;}
 
   /* Next step */
   .next-step{border-radius:12px;padding:18px 22px;margin-bottom:24px;display:flex;align-items:center;gap:16px;cursor:pointer;transition:all .15s ease;position:relative;overflow:hidden;}
@@ -119,24 +118,26 @@
   .next-step-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;}
   .next-step-title{font-size:15px;font-weight:600;margin-bottom:2px;letter-spacing:.3px;}
   .next-step-meta{font-size:12px;}
-  .next-step-btn{padding:10px 22px;border-radius:8px;font-weight:600;font-size:12px;border:none;cursor:pointer;font-family:inherit;transition:all .15s ease;letter-spacing:.5px;text-transform:uppercase;}
+  .next-step-btn{padding:10px 22px;border-radius:10px;font-weight:700;font-size:12px;border:none;cursor:pointer;font-family:'Quicksand',sans-serif;transition:all .15s ease;letter-spacing:.5px;text-transform:uppercase;}
   .next-step-btn:hover{transform:scale(1.05);filter:brightness(1.1);}
   .next-step-btn:active{transform:scale(.95);filter:brightness(.85);}
 
   /* Buttons */
-  .btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:8px;font-weight:600;font-size:13px;font-family:inherit;border:none;cursor:pointer;text-decoration:none;transition:all .15s ease;letter-spacing:.5px;text-transform:uppercase;}
-  .btn:hover{transform:translateY(-2px) scale(1.04);filter:brightness(1.1);}
-  .btn:active{transform:translateY(2px) scale(.96);filter:brightness(.85);}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:10px;font-weight:700;font-size:13px;font-family:'Quicksand',sans-serif;border:none;cursor:pointer;text-decoration:none;transition:all .15s ease;letter-spacing:.5px;text-transform:uppercase;}
+  .btn:hover{transform:translateY(-2px) scale(1.03);}
+  .btn:active{transform:translateY(1px) scale(.97);}
 
   /* Search */
   .search-input{width:100%;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600;font-family:inherit;border:2px solid;outline:none;transition:all .3s;}
   .search-input:focus{box-shadow:0 0 0 3px #c9a84c33;}
 
   /* Cards */
-  .card{border-radius:12px;padding:18px 20px;display:flex;align-items:start;justify-content:space-between;gap:12px;transition:all .15s ease;cursor:pointer;}
+  .card{border-radius:12px;padding:18px 20px;display:flex;align-items:start;justify-content:space-between;gap:12px;transition:all .15s ease;cursor:pointer;flex-wrap:wrap;}
+  .card-info{flex:1 1 200px;min-width:0;}
+  .card-actions{display:flex;gap:8px;align-items:center;flex-shrink:0;}
   .card:hover{transform:translateY(-3px);filter:brightness(1.03);}
   .card:active{transform:translateY(1px);filter:brightness(.97);}
-  .card-title{font-size:15px;font-weight:600;margin-bottom:4px;letter-spacing:.3px;}
+  .card-title{font-family:'Quicksand',sans-serif;font-size:15px;font-weight:700;margin-bottom:4px;letter-spacing:.3px;}
   .card-sub{font-size:13px;}
 
   /* Tabs */
@@ -159,13 +160,13 @@
 
   /* Game board */
   .game-board{border-radius:12px;padding:24px;transition:all .3s;}
-  .game-question{font-size:17px;font-weight:600;margin-bottom:20px;letter-spacing:.3px;}
-  .game-option{display:block;width:100%;padding:14px 18px;border-radius:10px;margin-bottom:10px;font-size:14px;font-weight:600;border:2px solid;cursor:pointer;text-align:left;font-family:inherit;transition:all .15s;letter-spacing:.3px;}
+  .game-question{font-family:'Quicksand',sans-serif;font-size:17px;font-weight:700;margin-bottom:20px;letter-spacing:.3px;}
+  .game-option{display:block;width:100%;padding:14px 18px;border-radius:12px;margin-bottom:10px;font-size:14px;font-weight:600;border:2px solid;cursor:pointer;text-align:left;font-family:'Nunito',sans-serif;transition:all .15s;letter-spacing:.3px;}
   .game-progress{display:flex;gap:4px;margin-bottom:20px;}
   .game-dot{width:8px;height:8px;border-radius:50%;transition:all .3s;}
 
   /* Activities */
-  .activity-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .activity-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;}
   .activity-card{border-radius:12px;padding:18px 14px;text-align:center;cursor:pointer;transition:all .15s ease;}
   .activity-card:hover{transform:translateY(-4px) scale(1.03);filter:brightness(1.05);}
   .activity-card:active{transform:translateY(1px) scale(.97);}
@@ -203,8 +204,8 @@
   /* Login */
   .login-wrapper{display:flex;align-items:center;justify-content:center;min-height:100%;padding:40px;}
   .login-card{max-width:420px;width:100%;border-radius:16px;padding:40px 36px;text-align:center;transition:all .4s;}
-  .login-logo{font-family:'Arena','Impact','Arial Black',sans-serif;font-size:48px;font-weight:600;margin-bottom:8px;font-style:normal;letter-spacing:3px;text-transform:uppercase;}
-  .login-title{font-size:22px;font-weight:600;margin-bottom:12px;letter-spacing:.5px;text-transform:uppercase;}
+  .login-logo{font-family:'Quicksand',sans-serif;font-size:48px;font-weight:700;margin-bottom:8px;font-style:normal;letter-spacing:3px;text-transform:uppercase;}
+  .login-title{font-family:'Quicksand',sans-serif;font-size:22px;font-weight:700;margin-bottom:12px;letter-spacing:.5px;text-transform:uppercase;}
   .login-desc{font-size:14px;margin-bottom:24px;}
 
   /* Toast */
@@ -246,7 +247,7 @@
   .light .sidebar-sub{color:#8a82a0;}
   .light .nav-item{color:#a09ab0;}
   .light .nav-item:hover{color:#d4c9a8;background:#ffffff0a;}
-  .light .nav-item.active{background:linear-gradient(135deg,#232358,#2a2a68);color:#f5efe0;border-color:#c9a84c44;box-shadow:inset 0 0 12px rgba(201,168,76,.1);text-shadow:1px 1px 0 rgba(0,0,0,.4),2px 2px 2px rgba(0,0,0,.2);}
+  .light .nav-item.active{background:linear-gradient(135deg,#232358,#2a2a68);color:#f5efe0;border-color:#c9a84c44;box-shadow:inset 0 0 12px rgba(201,168,76,.1);}
   .light .nav-icon{color:#c9a84c;}
   .light .sidebar-map{background:#0e0e24;border:1px solid #c9a84c22;}
   .light .sidebar-map-lines::before{border-color:#c9a84c33;}
@@ -257,9 +258,9 @@
   .light .sidebar-stat{color:#d4c9a8;background:#ffffff0a;border:1px solid #c9a84c22;}
 
   /* Top bar / stats */
-  .light .username{color:#3a2818;text-shadow:none;}
-  .light .stat-badge{border:1px solid #c9a84c55;color:#5a4228;background:linear-gradient(135deg,#f5ecd4,#ede4cc);box-shadow:0 2px 4px rgba(0,0,0,.08);text-shadow:none;}
-  .light .hero-heading{color:#2a1810;text-shadow:1px 1px 2px rgba(0,0,0,.08);}
+  .light .username{color:#3a2818;}
+  .light .stat-badge{border:1px solid #c9a84c55;color:#5a4228;background:linear-gradient(135deg,#f5ecd4,#ede4cc);box-shadow:0 2px 4px rgba(0,0,0,.08);}
+  .light .hero-heading{color:#2a1810;}
   .light .hero-sub{color:#6b3a28;}
 
   /* Next step — dark book-themed card */
@@ -267,11 +268,11 @@
   .light .next-step::before{border:1px solid #c9a84c22;margin:4px;}
   .light .next-step-icon{background:#c9a84c22;border:2px solid #c9a84c55;color:#c9a84c;}
   .light .next-step-label{color:#c9a84c;}
-  .light .next-step-title{color:#f5efe0;text-shadow:1px 1px 2px rgba(0,0,0,.25);}
+  .light .next-step-title{color:#f5efe0;}
   .light .next-step-meta{color:#a09ab0;}
-  .light .next-step-btn{background:linear-gradient(135deg,#c9a84c,#b8960a);color:#1a1a3e;box-shadow:0 4px 0 #8a7a0a,0 6px 8px rgba(0,0,0,.25);text-shadow:1px 1px 0 rgba(255,255,255,.3);}
+  .light .next-step-btn{background:#c9a84c;color:#1a1a3e;box-shadow:0 2px 6px rgba(201,168,76,.3);}
 
-  .light .section-title{color:#2a1810;text-shadow:none;}
+  .light .section-title{color:#2a1810;}
   .light .section-link{color:#8b2240;}
 
   /* Module cards — 3D books */
@@ -285,10 +286,10 @@
   /* Cards / search */
   .light .card{background:linear-gradient(135deg,#f8f2e4,#f0e8d4);border:1px solid #c9a84c33;box-shadow:0 2px 8px rgba(0,0,0,.06);}
   .light .card:hover{box-shadow:0 4px 12px rgba(0,0,0,.1);}
-  .light .card-title{color:#2a1810;text-shadow:1px 1px 0 #c9a84c33,2px 2px 2px rgba(0,0,0,.06);}
+  .light .card-title{color:#2a1810;}
   .light .card-sub{color:#5a4a38;}
   .light .search-input{background:#f8f2e4;border-color:#c9a84c55;color:#2a1810;}
-  .light .tab.active{background:#1a1a3e;color:#f5efe0;box-shadow:0 3px 0 #0a0a1e,0 5px 6px rgba(0,0,0,.15);text-shadow:1px 1px 0 rgba(0,0,0,.3);}
+  .light .tab.active{background:#1a1a3e;color:#f5efe0;box-shadow:0 2px 6px rgba(26,26,62,.2);}
   .light .tab{background:#e8dcc0;color:#5a4a38;border-color:#c9a84c33;}
   .light .avatar{background:linear-gradient(135deg,#e8dcc0,#d4c9a8);color:#c9a84c;border:3px solid #c9a84c55;}
   .light .stat-chip.gold{background:linear-gradient(135deg,#f5ecd4,#e8dcc0);color:#c9a84c;border:2px solid #c9a84c44;}
@@ -299,8 +300,8 @@
   .light .level-node.locked{background:#e8dcc0;border-color:#c9a84c44;color:#8a7a60;}
   .light .level-connector{background:#c9a84c55;}
   .light .game-board{background:#f8f2e4;box-shadow:0 4px 20px rgba(0,0,0,.1);border:2px solid #c9a84c33;border-top:4px solid #c9a84c;}
-  .light .game-question{color:#2a1810;text-shadow:1px 1px 0 #c9a84c44,2px 2px 0 #c9a84c22,3px 3px 2px rgba(0,0,0,.08);}
-  .light .game-option{background:#f8f2e4;border-color:#c9a84c44;color:#2a1810;box-shadow:0 3px 0 #c9a84c55,0 5px 6px rgba(0,0,0,.08);text-shadow:1px 1px 0 rgba(201,168,76,.2);}
+  .light .game-question{color:#2a1810;}
+  .light .game-option{background:#f8f2e4;border-color:#c9a84c44;color:#2a1810;box-shadow:0 2px 4px rgba(0,0,0,.06);}
   .light .game-option:hover{border-color:#c9a84c;background:#f5ecd4;}
   .light .game-option.selected{border-color:#1a1a3e;background:#e8dcc0;}
   .light .game-dot{background:#c9a84c44;}
@@ -312,23 +313,23 @@
   .light .breadcrumb{color:#5a4a38;}
   .light .breadcrumb a{color:#8b2240;}
   .light .lesson-content{color:#2a1810;}
-  .light .lesson-content h2{color:#2a1810;text-shadow:1px 1px 0 #c9a84c44,2px 2px 0 #c9a84c22,3px 3px 2px rgba(0,0,0,.08);}
+  .light .lesson-content h2{color:#2a1810;}
   .light .lesson-content blockquote{background:#f5ecd4;color:#5a4a38;border-left-color:#c9a84c;}
   .light .review-hint{background:#f5ecd4;border:1px solid #c9a84c33;color:#5a4a38;}
   .light .activity-card{background:linear-gradient(135deg,#f8f2e4,#f0e8d4);border:1px solid #c9a84c33;}
   .light .activity-icon{background:linear-gradient(135deg,#c9a84c22,#c9a84c11);color:#c9a84c;border:2px solid #c9a84c55;}
-  .light .activity-name{color:#2a1810;text-shadow:1px 1px 0 #c9a84c33,2px 2px 2px rgba(0,0,0,.06);}
+  .light .activity-name{color:#2a1810;}
   .light .activity-desc{color:#5a4a38;}
   .light .activity-link{color:#8b2240;}
   .light .login-card{background:linear-gradient(135deg,#f8f2e4,#efe7d6);border:2px solid #c9a84c44;box-shadow:0 8px 40px rgba(0,0,0,.12);}
-  .light .login-logo{color:#1a1a3e;text-shadow:1px 1px 0 #c9a84c88,2px 2px 0 #b8960a66,3px 3px 0 #a0850a55,4px 4px 0 #8a7a0a44,5px 5px 4px rgba(0,0,0,.2);}
-  .light .login-title{color:#2a1810;text-shadow:1px 1px 0 #c9a84c44,2px 2px 0 #c9a84c22,3px 3px 2px rgba(0,0,0,.1);}
+  .light .login-logo{color:#1a1a3e;}
+  .light .login-title{color:#2a1810;}
   .light .login-desc{color:#5a4a38;}
   .light .toast{background:#1a1a3e;color:#f5efe0;}
-  .light .btn-primary{background:linear-gradient(135deg,#1a1a3e,#22225a);color:#f5efe0;box-shadow:0 4px 0 #0a0a1e,0 6px 8px rgba(0,0,0,.2);text-shadow:1px 1px 0 rgba(0,0,0,.4);}
-  .light .btn-secondary{background:#e8dcc0;color:#2a1810;border:1px solid #c9a84c44;box-shadow:0 3px 0 #c9a84c55,0 5px 6px rgba(0,0,0,.08);text-shadow:1px 1px 0 rgba(201,168,76,.25);}
-  .light .btn-gold{background:linear-gradient(135deg,#c9a84c,#b8960a);color:#2a1810;box-shadow:0 4px 0 #8a7a0a,0 6px 8px rgba(0,0,0,.15);text-shadow:1px 1px 0 rgba(201,168,76,.5);}
-  .light .btn-burgundy{background:linear-gradient(135deg,#8b2240,#6a1830);color:#f5efe0;box-shadow:0 4px 0 #4a1020,0 6px 8px rgba(0,0,0,.2);text-shadow:1px 1px 0 rgba(0,0,0,.4);}
+  .light .btn-primary{background:#1a1a3e;color:#f5efe0;box-shadow:0 2px 6px rgba(26,26,62,.25);}
+  .light .btn-secondary{background:#f5efe0;color:#2a1810;border:2px solid #c9a84c66;box-shadow:0 2px 6px rgba(0,0,0,.08);}
+  .light .btn-gold{background:#c9a84c;color:#2a1810;box-shadow:0 2px 6px rgba(201,168,76,.3);}
+  .light .btn-burgundy{background:#8b2240;color:#f5efe0;box-shadow:0 2px 6px rgba(139,34,64,.25);}
   .light .quill-decor{color:#2a1810;}
 
   /* ===== DARK THEME ===== */
@@ -341,7 +342,7 @@
   .dark .sidebar-sub{color:#8a82a0;}
   .dark .nav-item{color:#8a82a0;}
   .dark .nav-item:hover{color:#d4c9a8;background:#ffffff08;}
-  .dark .nav-item.active{background:linear-gradient(135deg,#1a2a5e44,#2a3a6e44);color:#c9a84c;border-color:#c9a84c33;text-shadow:1px 1px 0 rgba(0,0,0,.5),2px 2px 2px rgba(0,0,0,.25);}
+  .dark .nav-item.active{background:linear-gradient(135deg,#1a2a5e44,#2a3a6e44);color:#c9a84c;border-color:#c9a84c33;}
   .dark .nav-icon{color:#c9a84c;}
   .dark .sidebar-map{background:#0c0c28;border:1px solid #c9a84c22;}
   .dark .sidebar-map-lines::before{border-color:#c9a84c22;}
@@ -352,18 +353,18 @@
   .dark .sidebar-stat{color:#c9a84c;background:#c9a84c11;border:1px solid #c9a84c33;}
   .dark .main{background:linear-gradient(180deg,#141438,#0e0e2c);}
   .dark .main::before{background:linear-gradient(90deg,transparent,#c9a84c22,#c9a84c44,#c9a84c22,transparent);}
-  .dark .username{color:#f5efe0;text-shadow:1px 1px 0 #0a0a1e,2px 2px 2px rgba(0,0,0,.25);}
+  .dark .username{color:#f5efe0;}
   .dark .stat-badge{border:1px solid #c9a84c33;color:#d4c9a8;background:#ffffff08;}
-  .dark .hero-heading{color:#f5efe0;text-shadow:1px 1px 0 #0a0a1e,2px 2px 0 #080818,3px 3px 0 #060614,4px 4px 3px rgba(0,0,0,.3);}
+  .dark .hero-heading{color:#f5efe0;}
   .dark .hero-sub{color:#c9a84c;}
   .dark .next-step{background:linear-gradient(135deg,#1a1a3e,#12122e);border:1px solid #c9a84c33;}
   .dark .next-step::before{border:1px solid #c9a84c11;margin:4px;}
   .dark .next-step-icon{background:#c9a84c22;border:1px solid #c9a84c44;color:#c9a84c;}
   .dark .next-step-label{color:#c9a84c;}
-  .dark .next-step-title{color:#f5efe0;text-shadow:1px 1px 0 rgba(0,0,0,.5),2px 2px 0 rgba(0,0,0,.3),3px 3px 2px rgba(0,0,0,.2);}
+  .dark .next-step-title{color:#f5efe0;}
   .dark .next-step-meta{color:#8a82a0;}
-  .dark .next-step-btn{background:#c9a84c;color:#0a0a1e;box-shadow:0 4px 0 #8a7a0a,0 6px 8px rgba(0,0,0,.3);text-shadow:1px 1px 0 rgba(255,255,255,.25);}
-  .dark .section-title{color:#f5efe0;text-shadow:1px 1px 0 #0a0a1e,2px 2px 0 #080818,3px 3px 2px rgba(0,0,0,.25);}
+  .dark .next-step-btn{background:#c9a84c;color:#0a0a1e;box-shadow:0 2px 6px rgba(201,168,76,.3);}
+  .dark .section-title{color:#f5efe0;}
   .dark .section-link{color:#c9a84c;}
   .dark .module-progress{background:rgba(255,255,255,.12);color:#e8dcc8;}
   .dark .book-border{border-color:rgba(255,255,255,.25);}
@@ -371,10 +372,10 @@
   .dark .footer-row{border-top:1px solid #c9a84c22;color:#8a82a0;}
   .dark .footer-accent{color:#c9a84c;font-style:italic;}
   .dark .card{background:#ffffff06;border:1px solid #c9a84c22;}
-  .dark .card-title{color:#f5efe0;text-shadow:1px 1px 0 #0a0a1e,2px 2px 2px rgba(0,0,0,.2);}
+  .dark .card-title{color:#f5efe0;}
   .dark .card-sub{color:#8a82a0;}
   .dark .search-input{background:#ffffff08;border-color:#c9a84c33;color:#f5efe0;}
-  .dark .tab.active{background:#c9a84c;color:#0a0a1e;box-shadow:0 3px 0 #8a7a0a,0 5px 6px rgba(0,0,0,.25);text-shadow:1px 1px 0 rgba(255,255,255,.2);}
+  .dark .tab.active{background:#c9a84c;color:#0a0a1e;box-shadow:0 2px 6px rgba(201,168,76,.25);}
   .dark .tab{background:#ffffff08;color:#8a82a0;border-color:#c9a84c22;}
   .dark .avatar{background:#1a2a5e;color:#c9a84c;border:2px solid #c9a84c44;}
   .dark .stat-chip.gold{background:#c9a84c22;color:#c9a84c;border:1px solid #c9a84c33;}
@@ -385,8 +386,8 @@
   .dark .level-node.locked{background:#161640;border-color:#ffffff22;color:#8a82a0;}
   .dark .level-connector{background:#c9a84c44;}
   .dark .game-board{background:#161640;box-shadow:0 4px 20px #00000044;border:1px solid #c9a84c22;border-top:4px solid #c9a84c;}
-  .dark .game-question{color:#f5efe0;text-shadow:1px 1px 0 #0a0a1e,2px 2px 0 #080818,3px 3px 2px rgba(0,0,0,.25);}
-  .dark .game-option{background:#161640;border-color:#c9a84c33;color:#f5efe0;box-shadow:0 3px 0 #0a0a20,0 5px 6px rgba(0,0,0,.25);text-shadow:1px 1px 0 rgba(0,0,0,.3);}
+  .dark .game-question{color:#f5efe0;}
+  .dark .game-option{background:#161640;border-color:#c9a84c33;color:#f5efe0;box-shadow:0 2px 4px rgba(0,0,0,.15);}
   .dark .game-option:hover{border-color:#c9a84c;background:#1e1e50;}
   .dark .game-option.selected{border-color:#c9a84c;background:#c9a84c22;}
   .dark .game-dot{background:#ffffff22;}
@@ -400,32 +401,47 @@
   .dark .breadcrumb{color:#8a82a0;}
   .dark .breadcrumb a{color:#c9a84c;}
   .dark .lesson-content{color:#d4c9a8;}
-  .dark .lesson-content h2{color:#f5efe0;text-shadow:1px 1px 0 #0a0a1e,2px 2px 0 #080818,3px 3px 2px rgba(0,0,0,.25);}
+  .dark .lesson-content h2{color:#f5efe0;}
   .dark .lesson-content blockquote{background:#ffffff06;color:#8a82a0;}
   .dark .review-hint{background:#ffffff06;border:1px solid #c9a84c11;color:#8a82a0;}
   .dark .activity-card{background:#161640;border:1px solid #c9a84c22;}
   .dark .activity-icon{background:#c9a84c15;border:2px solid #c9a84c33;color:#c9a84c;}
-  .dark .activity-name{color:#f5efe0;text-shadow:1px 1px 0 #0a0a1e,2px 2px 2px rgba(0,0,0,.2);}
+  .dark .activity-name{color:#f5efe0;}
   .dark .activity-desc{color:#8a82a0;}
   .dark .activity-link{color:#c9a84c;}
   .dark .login-card{background:#161640;border:1px solid #c9a84c22;box-shadow:0 8px 40px #00000044;}
-  .dark .login-logo{color:#c9a84c;text-shadow:1px 1px 0 #0a0a1e,2px 2px 0 #080818,3px 3px 0 #060614,4px 4px 0 #040410,5px 5px 4px rgba(0,0,0,.4);}
-  .dark .login-title{color:#f5efe0;text-shadow:1px 1px 0 #0a0a1e,2px 2px 0 #080818,3px 3px 2px rgba(0,0,0,.25);}
+  .dark .login-logo{color:#c9a84c;}
+  .dark .login-title{color:#f5efe0;}
   .dark .login-desc{color:#8a82a0;}
   .dark .toast{background:#c9a84c;color:#10102e;}
-  .dark .btn-primary{background:#c9a84c;color:#10102e;box-shadow:0 4px 0 #8a7a0a,0 6px 8px rgba(0,0,0,.3);text-shadow:1px 1px 0 rgba(255,255,255,.2);}
-  .dark .btn-secondary{background:#ffffff11;color:#d4c9a8;}
-  .dark .btn-gold{background:#c9a84c;color:#10102e;box-shadow:0 4px 0 #8a7a0a,0 6px 8px rgba(0,0,0,.3);text-shadow:1px 1px 0 rgba(255,255,255,.2);}
-  .dark .btn-burgundy{background:linear-gradient(135deg,#7a1a2e,#9a2a3e);color:#f5efe0;box-shadow:0 4px 0 #4a1020,0 6px 8px rgba(0,0,0,.3);text-shadow:1px 1px 0 rgba(0,0,0,.4);}
+  .dark .btn-primary{background:#c9a84c;color:#10102e;box-shadow:0 2px 6px rgba(201,168,76,.3);}
+  .dark .btn-secondary{background:#ffffff14;color:#d4c9a8;border:1px solid #c9a84c33;}
+  .dark .btn-gold{background:#c9a84c;color:#10102e;box-shadow:0 2px 6px rgba(201,168,76,.3);}
+  .dark .btn-burgundy{background:#8b2240;color:#f5efe0;box-shadow:0 2px 6px rgba(139,34,64,.3);}
   .dark .quill-decor{color:#c9a84c;}
 
-  /* ===== MOBILE RESPONSIVE ===== */
+  /* ===== TABLET (≤1024px) ===== */
+  @media(max-width:1024px){
+    .sidebar{width:220px;min-width:220px;}
+    .nav-btn-img{width:clamp(80px,12vw,130px);}
+    .main{padding:24px 20px;}
+  }
+
+  /* ===== MOBILE (≤768px) — sidebar becomes fixed bottom nav ===== */
   @media(max-width:768px){
     .app{flex-direction:column;height:100vh;}
 
-    /* Sidebar → bottom nav bar */
-    .sidebar{width:100%;min-width:unset;order:2;flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:0;height:auto;flex-shrink:0;}
-    .sidebar-inner{padding:6px 8px;flex-direction:row;align-items:center;gap:4px;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;}
+    /* --- Fixed bottom navigation bar --- */
+    .sidebar{
+      width:100%;min-width:unset;order:2;flex-direction:row;
+      overflow:visible;padding:0;height:auto;flex-shrink:0;
+      position:fixed;bottom:0;left:0;right:0;z-index:50;
+      border-top:1px solid rgba(201,168,76,.25);
+    }
+    .sidebar-inner{
+      padding:4px 0;flex-direction:row;align-items:center;
+      justify-content:space-evenly;gap:0;width:100%;
+    }
     .sidebar-logo{display:none;}
     .sidebar-sub{display:none;}
     .sidebar-border{display:none;}
@@ -433,70 +449,100 @@
     .sidebar-map{display:none;}
     .sidebar-bottom{display:none;}
     .sidebar-stats{display:none;}
-    .nav-list{display:flex;flex-direction:row;gap:4px;flex:unset;overflow-x:auto;-webkit-overflow-scrolling:touch;}
-    .nav-item-img{margin:0 !important;padding:2px 4px !important;}
-    .nav-btn-img{width:65px !important;}
+    .nav-list{
+      display:flex;flex-direction:row;flex:1;
+      justify-content:space-evenly;gap:0;
+    }
+    .nav-item-img{
+      margin:0 !important;padding:6px 4px !important;
+      flex:1;justify-content:center;
+      min-height:48px;
+    }
+    .nav-btn-img{width:clamp(52px,14vw,72px) !important;}
 
-    /* Main content fills screen */
-    .main{flex:1;padding:16px 12px;order:1;overflow-y:auto;}
+    /* Main content — pad bottom for fixed nav */
+    .main{flex:1;padding:16px 16px 72px;order:1;overflow-y:auto;}
 
-    /* JOSE title in main area */
-    .username.brand .jose-title-img{width:140px;}
+    /* Top bar */
+    .username.brand .jose-title-img{width:clamp(110px,30vw,160px);}
     .top-bar{flex-direction:column;align-items:flex-start;gap:8px;}
-    .stats-row{gap:6px;}
-    .stat-badge{padding:4px 10px;font-size:10px;}
 
-    /* Headings */
-    .hero-heading{font-size:18px;}
-    .hero-sub{font-size:12px;margin-bottom:16px;}
-    .section-title{font-size:14px;}
+    /* Typography — fluid */
+    .hero-heading{font-size:clamp(17px,4.5vw,22px);}
+    .hero-sub{font-size:clamp(12px,3vw,14px);margin-bottom:16px;}
+    .section-title{font-size:clamp(13px,3.5vw,16px);}
 
     /* Next step card */
-    .next-step{flex-direction:column;gap:12px;padding:14px;}
-    .next-step-btn{align-self:stretch;text-align:center;}
+    .next-step{flex-direction:column;gap:12px;padding:16px;}
+    .next-step-icon{width:44px;height:44px;font-size:20px;}
+    .next-step-btn{align-self:stretch;text-align:center;padding:12px 20px;}
 
-    /* Books grid → 2 columns */
-    .modules-grid{grid-template-columns:repeat(2,1fr);gap:8px;}
+    /* Books grid — auto-fill handles columns */
     .module-progress{font-size:10px;padding:3px 10px;}
 
-    /* Cards */
-    .card{flex-direction:column;gap:10px;}
-    .btn-wood{width:120px;}
+    /* Cards — buttons wrap below text gracefully */
+    .card{gap:10px;padding:14px 16px;}
+    .card-info{flex:1 1 100%;}
+    .card-actions{flex:0 0 auto;width:100%;justify-content:flex-start;}
 
     /* Game board */
     .game-board{padding:16px;}
-    .game-question{font-size:15px;}
+    .game-question{font-size:clamp(14px,3.8vw,17px);}
     .game-option{padding:12px 14px;font-size:13px;}
 
     /* Profile */
     .stat-chip{min-height:50px;padding:10px 6px;font-size:11px;}
 
     /* Login */
-    .login-card{margin:20px;padding:28px 20px;}
-    .login-logo .jose-title-img{width:180px;}
+    .login-wrapper{padding:20px;}
+    .login-card{margin:0;padding:28px 20px;max-width:100%;}
+    .login-logo .jose-title-img{width:clamp(140px,40vw,200px);}
 
-    /* Lesson content */
+    /* Lesson */
     .lesson-content{font-size:14px;}
-    .lesson-content h2{font-size:17px;}
+    .lesson-content h2{font-size:clamp(16px,4vw,20px);}
 
-    /* Preferences */
-    .pref-row{font-size:13px;}
+    /* Preferences — ensure toggles don't shrink */
+    .pref-row{font-size:13px;gap:12px;}
+    .pref-toggle{flex-shrink:0;}
 
     /* Breadcrumb */
     .breadcrumb{font-size:10px;}
 
     /* Search */
-    .search-input{font-size:13px;}
+    .search-input{font-size:13px;padding:10px 14px;}
+
+    /* Buttons — ensure minimum tap targets (44px) */
+    .btn{min-height:44px;padding:10px 18px;font-size:12px;}
+    .next-step-btn{min-height:44px;}
+    .game-option{min-height:44px;}
+    .tab{min-height:36px;padding:8px 14px;}
   }
 
-  /* Small phones */
+  /* ===== SMALL PHONES (≤380px) ===== */
   @media(max-width:380px){
-    .modules-grid{grid-template-columns:repeat(2,1fr);gap:6px;}
-    .nav-btn-img{width:55px !important;}
-    .main{padding:12px 8px;}
+    .main{padding:12px 10px 68px;}
     .hero-heading{font-size:16px;}
-    .username.brand .jose-title-img{width:120px;}
-    .btn-wood{width:100px;}
+    .username.brand .jose-title-img{width:110px;}
+    .nav-btn-img{width:48px !important;}
+
+    /* Tighter card layout */
+    .card{padding:12px;}
+    .card-actions .btn-wood{width:clamp(70px,20vw,100px);}
+
+    /* Activity grid 2-col on tiny screens */
+    .activity-grid{grid-template-columns:repeat(2,1fr);gap:10px;}
+    .activity-badge-img{width:48px;height:48px;}
+
+    /* Profile stat chips */
+    .stat-chip{padding:8px 4px;font-size:10px;min-height:44px;}
+
+    /* Login */
+    .login-card{padding:24px 16px;}
+
+    /* Game */
+    .game-board{padding:12px;}
+    .game-option{padding:10px 12px;font-size:12px;}
   }
 </style>
 </head>
@@ -513,15 +559,7 @@
       <div class="sidebar-logo"><img class="jose-title-img" src="assets/jose-title.png" alt="Jose" /></div>
       <div class="sidebar-sub" id="sidebar-sub">Learn something new today</div>
       <ul class="nav-list" id="nav-list"></ul>
-      <div class="sidebar-map">
-        <div class="sidebar-map-lines"></div>
-        <span class="sidebar-map-label">Archipelago</span>
-      </div>
       <div class="sidebar-bottom" id="sidebar-bottom-extra"></div>
-      <div class="sidebar-stats">
-        <span class="sidebar-stat"><span style="color:#c9a84c">&#10040;</span> 0 XP</span>
-        <span class="sidebar-stat"><span style="color:#cc3344">&#9829;</span> 5</span>
-      </div>
     </div>
     <div class="sidebar-filigree-bottom"></div>
   </div>
@@ -533,11 +571,6 @@
     <div class="page active" id="page-learn">
       <div class="top-bar">
         <span class="username brand"><img class="jose-title-img" src="assets/jose-title.png" alt="Jose" /></span>
-        <div class="stats-row">
-          <span class="stat-badge xp"><span class="icon" style="color:#c9a84c">&#10040;</span> 0 XP</span>
-          <span class="stat-badge streak"><span class="icon" style="color:#e08040">&#9878;</span> 0</span>
-          <span class="stat-badge hearts"><span class="icon" style="color:#cc3344">&#9829;</span> 5</span>
-        </div>
       </div>
       <h2 class="hero-heading">Let's make some progress!</h2>
       <p class="hero-sub">A little Rizal, a little discovery, every day.</p>
@@ -569,11 +602,6 @@
         <div class="module-wrapper"><div class="module-card m11" onclick="navigate('levels')" title="Module 11: The Retraction"></div><div class="module-progress">0/6</div></div>
         <div class="module-wrapper"><div class="module-card m12" onclick="navigate('levels')" title="Module 12: Eternal Legacy"></div><div class="module-progress">0/6</div></div>
       </div>
-      <div class="footer-row">
-        <span><span style="color:#c9a84c">&#10040;</span> XP &nbsp;&nbsp; <span style="color:#cc3344">&#9829;</span> 0</span>
-        <span class="footer-accent">Refined hearts</span>
-      </div>
-      <div class="quill-decor">&#10002;</div>
     </div>
 
     <!-- PRACTICE PAGE -->
@@ -607,9 +635,9 @@
       <h2 class="hero-heading" style="margin-bottom:16px;">Bookmarks</h2>
       <input class="search-input" placeholder="Search lessons" />
       <div style="margin-top:16px;display:flex;flex-direction:column;gap:12px;">
-        <div class="card" onclick="navigate('lesson')"><div style="flex:1;"><div class="card-title">Why the law was enacted</div><div class="card-sub">The Rizal Law</div><div style="margin-top:6px;font-size:12px;font-weight:500;color:#c9a84c;">&#10003; Completed</div></div><div style="display:flex;gap:8px;align-items:center;"><button class="btn-wood" onclick="event.stopPropagation();navigate('lesson')"><img src="assets/btn-open.png" alt="Open" /></button><button class="btn-wood" onclick="event.stopPropagation();showToast('Bookmark removed')"><img src="assets/btn-remove.png" alt="Remove" /></button></div></div>
-        <div class="card" onclick="navigate('lesson')"><div style="flex:1;"><div class="card-title">Rizal's family and childhood</div><div class="card-sub">Family Childhood</div></div><div style="display:flex;gap:8px;align-items:center;"><button class="btn-wood" onclick="event.stopPropagation();navigate('lesson')"><img src="assets/btn-open.png" alt="Open" /></button><button class="btn-wood" onclick="event.stopPropagation();showToast('Bookmark removed')"><img src="assets/btn-remove.png" alt="Remove" /></button></div></div>
-        <div class="card" onclick="navigate('lesson')"><div style="flex:1;"><div class="card-title">The propaganda movement</div><div class="card-sub">19th Century Philippines</div></div><div style="display:flex;gap:8px;align-items:center;"><button class="btn-wood" onclick="event.stopPropagation();navigate('lesson')"><img src="assets/btn-open.png" alt="Open" /></button><button class="btn-wood" onclick="event.stopPropagation();showToast('Bookmark removed')"><img src="assets/btn-remove.png" alt="Remove" /></button></div></div>
+        <div class="card" onclick="navigate('lesson')"><div class="card-info"><div class="card-title">Why the law was enacted</div><div class="card-sub">The Rizal Law</div><div style="margin-top:6px;font-size:12px;font-weight:500;color:#c9a84c;">&#10003; Completed</div></div><div class="card-actions"><button class="btn-wood" onclick="event.stopPropagation();navigate('lesson')"><img src="assets/btn-open.png" alt="Open" /></button><button class="btn-wood" onclick="event.stopPropagation();showToast('Bookmark removed')"><img src="assets/btn-remove.png" alt="Remove" /></button></div></div>
+        <div class="card" onclick="navigate('lesson')"><div class="card-info"><div class="card-title">Rizal's family and childhood</div><div class="card-sub">Family Childhood</div></div><div class="card-actions"><button class="btn-wood" onclick="event.stopPropagation();navigate('lesson')"><img src="assets/btn-open.png" alt="Open" /></button><button class="btn-wood" onclick="event.stopPropagation();showToast('Bookmark removed')"><img src="assets/btn-remove.png" alt="Remove" /></button></div></div>
+        <div class="card" onclick="navigate('lesson')"><div class="card-info"><div class="card-title">The propaganda movement</div><div class="card-sub">19th Century Philippines</div></div><div class="card-actions"><button class="btn-wood" onclick="event.stopPropagation();navigate('lesson')"><img src="assets/btn-open.png" alt="Open" /></button><button class="btn-wood" onclick="event.stopPropagation();showToast('Bookmark removed')"><img src="assets/btn-remove.png" alt="Remove" /></button></div></div>
       </div>
     </div>
 
@@ -742,7 +770,7 @@
       <div style="max-width:560px;">
         <div class="breadcrumb"><a onclick="navigate('profile')">Profile</a> <span class="sep">/</span> Reading settings</div>
         <h2 class="hero-heading" style="margin-bottom:20px;">Reading settings</h2>
-        <div class="pref-row">Dark mode <div class="pref-toggle" id="dark-pref" onclick="togglePref(this);toggleTheme()"></div></div>
+        <div class="pref-row">Dark mode <div class="pref-toggle off" id="dark-pref" onclick="togglePref(this);toggleTheme()"></div></div>
         <div class="pref-row">Filipino translations <div class="pref-toggle on" onclick="togglePref(this)"></div></div>
         <div class="pref-row">Larger text <div class="pref-toggle off" onclick="togglePref(this)"></div></div>
         <div class="pref-row">Reduced motion <div class="pref-toggle off" onclick="togglePref(this)"></div></div>
@@ -785,7 +813,6 @@ const navConfigs = {
     {id:'practice', label:'Practice'},
     {id:'bookmarks', label:'Bookmarks'},
     {id:'profile', label:'Profile'},
-    {id:'preferences', label:'Settings'},
   ],
   teach: [
     {id:'teach', label:'Modules'},
@@ -821,6 +848,7 @@ function navigate(pageId) {
   const navActive = ['learn','levels','lesson'].includes(pageId) ? 'learn'
     : ['practice','quiz'].includes(pageId) ? 'practice'
     : ['journal'].includes(pageId) ? 'learn'
+    : ['profile','preferences'].includes(pageId) ? 'profile'
     : pageId === 'teach' ? 'teach'
     : pageId;
   buildNav(navType, navActive);
