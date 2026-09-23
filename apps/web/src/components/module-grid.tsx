@@ -1,8 +1,10 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { ContinueLearningCard } from "@/components/continue-learning-card";
+import { moduleBookImage } from "@/lib/ui-assets";
 import type { ContinueLearning, ModuleCard } from "@jose/shared";
-import { ArrowRight, BookOpen, Sparkles, Star } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 export function ModuleGrid({
@@ -54,7 +56,7 @@ export function ModuleGrid({
           <ArrowRight className="size-4" aria-hidden />
         </Link>
       </div>
-      <ul className="grid gap-4 sm:grid-cols-2">
+      <ul className="module-grid">
         {modules.map((mod, index) => {
           const progress = mod.totalCount
             ? Math.min(
@@ -65,57 +67,37 @@ export function ModuleGrid({
           const completed =
             mod.totalCount > 0 && mod.completedCount >= mod.totalCount;
           return (
-            <li key={mod.id}>
+            <li key={mod.id} className="module-wrapper">
               <Link
                 href={`/learn/${mod.id}`}
-                className="learning-card group flex h-full flex-col rounded-3xl border-2 p-5 sm:p-6"
+                className="module-cover-link"
+                aria-label={`${mod.title}. ${completed ? "Completed" : `${mod.completedCount} of ${mod.totalCount} levels complete`}`}
               >
-                <div className="mb-5 flex items-center justify-between gap-3">
-                  <span
-                    className={`lesson-icon lesson-icon--${index % 4} flex size-16 items-center justify-center rounded-2xl transition-transform group-hover:-rotate-6`}
-                    aria-hidden
-                  >
-                    {mod.featured ? (
-                      <Star className="size-8" strokeWidth={2.5} />
-                    ) : (
-                      <BookOpen className="size-8" strokeWidth={2.5} />
-                    )}
-                  </span>
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-[var(--jose-text-muted)]">
-                    {completed ? "Completed" : mod.featured ? "The full story" : `Module ${index + 1}`}
-                  </span>
-                </div>
-                <h3 className="text-2xl font-extrabold leading-tight">
-                  {mod.title}
-                </h3>
-                <p className="mb-5 mt-2 flex-1 text-sm font-semibold leading-relaxed text-[var(--jose-text-muted)]">
-                  {mod.subtitle}
-                </p>
-                <div className="mb-2 flex items-center justify-between text-sm font-bold">
-                  <span className="text-[var(--jose-text-muted)]">
-                    {completed
-                      ? "Review module"
-                      : `${mod.completedCount} / ${mod.totalCount} levels`}
-                  </span>
-                  <ArrowRight
-                    className="size-5 text-[var(--jose-accent)]"
-                    aria-hidden
-                  />
-                </div>
-                <div
-                  role="progressbar"
-                  aria-label={`${mod.title} progress`}
-                  aria-valuenow={progress}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  className="h-3 overflow-hidden rounded-full bg-[var(--jose-surface-control)]"
-                >
-                  <div
-                    className="h-full rounded-full bg-[var(--jose-green)]"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
+                <img
+                  src={moduleBookImage(index)}
+                  alt=""
+                  aria-hidden
+                  className="book-cover-img"
+                />
+                <span className="sr-only">{mod.title}</span>
               </Link>
+              <div className="module-progress-label">
+                <span className="min-w-0 truncate">{mod.title}</span>
+                <span>{completed ? "Complete" : `${progress}%`}</span>
+              </div>
+              <div
+                role="progressbar"
+                aria-label={`${mod.title} progress`}
+                aria-valuenow={progress}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                className="module-progress-track"
+              >
+                <div
+                  className="module-progress-fill"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
             </li>
           );
         })}

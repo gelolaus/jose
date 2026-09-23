@@ -1,15 +1,18 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { JoseShell } from "@/components/jose-shell";
+import { TopBar } from "@/components/top-bar";
 import { t } from "@/lib/reading-preferences";
 import { JoseSessionProvider, useJoseSession } from "@/lib/use-jose-session";
 import { useReadingPreferences } from "@/lib/use-reading-preferences";
+import { NAVIGATION_IMAGES } from "@/lib/ui-assets";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   BookMarked,
   Map,
-  Settings,
   Sparkles,
   UserRound,
   Wrench,
@@ -53,11 +56,19 @@ function AppShellBody({
   topBar?: ReactNode;
 }) {
   const prefs = useReadingPreferences();
-  const { canTeach } = useJoseSession();
+  const { canTeach, learner } = useJoseSession();
+  const pathname = usePathname();
+  const showStatusHud = isActive(pathname, "/learn");
+  const statusBar = showStatusHud
+    ? (topBar ??
+      (learner ? (
+        <TopBar courseTitle="Jose" streak={learner.streak} hearts={learner.hearts} xp={learner.xp} />
+      ) : undefined))
+    : undefined;
 
   return (
     <JoseShell
-      topBar={topBar}
+      topBar={statusBar}
       brandSubtitle="Learn something new today"
       tabs={tabDefs.map((tab) => ({
         href: tab.href,
@@ -77,12 +88,20 @@ function AppShellBody({
           : []
       }
       footer={
-        <Link
-          href="/profile/preferences"
-          className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-[var(--jose-text-muted)]"
-        >
-          <Settings className="size-5" aria-hidden /> Settings
-        </Link>
+        <div className={`nav-item-img ${isActive(pathname, "/profile/preferences") ? "active" : ""}`}>
+          <Link
+            href="/profile/preferences"
+            className="nav-image-link"
+            aria-label="Settings"
+            aria-current={isActive(pathname, "/profile/preferences") ? "page" : undefined}
+          >
+            <img
+              src={NAVIGATION_IMAGES["/profile/preferences"]}
+              alt="Settings"
+              className="nav-btn-img"
+            />
+          </Link>
+        </div>
       }
     >
       {children}

@@ -1,8 +1,10 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { completeMockLogin, fetchAuthStatus } from "@/lib/auth-api";
+import { JOSE_TITLE_IMAGE } from "@/lib/ui-assets";
 
 const PRESETS = [
   {
@@ -109,7 +111,13 @@ export function MockIdentityPicker() {
       <main className="jose-login">
         <div className="jose-login__glow" aria-hidden />
         <section className="jose-login__card">
-          <p className="jose-login__brand">Jose</p>
+          <div className="login-logo">
+            <img
+              src={JOSE_TITLE_IMAGE}
+              alt="Jose"
+              className="jose-title-img jose-title-img--login"
+            />
+          </div>
           <h1>Mock login is off</h1>
           <p className="jose-login__lead">
             This server does not run test identities. Sign in with your APC Microsoft
@@ -127,7 +135,13 @@ export function MockIdentityPicker() {
     <main className="jose-login">
       <div className="jose-login__glow" aria-hidden />
       <section className="jose-login__card">
-        <p className="jose-login__brand">Jose</p>
+        <div className="login-logo">
+          <img
+            src={JOSE_TITLE_IMAGE}
+            alt="Jose"
+            className="jose-title-img jose-title-img--login"
+          />
+        </div>
         <h1>Mock Microsoft identities</h1>
         <p className="jose-login__lead">
           Local Entra stand-in. Pick an identity to exercise admission, denial, and consent states.

@@ -1,12 +1,12 @@
 "use client";
 
 import { ExplorerAvatar } from "@/components/explorer-avatar";
+import { StatusHud } from "@/components/status-hud";
 import { logoutJose } from "@/lib/auth-api";
 import { clearSensitiveClientState, isAvatarId } from "@/lib/explorer-identity";
 import { useExplorerIdentity } from "@/lib/use-explorer-identity";
 import { useJoseSession } from "@/lib/use-jose-session";
 import type { ProfileStatsResponse } from "@jose/shared";
-import { Flame, Heart, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -27,7 +27,7 @@ export function ProfileShowcase({
       ? stats.learner.avatarId
       : identity.avatarId;
   const displayName = stats.learner.displayName || identity.displayName;
-  const { streak, hearts, xp } = stats.learner;
+  const { hearts, streak, xp } = stats.learner;
 
   async function onSignOut() {
     setSigningOut(true);
@@ -59,27 +59,7 @@ export function ProfileShowcase({
         </Link>
       </section>
 
-      <section aria-label="Stats" className="grid grid-cols-3 gap-3">
-        <StatChip tone="sky" icon={Zap} label={`${xp} XP`} name={`${xp} experience points`} />
-        <StatChip
-          tone="coral"
-          icon={Flame}
-          label={`${streak}`}
-          name={`${streak} day streak`}
-        />
-        <StatChip
-          tone="rose"
-          icon={Heart}
-          label={`${hearts}`}
-          name={`${hearts} lives`}
-        />
-      </section>
-      <LivesCountdown
-        hearts={hearts}
-        heartsUpdatedAt={stats.learner.heartsUpdatedAt}
-        nextHeartAt={stats.learner.nextHeartAt}
-        serverNow={stats.learner.serverNow}
-      />
+      <StatusHud xp={xp} streak={streak} hearts={hearts} variant="profile" />
 
       <section aria-labelledby="settings-heading" className="space-y-2">
         <h2 id="settings-heading" className="text-sm font-extrabold uppercase tracking-wide text-[var(--jose-ink-muted)]">
@@ -93,6 +73,13 @@ export function ProfileShowcase({
           ) : null}
         </ul>
       </section>
+
+      <LivesCountdown
+        hearts={hearts}
+        heartsUpdatedAt={stats.learner.heartsUpdatedAt}
+        nextHeartAt={stats.learner.nextHeartAt}
+        serverNow={stats.learner.serverNow}
+      />
 
       {!loading && !authenticated ? (
         <Link href="/login" className="jose-button text-center">
@@ -126,33 +113,5 @@ function SettingsLink({ href, label }: { href: string; label: string }) {
         {label}
       </Link>
     </li>
-  );
-}
-
-function StatChip({
-  label,
-  tone,
-  icon: Icon,
-  name,
-}: {
-  label: string;
-  tone: "sky" | "coral" | "rose";
-  icon: typeof Zap;
-  name: string;
-}) {
-  const tones = {
-    sky: "bg-[#e8dcc0] text-[#c9a84c]",
-    coral: "bg-[#f0d4c4] text-[#a0522d]",
-    rose: "bg-[#f0d8de] text-[#7a1a2e]",
-  };
-  return (
-    <span
-      role="status"
-      aria-label={name}
-      className={`flex min-h-11 flex-col items-center justify-center rounded-2xl px-2 py-3 text-sm font-extrabold tabular-nums ${tones[tone]}`}
-    >
-      <Icon className="size-5" strokeWidth={2.25} aria-hidden />
-      <span aria-hidden>{label}</span>
-    </span>
   );
 }
