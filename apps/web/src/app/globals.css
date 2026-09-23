@@ -1492,10 +1492,10 @@ html[data-theme="dark"] .path-node-label {
   --sheet-ink: #3b2419;
   --sheet-wood: #75412b;
   position: relative;
-  width: min(100% - 2rem, 72rem);
-  min-height: min(50rem, calc(100vh - 7rem));
-  margin: clamp(1rem, 3vw, 2.25rem) auto;
-  padding: clamp(0.7rem, 2.5vw, 1.6rem);
+  width: min(100% - 1.5rem, 82rem);
+  min-height: min(42rem, calc(100dvh - 2rem));
+  margin: clamp(0.75rem, 2vw, 1.5rem) auto;
+  padding: clamp(0.6rem, 1.8vw, 1.2rem);
   color: var(--sheet-ink);
   background: #d8ad71;
   border: 6px solid #432619;
@@ -1527,8 +1527,8 @@ html[data-theme="dark"] .path-node-label {
   display: flex;
   min-height: inherit;
   flex-direction: column;
-  gap: clamp(1.2rem, 2.8vw, 2rem);
-  padding: clamp(2.6rem, 5vw, 3.7rem) clamp(0.8rem, 2.7vw, 2.4rem) clamp(1.2rem, 3vw, 2rem);
+  gap: clamp(0.9rem, 2vw, 1.5rem);
+  padding: clamp(2.2rem, 3vw, 2.9rem) clamp(0.8rem, 2.2vw, 2rem) clamp(1rem, 2vw, 1.5rem);
   background: #f2d9a8 url("/assets/ui/profile/papyrus-tile.png") repeat;
   background-size: 330px 330px;
   border: 3px solid #5f3523;
@@ -1689,54 +1689,113 @@ html[data-theme="dark"] .path-node-label {
 
 .profile-sheet__lower {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 270px);
-  align-items: end;
-  gap: clamp(1rem, 3vw, 2rem);
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 285px);
+  align-items: stretch;
+  gap: clamp(0.75rem, 2vw, 1.5rem);
   flex: 1;
 }
 
-.profile-sheet__milestones {
-  max-width: 33rem;
-  margin: 2rem auto 0;
-  text-align: center;
+.profile-sheet__bookshelf {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 13rem;
+  flex-direction: column;
+  padding: clamp(0.7rem, 1.4vw, 1rem);
+  background: linear-gradient(180deg, #a87249 0 9%, #5a3328 9% 80%, #7b4a30 80% 91%, #42271e 91%);
+  border: 5px solid #4d2b20;
+  box-shadow: inset 0 0 0 3px #d2a171, inset 0 0 0 7px #70402d, 5px 6px 0 rgb(56 31 20 / 30%);
 }
 
-.profile-sheet__milestones h2,
+.profile-sheet__shelf-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.25rem 0.4rem;
+  color: #ffedc7;
+  text-shadow: 1px 2px #2b1913;
+}
+
+.profile-sheet__shelf-heading span { font-size: 0.74rem; white-space: nowrap; }
+
+.profile-sheet__shelf-heading h2,
 .profile-sheet__panel h2 {
-  margin: 0 0 0.7rem;
-  font-size: 0.9rem;
+  margin: 0;
+  font-size: 0.94rem;
   font-weight: 700;
-  text-align: center;
 }
 
-.profile-sheet__milestone-rail {
+.profile-sheet__book-list {
   display: flex;
+  min-height: 0;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: clamp(0.7rem, 2vw, 1.3rem);
-  padding: 0.9rem 1rem;
-  background: linear-gradient(#c18b56 0 22%, #8c5636 22% 78%, #5c3828 78%);
-  border: 4px solid #4f2f20;
-  box-shadow: inset 0 0 0 2px #dfb07a, 0 5px 0 rgb(58 33 20 / 30%);
+  align-content: center;
+  align-items: end;
+  justify-content: flex-start;
+  gap: clamp(0.5rem, 1.5vw, 1rem);
+  flex: 1;
+  margin: 0.3rem 0 0;
+  padding: 0.55rem;
+  list-style: none;
+  background: rgb(41 22 18 / 46%);
+  border: 3px solid #d2a171;
+  box-shadow: inset 0 0 0 3px #603828;
 }
 
-.profile-sheet__milestone {
+.profile-sheet__book-list li { min-width: 0; }
+
+.profile-sheet__book-list a {
   display: flex;
-  min-width: 5rem;
+  width: clamp(64px, 7vw, 90px);
+  min-height: 44px;
   flex-direction: column;
   align-items: center;
-  color: #fff0d2;
-  font-size: 0.78rem;
-  text-shadow: 1px 1px #382218;
+  gap: 0.3rem;
+  color: #fff0d1;
+  font-size: 0.68rem;
+  text-align: center;
+  text-decoration: none;
+  text-shadow: 1px 1px #2c1710;
 }
 
-.profile-sheet__milestone img {
+.profile-sheet__book-list a:hover { text-decoration: underline; }
+
+.profile-sheet__book-cover {
   display: block;
-  width: 44px;
-  height: 44px;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 470 / 610;
   object-fit: contain;
   image-rendering: pixelated;
+  filter: drop-shadow(2px 4px 2px rgb(0 0 0 / 45%));
+  transition: transform .15s ease, filter .15s ease;
 }
+
+.profile-sheet__book-list a:hover .profile-sheet__book-cover { transform: translateY(-4px); filter: brightness(1.12) drop-shadow(3px 6px 4px rgb(0 0 0 / 45%)); }
+.profile-sheet__book-list a:active .profile-sheet__book-cover { transform: translateY(1px) scale(0.96); }
+.profile-sheet__book-list a span { display: -webkit-box; max-width: 100%; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+.profile-sheet__shelf-empty {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 0.3rem;
+  padding: 0.8rem;
+  background: rgb(41 22 18 / 46%);
+  border: 3px solid #d2a171;
+  box-shadow: inset 0 0 0 3px #603828;
+  color: #fff0d1;
+  text-align: center;
+}
+
+.profile-sheet__shelf-empty p { margin: 0; font-size: 1rem; }
+.profile-sheet__shelf-empty span { max-width: 30rem; font-size: 0.78rem; }
+.profile-sheet__shelf-empty a { min-height: 44px; padding: 0.5rem; color: #ffe7a8; font-size: 0.82rem; text-decoration: underline; }
 
 .profile-sheet__side {
   display: flex;
@@ -1744,6 +1803,8 @@ html[data-theme="dark"] .path-node-label {
   gap: 0.9rem;
   align-self: end;
 }
+
+.profile-sheet__panel h2 { margin-bottom: 0.65rem; text-align: center; }
 
 .profile-sheet__panel {
   min-width: 0;
@@ -1784,16 +1845,13 @@ html[data-theme="dark"] .path-node-label {
   .profile-sheet { width: min(100% - 1rem, 42rem); min-height: 0; margin-block: 1rem; padding: 0.55rem; }
   .profile-sheet__inner { gap: 1.4rem; padding: 2.2rem 0.75rem 1.2rem; }
   .profile-sheet__lower { grid-template-columns: minmax(0, 1fr); }
-  .profile-sheet__milestones { margin-top: 0; }
+  .profile-sheet__bookshelf { min-height: 12rem; }
   .profile-sheet__side { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; }
 }
 
 @media (max-width: 520px) {
-  .profile-sheet__side { grid-template-columns: minmax(0, 1fr); }
   .profile-sheet__hud-row .jose-status-hud--profile { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .profile-sheet__milestone-rail { gap: 0.5rem; padding: 0.7rem 0.4rem; }
-  .profile-sheet__milestone { min-width: 4.3rem; font-size: 0.6rem; }
-  .profile-sheet__milestone img { width: 34px; height: 34px; }
+  .profile-sheet__book-list a { width: clamp(64px, 18vw, 78px); }
   .profile-sheet__actions { gap: 0.5rem; }
   .profile-sheet__actions .profile-sheet__wood-button { min-width: 8rem; }
 }
