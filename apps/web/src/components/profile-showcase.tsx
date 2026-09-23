@@ -1,7 +1,9 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { ExplorerAvatar } from "@/components/explorer-avatar";
+import { LivesCountdown } from "@/components/lives-countdown";
 import { StatusHud } from "@/components/status-hud";
+import { getAvatarOption } from "@/lib/avatar-catalog";
 import { logoutJose } from "@/lib/auth-api";
 import { clearSensitiveClientState, isAvatarId } from "@/lib/explorer-identity";
 import { useExplorerIdentity } from "@/lib/use-explorer-identity";
@@ -10,13 +12,8 @@ import type { ProfileStatsResponse } from "@jose/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { LivesCountdown } from "@/components/lives-countdown";
 
-export function ProfileShowcase({
-  stats,
-}: {
-  stats: ProfileStatsResponse;
-}) {
+export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
   const identity = useExplorerIdentity(stats.learner.displayName);
   const { authenticated, canAdmin, loading, user } = useJoseSession();
   const router = useRouter();
@@ -26,8 +23,17 @@ export function ProfileShowcase({
     stats.learner.avatarId && isAvatarId(stats.learner.avatarId)
       ? stats.learner.avatarId
       : identity.avatarId;
+  const avatar = getAvatarOption(avatarId);
+  const AvatarEmblem = avatar.icon;
   const displayName = stats.learner.displayName || identity.displayName;
   const { hearts, streak, xp } = stats.learner;
+  const latestAchievements = stats.achievements
+    .filter((achievement) => achievement.unlocked)
+    .sort((a, b) => (b.earnedAt ?? 0) - (a.earnedAt ?? 0))
+    .slice(0, 2);
+  const inProgressModule = stats.modules.find(
+    (module) => module.completedCount > 0 && module.completedCount < module.totalCount,
+  );
 
   async function onSignOut() {
     setSigningOut(true);
@@ -41,77 +47,121 @@ export function ProfileShowcase({
   }
 
   return (
-    <div className="jose-surface mx-auto flex w-full max-w-xl flex-col gap-8 px-5 py-8 sm:px-8 sm:py-10">
-      <section className="flex flex-col items-center gap-4 text-center">
-        <ExplorerAvatar avatarId={avatarId} floating />
-        <div className="space-y-1.5">
-          <h1 className="font-display text-4xl font-semibold tracking-tight text-[var(--jose-ink)]">
-            {displayName}
-          </h1>
+    <main className="profile-sheet" aria-label="Character sheet">
+      <div className="profile-sheet__inner">
+        <div className="profile-sheet__crest" aria-hidden="true">✦ Character Sheet ✦</div>
+
+        <section className="profile-sheet__core" aria-labelledby="profile-name">
+          <div className="profile-sheet__avatar-frame">
+            <img
+              src="/assets/ui/profile/warrior-avatar.png"
+              alt="Pixel-art Filipino warrior avatar"
+              className="profile-sheet__avatar-img"
+            />
+            <span className="profile-sheet__avatar-emblem" title={`Selected emblem: ${avatar.label}`}>
+              <AvatarEmblem aria-hidden="true" size={18} strokeWidth={2.5} />
+              <span className="sr-only">Selected emblem: {avatar.label}</span>
+            </span>
+          </div>
+          <h1 id="profile-name" className="profile-sheet__name">{displayName}</h1>
           {user?.admissionEmail ? (
-            <p className="text-sm font-semibold text-[var(--jose-ink-muted)]">
-              {user.admissionEmail}
-            </p>
+            <p className="profile-sheet__email">{user.admissionEmail}</p>
+          ) : null}
+
+          <div className="profile-sheet__hud-row">
+            <StatusHud xp={xp} streak={streak} hearts={hearts} variant="profile" />
+            <details className="profile-sheet__lives-help">
+              <summary aria-label="About lives">i</summary>
+              <div className="profile-sheet__lives-popover">
+                <strong>Lives</strong>
+                <p>{stats.rules.hearts}</p>
+                <LivesCountdown
+                  hearts={hearts}
+                  heartsUpdatedAt={stats.learner.heartsUpdatedAt}
+                  nextHeartAt={stats.learner.nextHeartAt}
+                  serverNow={stats.learner.serverNow}
+                />
+              </div>
+            </details>
+          </div>
+          <Link href="/profile/edit" className="profile-sheet__wood-button profile-sheet__wood-button--small">
+            Customize Avatar
+          </Link>
+        </section>
+
+        <div className="profile-sheet__lower">
+          <section className="profile-sheet__milestones" aria-labelledby="milestones-heading">
+            <h2 id="milestones-heading">Journey Milestones</h2>
+            <div className="profile-sheet__milestone-rail">
+              <span className="profile-sheet__milestone" title={`${stats.totals.completedLevels} levels completed`}>
+                <img src="/assets/path-book-pixel.png" alt="" />
+                <span>{stats.totals.completedLevels} levels</span>
+              </span>
+              <span className="profile-sheet__milestone" title={`${stats.totals.chestsOpened} chests opened`}>
+                <img src="/assets/path-chest-pixel.png" alt="" />
+                <span>{stats.totals.chestsOpened} treasures</span>
+              </span>
+              <span className="profile-sheet__milestone" title={`${stats.achievements.filter((achievement) => achievement.unlocked).length} badges earned`}>
+                <img src="/assets/ui/hud/agimat-sun.png" alt="" />
+                <span>{stats.achievements.filter((achievement) => achievement.unlocked).length} badges</span>
+              </span>
+            </div>
+          </section>
+
+          <aside className="profile-sheet__side" aria-label="Status and settings">
+            <section className="profile-sheet__panel" aria-labelledby="activity-heading">
+              <h2 id="activity-heading">Adventure Log</h2>
+              <ul className="profile-sheet__log">
+                {latestAchievements.map((achievement) => (
+                  <li key={achievement.id}>
+                    <img src="/assets/ui/hud/agimat-sun.png" alt="" />
+                    <span>Earned: {achievement.title}</span>
+                  </li>
+                ))}
+                {inProgressModule ? (
+                  <li>
+                    <img src="/assets/path-book-pixel.png" alt="" />
+                    <span>{inProgressModule.title}: {inProgressModule.completedCount}/{inProgressModule.totalCount} levels</span>
+                  </li>
+                ) : null}
+                <li>
+                  <img src="/assets/ui/hud/kalan-fire.png" alt="" />
+                  <span>Current streak: {streak} {streak === 1 ? "day" : "days"}</span>
+                </li>
+              </ul>
+            </section>
+
+            <section className="profile-sheet__panel profile-sheet__panel--help" aria-labelledby="account-heading">
+              <h2 id="account-heading">Account &amp; Help</h2>
+              <ul className="profile-sheet__links">
+                <li><Link href="/profile/preferences"><span aria-hidden="true">⚙</span> Account Settings</Link></li>
+                <li><Link href="/learn#classes"><span aria-hidden="true">▣</span> My Classes</Link></li>
+                {!loading && canAdmin ? (
+                  <li><Link href="/admin/teachers"><span aria-hidden="true">▣</span> Manage Teachers</Link></li>
+                ) : null}
+                <li>
+                  <details>
+                    <summary><span aria-hidden="true">?</span> Help</summary>
+                    <p>{stats.rules.xp} {stats.rules.streak}</p>
+                  </details>
+                </li>
+              </ul>
+            </section>
+          </aside>
+        </div>
+
+        <div className="profile-sheet__actions">
+          <Link href="/profile/edit" className="profile-sheet__wood-button">Edit Profile</Link>
+          {!loading && authenticated ? (
+            <button type="button" onClick={onSignOut} disabled={signingOut} className="profile-sheet__wood-button">
+              {signingOut ? "Signing out…" : "Sign Out"}
+            </button>
+          ) : null}
+          {!loading && !authenticated ? (
+            <Link href="/login" className="profile-sheet__wood-button">School sign-in</Link>
           ) : null}
         </div>
-        <Link href="/profile/edit" className="jose-button">
-          Edit profile
-        </Link>
-      </section>
-
-      <StatusHud xp={xp} streak={streak} hearts={hearts} variant="profile" />
-
-      <section aria-labelledby="settings-heading" className="space-y-2">
-        <h2 id="settings-heading" className="text-sm font-extrabold uppercase tracking-wide text-[var(--jose-ink-muted)]">
-          Settings
-        </h2>
-        <ul className="flex flex-col gap-2">
-          <SettingsLink href="/profile/preferences" label="Reading settings" />
-          <SettingsLink href="/learn#classes" label="My classes" />
-          {!loading && canAdmin ? (
-            <SettingsLink href="/admin/teachers" label="Manage teachers" />
-          ) : null}
-        </ul>
-      </section>
-
-      <LivesCountdown
-        hearts={hearts}
-        heartsUpdatedAt={stats.learner.heartsUpdatedAt}
-        nextHeartAt={stats.learner.nextHeartAt}
-        serverNow={stats.learner.serverNow}
-      />
-
-      {!loading && !authenticated ? (
-        <Link href="/login" className="jose-button text-center">
-          School sign-in
-        </Link>
-      ) : null}
-
-      {!loading && authenticated ? (
-        <button
-          type="button"
-          onClick={onSignOut}
-          disabled={signingOut}
-          className="min-h-11 rounded-full bg-white px-6 py-3 text-base font-extrabold text-slate-600 shadow-sm ring-1 ring-black/10 disabled:opacity-60"
-        >
-          {signingOut ? "Signing out…" : "Sign out"}
-        </button>
-      ) : null}
-
-      <p className="text-sm text-[var(--jose-ink-muted)]">{stats.rules.hearts}</p>
-    </div>
-  );
-}
-
-function SettingsLink({ href, label }: { href: string; label: string }) {
-  return (
-    <li>
-      <Link
-        href={href}
-        className="flex min-h-11 items-center rounded-2xl bg-white px-4 py-3 text-base font-extrabold ring-1 ring-black/5"
-      >
-        {label}
-      </Link>
-    </li>
+      </div>
+    </main>
   );
 }

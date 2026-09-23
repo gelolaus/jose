@@ -40,15 +40,18 @@ const stats = {
 
 describe("ProfileShowcase", () => {
   afterEach(() => cleanup());
-  it("places the learner HUD between Edit profile and Settings", () => {
+  it("shows live stats, avatar controls, and the account panel in the character sheet", () => {
     render(<ProfileShowcase stats={stats} />);
     const editProfile = screen.getByRole("link", { name: "Edit profile" });
     const hud = screen.getByLabelText("Learner status");
-    const settings = screen.getByRole("heading", { name: "Settings" });
+    const account = screen.getByRole("heading", { name: "Account & Help" });
 
     expect(hud).toHaveClass("jose-status-hud--profile");
-    expect(editProfile.compareDocumentPosition(hud) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(hud.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Customize Avatar" })).toHaveAttribute("href", "/profile/edit");
+    expect(screen.getByRole("status", { name: "10 experience points" })).toBeInTheDocument();
+    expect(screen.getByText("Current streak: 1 day")).toBeInTheDocument();
+    expect(hud.compareDocumentPosition(account) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(account.compareDocumentPosition(editProfile) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("never renders Teacher area for teachers; admins keep Manage teachers", () => {
