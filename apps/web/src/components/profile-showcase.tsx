@@ -6,6 +6,7 @@ import { StatusHud } from "@/components/status-hud";
 import { getAvatarOption } from "@/lib/avatar-catalog";
 import { logoutJose } from "@/lib/auth-api";
 import { clearSensitiveClientState, isAvatarId } from "@/lib/explorer-identity";
+import { moduleBookImage } from "@/lib/ui-assets";
 import { useExplorerIdentity } from "@/lib/use-explorer-identity";
 import { useJoseSession } from "@/lib/use-jose-session";
 import type { ProfileStatsResponse } from "@jose/shared";
@@ -34,6 +35,9 @@ export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
   const inProgressModule = stats.modules.find(
     (module) => module.completedCount > 0 && module.completedCount < module.totalCount,
   );
+  const completedBooks = stats.modules
+    .map((module, index) => ({ module, cover: moduleBookImage(index) }))
+    .filter(({ module }) => module.totalCount > 0 && module.completedCount >= module.totalCount);
 
   async function onSignOut() {
     setSigningOut(true);
@@ -90,22 +94,29 @@ export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
         </section>
 
         <div className="profile-sheet__lower">
-          <section className="profile-sheet__milestones" aria-labelledby="milestones-heading">
-            <h2 id="milestones-heading">Journey Milestones</h2>
-            <div className="profile-sheet__milestone-rail">
-              <span className="profile-sheet__milestone" title={`${stats.totals.completedLevels} levels completed`}>
-                <img src="/assets/path-book-pixel.png" alt="" />
-                <span>{stats.totals.completedLevels} levels</span>
-              </span>
-              <span className="profile-sheet__milestone" title={`${stats.totals.chestsOpened} chests opened`}>
-                <img src="/assets/path-chest-pixel.png" alt="" />
-                <span>{stats.totals.chestsOpened} treasures</span>
-              </span>
-              <span className="profile-sheet__milestone" title={`${stats.achievements.filter((achievement) => achievement.unlocked).length} badges earned`}>
-                <img src="/assets/ui/hud/agimat-sun.png" alt="" />
-                <span>{stats.achievements.filter((achievement) => achievement.unlocked).length} badges</span>
-              </span>
+          <section className="profile-sheet__bookshelf" aria-labelledby="completed-books-heading">
+            <div className="profile-sheet__shelf-heading">
+              <h2 id="completed-books-heading">Completed Books</h2>
+              <span>{completedBooks.length} / {stats.modules.length}</span>
             </div>
+            {completedBooks.length > 0 ? (
+              <ul className="profile-sheet__book-list">
+                {completedBooks.map(({ module, cover }) => (
+                  <li key={module.moduleId}>
+                    <Link href={`/learn/${module.moduleId}`} aria-label={`${module.title}, completed book`}>
+                      <img src={cover} alt="" className="profile-sheet__book-cover" />
+                      <span>{module.title}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="profile-sheet__shelf-empty">
+                <p>No completed books yet</p>
+                <span>Finish every level in a module to add its book to this shelf.</span>
+                <Link href="/learn">Explore modules</Link>
+              </div>
+            )}
           </section>
 
           <aside className="profile-sheet__side" aria-label="Status and settings">
