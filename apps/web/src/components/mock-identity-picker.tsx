@@ -142,7 +142,7 @@ export function MockIdentityPicker() {
             className="jose-title-img jose-title-img--login"
           />
         </div>
-        <h1>Mock Microsoft identities</h1>
+        <h1>Microsoft identities</h1>
         <p className="jose-login__lead">
           Local Entra stand-in. Pick an identity to exercise admission, denial, and consent states.
         </p>

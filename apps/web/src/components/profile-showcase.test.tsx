@@ -40,15 +40,37 @@ const stats = {
 
 describe("ProfileShowcase", () => {
   afterEach(() => cleanup());
-  it("places the learner HUD between Edit profile and Settings", () => {
+  it("shows live stats, avatar controls, and the account panel in the character sheet", () => {
     render(<ProfileShowcase stats={stats} />);
     const editProfile = screen.getByRole("link", { name: "Edit profile" });
     const hud = screen.getByLabelText("Learner status");
-    const settings = screen.getByRole("heading", { name: "Settings" });
+    const account = screen.getByRole("heading", { name: "Account & Help" });
 
     expect(hud).toHaveClass("jose-status-hud--profile");
-    expect(editProfile.compareDocumentPosition(hud) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(hud.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Customize Avatar" })).toHaveAttribute("href", "/profile/edit");
+    expect(screen.getByRole("status", { name: "10 experience points" })).toBeInTheDocument();
+    expect(screen.getByText("Current streak: 1 day")).toBeInTheDocument();
+    expect(screen.getByText("No completed books yet")).toBeInTheDocument();
+    expect(hud.compareDocumentPosition(account) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(account.compareDocumentPosition(editProfile) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shelves only fully completed modules with their matching Learn cover", () => {
+    render(<ProfileShowcase stats={{
+      ...stats,
+      modules: [
+        { moduleId: "partial", title: "In progress", featured: true, completedCount: 2, totalCount: 3, coverColor: "#44a" },
+        { moduleId: "finished", title: "Finished story", featured: false, completedCount: 3, totalCount: 3, coverColor: "#a44" },
+        { moduleId: "empty", title: "Empty module", featured: false, completedCount: 0, totalCount: 0, coverColor: "#4a4" },
+      ],
+    }} />);
+
+    const book = screen.getByRole("link", { name: "Finished story, completed book" });
+    expect(book).toHaveAttribute("href", "/learn/finished");
+    expect(book.querySelector("img")).toHaveAttribute("src", "/assets/ui/books/02-hero-then-now.png");
+    expect(screen.queryByRole("link", { name: /In progress, completed book/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Empty module, completed book/ })).toBeNull();
+    expect(screen.queryByText("No completed books yet")).toBeNull();
   });
 
   it("never renders Teacher area for teachers; admins keep Manage teachers", () => {
