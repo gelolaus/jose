@@ -10,6 +10,7 @@ import {
   modulesResponseSchema,
   pathResponseSchema,
   type SessionUser,
+  UNLIMITED_LEARNING,
 } from "@jose/shared";
 import { eq } from "drizzle-orm";
 import { AppModule } from "../app.module";
@@ -28,6 +29,10 @@ function teacherUser(account: TestAccount): SessionUser {
     suspended: false,
   };
 }
+
+// Some economy rules only exist in one learning mode (see UNLIMITED_LEARNING).
+const itLimited = UNLIMITED_LEARNING ? it.skip : it;
+const itUnlimited = UNLIMITED_LEARNING ? it : it.skip;
 
 describe("CurriculumService", () => {
   let service: CurriculumService;
@@ -133,7 +138,7 @@ describe("CurriculumService", () => {
     expect(after.some((row) => row.id === created.id)).toBe(false);
   });
 
-  it("records path misses for practice without spending hearts or locking the game", async () => {
+  it("spends a Life per module-game miss unless unlimited learning is on", async () => {
     await service.completeLevel("ateneo-welcome", student.learnerId);
     await database.db
       .update(learners)
@@ -144,17 +149,42 @@ describe("CurriculumService", () => {
       idempotencyKey: `miss-${randomUUID()}`,
     });
     const afterMiss = await service.getLearner(student.learnerId);
-    expect(afterMiss.hearts).toBe(before.hearts);
+    expect(afterMiss.hearts).toBe(
+      UNLIMITED_LEARNING ? before.hearts : before.hearts - 1,
+    );
 
     await database.db
       .update(learners)
       .set({ hearts: 1, heartsUpdatedAt: Date.now() })
       .where(eq(learners.id, student.learnerId));
     await service.completeLevel("childhood-born", student.learnerId);
-    expect((await service.getLearner(student.learnerId)).hearts).toBe(1);
+    // Limited learning: reading a lesson restores a Life.
+    expect((await service.getLearner(student.learnerId)).hearts).toBe(
+      UNLIMITED_LEARNING ? 1 : 2,
+    );
   });
 
-  it("still lets a student start a path game at zero hearts", async () => {
+  itLimited("blocks module games at zero Lives until a lesson is read", async () => {
+    await service.completeLevel("ateneo-welcome", student.learnerId);
+    await database.db
+      .update(learners)
+      .set({ hearts: 0, heartsUpdatedAt: Date.now() })
+      .where(eq(learners.id, student.learnerId));
+    await expect(
+      service.getPlayLevel("ateneo-quiz", student.learnerId),
+    ).rejects.toMatchObject({ response: { code: "HEARTS_EMPTY" } });
+    await service.completeLevel("ateneo-welcome", student.learnerId);
+    expect((await service.getLearner(student.learnerId)).hearts).toBe(1);
+    const play = await service.getPlayLevel("ateneo-quiz", student.learnerId);
+    expect(play.level.kind).toBe("game");
+    expect(play.attempt?.gradedAttemptsRemaining).toBeLessThanOrEqual(2);
+    await database.db
+      .update(learners)
+      .set({ hearts: 5, heartsUpdatedAt: Date.now() })
+      .where(eq(learners.id, student.learnerId));
+  });
+
+  itUnlimited("still lets a student start a path game at zero hearts", async () => {
     await service.completeLevel("ateneo-welcome", student.learnerId);
     await database.db
       .update(learners)
@@ -805,7 +835,7 @@ describe("authoritative assessment", () => {
     ).toHaveLength(1);
   });
 
-  it("applies a two-minute lesson credit once and ignores replays", async () => {
+  itUnlimited("applies a two-minute lesson credit once and ignores replays", async () => {
     const reader = await createTestAccount(database, {
       admissionEmail: `reader-${randomUUID()}@student.apc.edu.ph`,
       displayName: "Reader",

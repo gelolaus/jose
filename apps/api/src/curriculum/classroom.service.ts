@@ -28,9 +28,17 @@ import {
   type ClassReport,
   type ClassSummary,
   type StudentAssignment,
+  moduleFinalScore,
+  parseGameContent,
+  pieceCount,
+  simplifyGameContent,
 } from "@jose/shared";
 import { and, asc, eq, inArray, isNull, isNotNull } from "drizzle-orm";
 import { DatabaseService } from "../db/database.service";
+
+function isAbandoned(row: { payload: string | null }) {
+  return (row.payload ?? "").includes('"abandoned":true');
+}
 import {
   assignments,
   attempts,
@@ -602,6 +610,7 @@ export class ClassroomService {
           attemptMap,
           revisionMap,
           overrideMap,
+          gameMaxScores: this.gameMaxScoresFromSnapshotJson(snapshotJson),
         }),
       );
       // Stable member order by joinedAt then learnerId.
@@ -671,6 +680,7 @@ export class ClassroomService {
         attemptMap,
         revisionMap,
         overrideMap,
+        gameMaxScores: this.gameMaxScoresFromSnapshotJson(snapshotJson),
       }),
     );
     members.sort((a, b) =>
@@ -1008,18 +1018,25 @@ export class ClassroomService {
           eq(attempts.status, "finished"),
         ),
       );
-    let bestScore: number | null = null;
-    let bestMaxScore: number | null = null;
+    const snapshotJson =
+      assignment.assignedSnapshotJson ??
+      (await this.revisionSnapshotJson(assignment.contentRevisionId));
+    const levelSet = new Set(levelIds);
+    const graded = attemptRows.filter(
+      (attempt) => levelSet.has(attempt.levelId) && !isAbandoned(attempt),
+    );
     let latestAttemptAt: number | null = null;
-    for (const attempt of attemptRows) {
+    for (const attempt of graded) {
       if (latestAttemptAt === null || attempt.createdAt > latestAttemptAt) {
         latestAttemptAt = attempt.createdAt;
       }
-      if (bestScore === null || attempt.score > bestScore) {
-        bestScore = attempt.score;
-        bestMaxScore = attempt.maxScore;
-      }
     }
+    const moduleScore = moduleFinalScore(
+      graded,
+      this.gameMaxScoresFromSnapshotJson(snapshotJson),
+    );
+    const bestScore = moduleScore?.score ?? null;
+    const bestMaxScore = moduleScore?.maxScore ?? null;
     const masteryPercent =
       bestScore !== null && bestMaxScore && bestMaxScore > 0
         ? Math.round((bestScore / bestMaxScore) * 100)
@@ -1048,6 +1065,7 @@ export class ClassroomService {
     attemptMap: Map<string, Array<typeof attempts.$inferSelect>>;
     revisionMap: Map<string, typeof moduleRevisions.$inferSelect>;
     overrideMap?: Map<string, typeof gradeOverrides.$inferSelect>;
+    gameMaxScores?: Map<string, number>;
   }) {
     const {
       member,
@@ -1071,35 +1089,30 @@ export class ClassroomService {
           ? ("completed" as const)
           : ("in_progress" as const);
     const key = `${member.learnerId}::${assignment.contentRevisionId}`;
+    const levelSet = new Set(levelIds);
     const rows = (attemptMap.get(key) ?? [])
-      .filter((a) => a.mode === "assessment" && a.status === "finished")
+      .filter(
+        (a) =>
+          a.mode === "assessment" &&
+          a.status === "finished" &&
+          levelSet.has(a.levelId) &&
+          !isAbandoned(a),
+      )
       .sort((a, b) => a.createdAt - b.createdAt);
-    let latest: typeof attempts.$inferSelect | null = null;
-    let best: typeof attempts.$inferSelect | null = null;
-    for (const row of rows) {
-      latest = row;
-      if (!best) {
-        best = row;
-        continue;
-      }
-      const prevPct = best.maxScore > 0 ? best.score / best.maxScore : -1;
-      const nextPct = row.maxScore > 0 ? row.score / row.maxScore : -1;
-      if (nextPct > prevPct || (nextPct === prevPct && row.createdAt > best.createdAt)) {
-        best = row;
-      }
-    }
+    const latest = rows[rows.length - 1] ?? null;
+    // Module grade = sum of each game's final attempt (2nd if taken, else 1st).
+    const moduleScore = moduleFinalScore(rows, input.gameMaxScores);
     const masteryPercent =
-      best && best.maxScore > 0
-        ? Math.round((best.score / best.maxScore) * 100)
+      moduleScore && moduleScore.maxScore > 0
+        ? Math.round((moduleScore.score / moduleScore.maxScore) * 100)
         : null;
     const revision = input.revisionMap.get(assignment.contentRevisionId);
     const policy = this.assignmentPolicyOf(assignment);
     const overrideKey = `${assignment.id}::${member.learnerId}`;
     const override = overrideMap?.get(overrideKey) ?? null;
-    const bestPair = best ? { score: best.score, maxScore: best.maxScore } : null;
-    const latestPair = latest
-      ? { score: latest.score, maxScore: latest.maxScore }
-      : null;
+    const best = moduleScore;
+    const bestPair = moduleScore;
+    const latestPair = moduleScore;
     const overridePair = override
       ? { score: override.score, maxScore: override.maxScore }
       : null;
@@ -1120,9 +1133,9 @@ export class ClassroomService {
       bestScore: formatScore(best?.score ?? null, best?.maxScore ?? null),
       bestNumerator: best?.score ?? null,
       bestDenominator: best?.maxScore ?? null,
-      latestScore: formatScore(latest?.score ?? null, latest?.maxScore ?? null),
-      latestNumerator: latest?.score ?? null,
-      latestDenominator: latest?.maxScore ?? null,
+      latestScore: formatScore(moduleScore?.score ?? null, moduleScore?.maxScore ?? null),
+      latestNumerator: moduleScore?.score ?? null,
+      latestDenominator: moduleScore?.maxScore ?? null,
       latestAttemptAt: latest ? new Date(latest.createdAt).toISOString() : null,
       effectiveScore: formatScore(effective?.score ?? null, effective?.maxScore ?? null),
       effectiveNumerator: effective?.score ?? null,
@@ -1442,6 +1455,36 @@ export class ClassroomService {
   ): string | null {
     if (row.assignedSnapshotJson) return row.assignedSnapshotJson;
     return revisionMap.get(row.contentRevisionId)?.snapshotJson ?? null;
+  }
+
+  /** Max score of every game level in a snapshot, keyed by level id. */
+  private gameMaxScoresFromSnapshotJson(snapshotJson: string | null | undefined) {
+    const map = new Map<string, number>();
+    if (!snapshotJson) return map;
+    try {
+      const snapshot = JSON.parse(snapshotJson) as {
+        sections: Array<{ levels: Array<{ id: string; kind?: string; game?: unknown }> }>;
+      };
+      for (const level of snapshot.sections.flatMap((section) => section.levels)) {
+        if (level.kind !== "game" || !level.game) continue;
+        try {
+          map.set(level.id, pieceCount(simplifyGameContent(parseGameContent(level.game))));
+        } catch {
+          // Unparseable games fall back to attempt max scores only.
+        }
+      }
+    } catch {
+      return map;
+    }
+    return map;
+  }
+
+  private async revisionSnapshotJson(revisionId: string) {
+    const [row] = await this.db
+      .select({ snapshotJson: moduleRevisions.snapshotJson })
+      .from(moduleRevisions)
+      .where(eq(moduleRevisions.id, revisionId));
+    return row?.snapshotJson ?? null;
   }
 
   private levelIdsFromSnapshotJson(snapshotJson: string | null): string[] {

@@ -17,8 +17,11 @@ import {
   finishAttempt,
   recordMiss,
 } from "@/lib/path-api";
+import { OutOfLives } from "@/components/out-of-lives";
 import {
+  MAX_GRADED_ATTEMPTS,
   HEARTS_EMPTY_CODE,
+  UNLIMITED_LEARNING,
   firstTryScore,
   pieceCount,
   type AssessmentGame,
@@ -100,7 +103,7 @@ export function GamePlayer({
   const revision = attempt.contentRevision || gameContentRevision(game as unknown as GameContent);
   const [hearts, setHearts] = useState(startHearts);
   const [why, setWhy] = useState<WhyPayload | null>(null);
-  const [, setEmpty] = useState(startHearts <= 0);
+  const [empty, setEmpty] = useState(!UNLIMITED_LEARNING && startHearts <= 0);
   const pendingEmpty = useRef(false);
   const [resume] = useState(() => readResumeDraft(accountId, levelId, revision));
   const [result, setResult] = useState<ScoredResult | null>(() => {
@@ -119,6 +122,7 @@ export function GamePlayer({
     return resume.status === "saving" ? "save-failed" : resume.status;
   });
   const [busy, setBusy] = useState(false);
+  const [remainingAfter, setRemainingAfter] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(() =>
     resume
       ? "Your result was kept on this device. Retry saving when you are back online."
@@ -164,6 +168,9 @@ export function GamePlayer({
         continueHref: finished.continueHref,
       };
       setResult(next);
+      if (finished.gradedAttemptsRemaining !== undefined) {
+        setRemainingAfter(finished.gradedAttemptsRemaining);
+      }
       setSavePhase("saved");
       persistDraft(next, "saved");
       clearAttemptDraft({ accountId, levelId, revision });
@@ -253,6 +260,13 @@ export function GamePlayer({
     await reconcileSave(scored);
   }
 
+  const attemptsUsed = attempt.gradedAttemptsUsed ?? 0;
+  const attemptsLeft = attempt.gradedAttemptsRemaining ?? MAX_GRADED_ATTEMPTS - attemptsUsed;
+  const attemptsLabel =
+    attemptsLeft > 0
+      ? `Attempt ${attemptsUsed + 1} of ${MAX_GRADED_ATTEMPTS} · ${attemptsLeft} graded attempt${attemptsLeft === 1 ? "" : "s"} remaining`
+      : "No graded attempts remaining · practice only, your final score is saved";
+
   if (result && savePhase !== "playing") {
     const unsaved = isUnsavedSavePhase(savePhase);
     return (
@@ -263,7 +277,15 @@ export function GamePlayer({
         maxScore={result.maxScore}
         stars={result.stars}
         error={error}
-        statusLabel={statusLabelFor(savePhase)}
+        statusLabel={
+          savePhase === "saved" && remainingAfter !== null
+            ? remainingAfter > 0
+              ? `Saved · ${remainingAfter} graded attempt${remainingAfter === 1 ? "" : "s"} remaining`
+              : attemptsLeft > 0
+                ? "Saved · this is your final score"
+                : "Practice run · your final score is unchanged"
+            : statusLabelFor(savePhase)
+        }
         onRetrySave={
           unsaved && !busy
             ? () => {
@@ -289,13 +311,23 @@ export function GamePlayer({
     );
   }
 
+  if (empty && !UNLIMITED_LEARNING && !why) {
+    return <OutOfLives moduleId={moduleId} />;
+  }
+
   return (
     <>
+      <p
+        className="mx-auto mb-3 w-fit rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-700"
+        data-testid="attempts-remaining"
+      >
+        {attemptsLabel}
+      </p>
       <GameFrame
         title={title}
         hint={hintFor(game.type)}
         hearts={hearts}
-        showHearts={false}
+        showHearts={!UNLIMITED_LEARNING}
         progress={labelFor(game.type)}
         scene={game.type}
         wide

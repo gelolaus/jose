@@ -15,6 +15,8 @@ import {
   MAX_ASSET_BYTES,
   MAX_ATTEMPT_PAYLOAD_BYTES,
   MAX_HEARTS,
+  MAX_GRADED_ATTEMPTS,
+  UNLIMITED_LEARNING,
   PRACTICE_RULES,
   PROFILE_RULES,
   applyHeartDrip,
@@ -352,7 +354,11 @@ export class CurriculumService {
         )?.title ?? ctx.section.title
       : ctx.section.title;
     const moduleTitle = snapshot?.module.title ?? ctx.module.title;
-    // Core path learning is unlimited — hearts never block coursework.
+    // With UNLIMITED_LEARNING on, hearts never block coursework; otherwise
+    // module games need at least one Life (misses spend them, see recordMiss).
+    if (kind === "game" && !UNLIMITED_LEARNING && learner.hearts <= 0) {
+      throw this.heartsEmpty();
+    }
 
     const payload: PlayLevelResponse = {
       learner,
@@ -404,6 +410,7 @@ export class CurriculumService {
         contentRevision: opened.contentRevision,
         mode: "assessment",
         status: "open",
+        ...(await this.gradedAttemptCounts(levelId, learnerId)),
       };
     } else {
       payload.chest = await this.readChestContent(levelId, title);
@@ -513,6 +520,10 @@ export class CurriculumService {
 
       if (inserted.length === 0) {
         return;
+      }
+
+      if (!UNLIMITED_LEARNING) {
+        await this.spendHeart(learnerId, tx);
       }
 
       await tx.insert(learningMisses).values({
@@ -700,12 +711,20 @@ export class CurriculumService {
         if (updated.length === 0) {
           return false;
         }
-        return this.markComplete(
+        const firstWin = await this.markComplete(
           attempt.levelId,
           learnerId,
           tx as unknown as JoseDb,
           attempt.publishedRevisionId ?? ctx.module.publishedRevisionId ?? null,
         );
+        // Duolingo-style: replayed wins keep earning XP when learning is limited.
+        if (!firstWin && !UNLIMITED_LEARNING && graded.score > 0) {
+          await tx
+            .update(learners)
+            .set({ xp: sql`${learners.xp} + ${FIRST_COMPLETE_XP}` })
+            .where(eq(learners.id, learnerId));
+        }
+        return firstWin;
       });
 
       const [fresh] = await this.db
@@ -2952,7 +2971,8 @@ export class CurriculumService {
       })
       .onConflictDoNothing()
       .returning({ levelId: lessonLifeCredits.levelId });
-    if (inserted.length === 0) return false;
+    // Limited learning: every lesson read (including re-reads) restores a Life.
+    if (inserted.length === 0 && UNLIMITED_LEARNING) return false;
     const credited = applyLessonCredit(dripped.hearts, dripped.heartsUpdatedAt, now);
     if (!credited.creditApplied) return false;
     await executor
@@ -3026,6 +3046,25 @@ export class CurriculumService {
         })
         .where(eq(learners.id, learnerId));
     }
+  }
+
+  private async spendHeart(learnerId: string, executor: JoseDb) {
+    const [row] = await executor
+      .select()
+      .from(learners)
+      .where(eq(learners.id, learnerId));
+    if (!row) throw new NotFoundException("Learner not found");
+    const lives = applyHeartDrip(row.hearts, row.heartsUpdatedAt, Date.now());
+    if (lives.hearts <= 0) {
+      throw this.heartsEmpty();
+    }
+    await executor
+      .update(learners)
+      .set({
+        hearts: lives.hearts - 1,
+        heartsUpdatedAt: lives.hearts >= MAX_HEARTS ? Date.now() : lives.heartsUpdatedAt,
+      })
+      .where(eq(learners.id, learnerId));
   }
 
   private heartsEmpty() {
@@ -3435,6 +3474,30 @@ export class CurriculumService {
       continueHref: nextId
         ? `/learn/${ctx.module.id}/${nextId}`
         : `/learn/${ctx.module.id}`,
+      ...(await this.gradedAttemptCounts(attempt.levelId, learnerId)),
+    };
+  }
+
+  /** Finished assessment attempts on a game, capped at MAX_GRADED_ATTEMPTS. */
+  private async gradedAttemptCounts(levelId: string, learnerId: string) {
+    const rows = await this.db
+      .select({ id: attempts.id, payload: attempts.payload })
+      .from(attempts)
+      .where(
+        and(
+          eq(attempts.learnerId, learnerId),
+          eq(attempts.levelId, levelId),
+          eq(attempts.mode, "assessment"),
+          eq(attempts.status, "finished"),
+        ),
+      );
+    const finished = rows.filter(
+      (row) => !(row.payload ?? "").includes('"abandoned":true'),
+    ).length;
+    const used = Math.min(MAX_GRADED_ATTEMPTS, finished);
+    return {
+      gradedAttemptsUsed: used,
+      gradedAttemptsRemaining: MAX_GRADED_ATTEMPTS - used,
     };
   }
 

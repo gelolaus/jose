@@ -1,7 +1,9 @@
+import { HEARTS_EMPTY_CODE, UNLIMITED_LEARNING } from "@jose/shared";
 import { ChestPlayer } from "@/components/chest-player";
 import { GamePlayer } from "@/components/game-player";
 import { AppShell } from "@/components/learning-shell";
 import { LessonPlayer } from "@/components/lesson-player";
+import { OutOfLives } from "@/components/out-of-lives";
 import { RecoveryState } from "@/components/recovery-state";
 import { SignInRequired } from "@/components/sign-in-required";
 import { fetchPlayLevel } from "@/lib/server-api";
@@ -30,6 +32,13 @@ export default async function PlayLevelPage({ params }: Props) {
       return (
         <AppShell>
           <SignInRequired />
+        </AppShell>
+      );
+    }
+    if (result.code === HEARTS_EMPTY_CODE) {
+      return (
+        <AppShell>
+          <OutOfLives moduleId={moduleId} />
         </AppShell>
       );
     }
@@ -68,7 +77,7 @@ export default async function PlayLevelPage({ params }: Props) {
               {data.level.sectionTitle}
             </p>
             <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#12122e]">
-              Unlimited learning
+              {UNLIMITED_LEARNING ? "Unlimited learning" : `Lives ${data.learner.hearts}`}
             </span>
           </div>
         </header>

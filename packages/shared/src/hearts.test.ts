@@ -3,12 +3,33 @@ import {
   HEART_DRIP_MS,
   LESSON_CREDIT_MS,
   MAX_HEARTS,
+  UNLIMITED_LEARNING,
   applyHeartDrip,
   applyLessonCredit,
   firstTryScore,
   nextHeartAt,
   starsFromMisses,
 } from "./hearts";
+
+describe.runIf(!UNLIMITED_LEARNING)("limited learning lives", () => {
+  it("never refills Lives on a timer", () => {
+    expect(applyHeartDrip(0, 0, HEART_DRIP_MS * 50)).toEqual({
+      hearts: 0,
+      heartsUpdatedAt: 0,
+      changed: false,
+    });
+    expect(nextHeartAt(0, 0, 1)).toBeNull();
+  });
+
+  it("restores exactly one Life per lesson read, capped at the max", () => {
+    expect(applyLessonCredit(0, 0, 100)).toEqual({
+      hearts: 1,
+      heartsUpdatedAt: 100,
+      creditApplied: true,
+    });
+    expect(applyLessonCredit(MAX_HEARTS, 0, 100).creditApplied).toBe(false);
+  });
+});
 
 describe("applyHeartDrip", () => {
   it("uses a ten-minute regeneration interval", () => {
@@ -27,7 +48,7 @@ describe("applyHeartDrip", () => {
     });
   });
 
-  it("grants one life exactly at the interval and keeps the remainder", () => {
+  it.runIf(UNLIMITED_LEARNING)("grants one life exactly at the interval and keeps the remainder", () => {
     const start = 1_000_000;
     const next = applyHeartDrip(3, start, start + HEART_DRIP_MS * 2 + 1_000);
     expect(next).toEqual({
@@ -56,14 +77,14 @@ describe("nextHeartAt", () => {
     expect(nextHeartAt(5, 10, 10_000)).toBeNull();
   });
 
-  it("points at the end of the current wait", () => {
+  it.runIf(UNLIMITED_LEARNING)("points at the end of the current wait", () => {
     const start = 1_000_000;
     expect(nextHeartAt(3, start, start + 1_000)).toBe(start + HEART_DRIP_MS);
   });
 });
 
 describe("applyLessonCredit", () => {
-  it("shortens a full ten-minute wait to eight minutes", () => {
+  it.runIf(UNLIMITED_LEARNING)("shortens a full ten-minute wait to eight minutes", () => {
     const now = 5_000_000;
     const next = applyLessonCredit(3, now, now);
     expect(next.hearts).toBe(3);
@@ -74,7 +95,7 @@ describe("applyLessonCredit", () => {
     );
   });
 
-  it("carries one leftover minute into the next life", () => {
+  it.runIf(UNLIMITED_LEARNING)("carries one leftover minute into the next life", () => {
     const now = 5_000_000;
     const updatedAt = now - (HEART_DRIP_MS - 60_000);
     const next = applyLessonCredit(3, updatedAt, now);

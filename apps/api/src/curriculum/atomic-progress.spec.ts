@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { eq, and, asc } from "drizzle-orm";
-import type { SessionUser } from "@jose/shared";
+import { UNLIMITED_LEARNING, type SessionUser } from "@jose/shared";
 import { AppModule } from "../app.module";
 import { CurriculumService } from "./curriculum.service";
 import { DatabaseService } from "../db/database.service";
@@ -160,7 +160,7 @@ describe("atomic progress and economy writes", () => {
     expect(await xpOf()).toBe(before + 20);
   });
 
-  it("does not spend hearts on path misses, including retries", async () => {
+  it("spends at most one Life per path miss, including retries", async () => {
     await service.completeLevel("ateneo-welcome", student.learnerId);
     await database.db
       .update(learners)
@@ -171,16 +171,17 @@ describe("atomic progress and economy writes", () => {
     const first = await service.recordMiss("ateneo-quiz", student.learnerId, {
       idempotencyKey: key,
     });
-    expect(first.learner.hearts).toBe(5);
+    const afterMiss = UNLIMITED_LEARNING ? 5 : 4;
+    expect(first.learner.hearts).toBe(afterMiss);
 
     const retry = await service.recordMiss("ateneo-quiz", student.learnerId, {
       idempotencyKey: key,
     });
-    expect(retry.learner.hearts).toBe(5);
-    expect(await heartsOf()).toBe(5);
+    expect(retry.learner.hearts).toBe(afterMiss);
+    expect(await heartsOf()).toBe(afterMiss);
 
     const arcade = await service.recordArcadeMiss(student.learnerId);
-    expect(arcade.learner.hearts).toBe(4);
+    expect(arcade.learner.hearts).toBe(afterMiss - 1);
   });
 
   it("rolls back half-created levels when a fault is injected mid-create", async () => {
