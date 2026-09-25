@@ -184,6 +184,9 @@ export const attemptInfoSchema = z.object({
   contentRevision: z.string().min(1),
   mode: attemptModeSchema,
   status: attemptStatusSchema,
+  /** Finished graded attempts already used on this game (max MAX_GRADED_ATTEMPTS). */
+  gradedAttemptsUsed: z.number().int().nonnegative().optional(),
+  gradedAttemptsRemaining: z.number().int().nonnegative().optional(),
 });
 
 export type AttemptInfo = z.infer<typeof attemptInfoSchema>;
@@ -331,6 +334,8 @@ export const finishAttemptResultSchema = z.object({
   deduplicated: z.boolean(),
   nextLevelId: z.string().min(1).nullable().optional(),
   continueHref: z.string().min(1).optional(),
+  gradedAttemptsUsed: z.number().int().nonnegative().optional(),
+  gradedAttemptsRemaining: z.number().int().nonnegative().optional(),
 });
 
 export type FinishAttemptResult = z.infer<typeof finishAttemptResultSchema>;

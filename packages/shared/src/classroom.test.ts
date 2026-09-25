@@ -3,6 +3,9 @@ import {
   classRosterResponseSchema,
   csvSafeCell,
   gradebookResponseSchema,
+  MAX_GRADED_ATTEMPTS,
+  finalGradedAttempt,
+  moduleFinalScore,
 } from "./classroom";
 
 describe("gradebook contracts", () => {
@@ -77,5 +80,35 @@ describe("gradebook contracts", () => {
       nextCursor: null,
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe("moduleFinalScore", () => {
+  const row = (levelId: string, score: number, createdAt: number) => ({
+    levelId,
+    score,
+    maxScore: 10,
+    createdAt,
+  });
+
+  it("sums each game's final attempt across the module", () => {
+    expect(
+      moduleFinalScore([row("a", 5, 1), row("b", 10, 2), row("c", 7, 3)]),
+    ).toEqual({ score: 22, maxScore: 30 });
+  });
+
+  it("uses the second attempt as final and ignores attempts past the cap", () => {
+    expect(
+      moduleFinalScore([row("a", 9, 1), row("a", 4, 2), row("a", 10, 3)]),
+    ).toEqual({ score: 4, maxScore: 10 });
+    expect(finalGradedAttempt([row("a", 6, 1)])?.score).toBe(6);
+    expect(MAX_GRADED_ATTEMPTS).toBe(2);
+  });
+
+  it("counts unplayed games as zero out of their max", () => {
+    expect(
+      moduleFinalScore([row("a", 5, 1)], new Map([["a", 10], ["b", 10]])),
+    ).toEqual({ score: 5, maxScore: 20 });
+    expect(moduleFinalScore([])).toBeNull();
   });
 });

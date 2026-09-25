@@ -1,8 +1,18 @@
 /**
- * Lives (internal name: hearts) refill on a ten-minute timer.
- * Required path learning and teacher assignments never spend or require lives.
- * HEARTS_EMPTY applies only to optional arcade challenge sessions.
+ * Lives (internal name: hearts). With UNLIMITED_LEARNING off, module-game
+ * misses spend Lives, zero Lives blocks module games, and only reading a
+ * lesson (again) restores a Life. With it on, Lives refill on a timer and
+ * never block coursework.
  */
+
+/**
+ * Master switch for "unlimited learning". When true, module games never cost
+ * Lives and XP is only granted on a level's first completion. When false
+ * (Duolingo-style), every miss in a module game costs a Life and every won
+ * module game earns XP. Practice games are never affected.
+ */
+export const UNLIMITED_LEARNING = false;
+
 export const MAX_HEARTS = 5;
 export const HEART_DRIP_MS = 10 * 60 * 1000;
 export const LESSON_CREDIT_MS = 2 * 60 * 1000;
@@ -21,6 +31,10 @@ export function applyHeartDrip(
 ): { hearts: number; heartsUpdatedAt: number; changed: boolean } {
   const capped = Math.min(MAX_HEARTS, Math.max(0, Math.floor(hearts)));
   const updatedAt = Math.max(0, heartsUpdatedAt);
+  if (!UNLIMITED_LEARNING) {
+    // Lives never refill on a timer; only re-reading lessons earns them back.
+    return { hearts: capped, heartsUpdatedAt: updatedAt, changed: false };
+  }
   if (capped >= MAX_HEARTS) {
     return { hearts: MAX_HEARTS, heartsUpdatedAt: updatedAt, changed: false };
   }
@@ -44,6 +58,7 @@ export function nextHeartAt(
   heartsUpdatedAt: number,
   now: number,
 ): number | null {
+  if (!UNLIMITED_LEARNING) return null;
   const dripped = applyHeartDrip(hearts, heartsUpdatedAt, now);
   if (dripped.hearts >= MAX_HEARTS) return null;
   return dripped.heartsUpdatedAt + HEART_DRIP_MS;
@@ -54,6 +69,14 @@ export function applyLessonCredit(
   heartsUpdatedAt: number,
   now: number,
 ): { hearts: number; heartsUpdatedAt: number; creditApplied: boolean } {
+  if (!UNLIMITED_LEARNING) {
+    // Each lesson read (including re-reads) restores one Life.
+    const capped = Math.min(MAX_HEARTS, Math.max(0, Math.floor(hearts)));
+    if (capped >= MAX_HEARTS) {
+      return { hearts: MAX_HEARTS, heartsUpdatedAt, creditApplied: false };
+    }
+    return { hearts: capped + 1, heartsUpdatedAt: now, creditApplied: true };
+  }
   const afterDrip = applyHeartDrip(hearts, heartsUpdatedAt, now);
   if (afterDrip.hearts >= MAX_HEARTS) {
     return {
@@ -116,10 +139,3 @@ export function firstTryScore(pieces: number, misses: number): {
   return { score, maxScore, stars: starsFromMisses(misses, maxScore) };
 }
 
-/**
- * Master switch for "unlimited learning". When true, module games never cost
- * Lives and XP is only granted on a level's first completion. When false
- * (Duolingo-style), every miss in a module game costs a Life and every won
- * module game earns XP. Practice games are never affected.
- */
-export const UNLIMITED_LEARNING = false;

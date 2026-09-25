@@ -30,6 +30,10 @@ function teacherUser(account: TestAccount): SessionUser {
   };
 }
 
+// Some economy rules only exist in one learning mode (see UNLIMITED_LEARNING).
+const itLimited = UNLIMITED_LEARNING ? it.skip : it;
+const itUnlimited = UNLIMITED_LEARNING ? it : it.skip;
+
 describe("CurriculumService", () => {
   let service: CurriculumService;
   let database: DatabaseService;
@@ -154,10 +158,33 @@ describe("CurriculumService", () => {
       .set({ hearts: 1, heartsUpdatedAt: Date.now() })
       .where(eq(learners.id, student.learnerId));
     await service.completeLevel("childhood-born", student.learnerId);
-    expect((await service.getLearner(student.learnerId)).hearts).toBe(1);
+    // Limited learning: reading a lesson restores a Life.
+    expect((await service.getLearner(student.learnerId)).hearts).toBe(
+      UNLIMITED_LEARNING ? 1 : 2,
+    );
   });
 
-  it("still lets a student start a path game at zero hearts", async () => {
+  itLimited("blocks module games at zero Lives until a lesson is read", async () => {
+    await service.completeLevel("ateneo-welcome", student.learnerId);
+    await database.db
+      .update(learners)
+      .set({ hearts: 0, heartsUpdatedAt: Date.now() })
+      .where(eq(learners.id, student.learnerId));
+    await expect(
+      service.getPlayLevel("ateneo-quiz", student.learnerId),
+    ).rejects.toMatchObject({ response: { code: "HEARTS_EMPTY" } });
+    await service.completeLevel("ateneo-welcome", student.learnerId);
+    expect((await service.getLearner(student.learnerId)).hearts).toBe(1);
+    const play = await service.getPlayLevel("ateneo-quiz", student.learnerId);
+    expect(play.level.kind).toBe("game");
+    expect(play.attempt?.gradedAttemptsRemaining).toBeLessThanOrEqual(2);
+    await database.db
+      .update(learners)
+      .set({ hearts: 5, heartsUpdatedAt: Date.now() })
+      .where(eq(learners.id, student.learnerId));
+  });
+
+  itUnlimited("still lets a student start a path game at zero hearts", async () => {
     await service.completeLevel("ateneo-welcome", student.learnerId);
     await database.db
       .update(learners)
@@ -808,7 +835,7 @@ describe("authoritative assessment", () => {
     ).toHaveLength(1);
   });
 
-  it("applies a two-minute lesson credit once and ignores replays", async () => {
+  itUnlimited("applies a two-minute lesson credit once and ignores replays", async () => {
     const reader = await createTestAccount(database, {
       admissionEmail: `reader-${randomUUID()}@student.apc.edu.ph`,
       displayName: "Reader",

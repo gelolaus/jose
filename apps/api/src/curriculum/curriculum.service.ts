@@ -15,6 +15,7 @@ import {
   MAX_ASSET_BYTES,
   MAX_ATTEMPT_PAYLOAD_BYTES,
   MAX_HEARTS,
+  MAX_GRADED_ATTEMPTS,
   UNLIMITED_LEARNING,
   PRACTICE_RULES,
   PROFILE_RULES,
@@ -354,7 +355,10 @@ export class CurriculumService {
       : ctx.section.title;
     const moduleTitle = snapshot?.module.title ?? ctx.module.title;
     // With UNLIMITED_LEARNING on, hearts never block coursework; otherwise
-    // module-game misses cost Lives (see recordMiss).
+    // module games need at least one Life (misses spend them, see recordMiss).
+    if (kind === "game" && !UNLIMITED_LEARNING && learner.hearts <= 0) {
+      throw this.heartsEmpty();
+    }
 
     const payload: PlayLevelResponse = {
       learner,
@@ -406,6 +410,7 @@ export class CurriculumService {
         contentRevision: opened.contentRevision,
         mode: "assessment",
         status: "open",
+        ...(await this.gradedAttemptCounts(levelId, learnerId)),
       };
     } else {
       payload.chest = await this.readChestContent(levelId, title);
@@ -2966,7 +2971,8 @@ export class CurriculumService {
       })
       .onConflictDoNothing()
       .returning({ levelId: lessonLifeCredits.levelId });
-    if (inserted.length === 0) return false;
+    // Limited learning: every lesson read (including re-reads) restores a Life.
+    if (inserted.length === 0 && UNLIMITED_LEARNING) return false;
     const credited = applyLessonCredit(dripped.hearts, dripped.heartsUpdatedAt, now);
     if (!credited.creditApplied) return false;
     await executor
@@ -3468,6 +3474,30 @@ export class CurriculumService {
       continueHref: nextId
         ? `/learn/${ctx.module.id}/${nextId}`
         : `/learn/${ctx.module.id}`,
+      ...(await this.gradedAttemptCounts(attempt.levelId, learnerId)),
+    };
+  }
+
+  /** Finished assessment attempts on a game, capped at MAX_GRADED_ATTEMPTS. */
+  private async gradedAttemptCounts(levelId: string, learnerId: string) {
+    const rows = await this.db
+      .select({ id: attempts.id, payload: attempts.payload })
+      .from(attempts)
+      .where(
+        and(
+          eq(attempts.learnerId, learnerId),
+          eq(attempts.levelId, levelId),
+          eq(attempts.mode, "assessment"),
+          eq(attempts.status, "finished"),
+        ),
+      );
+    const finished = rows.filter(
+      (row) => !(row.payload ?? "").includes('"abandoned":true'),
+    ).length;
+    const used = Math.min(MAX_GRADED_ATTEMPTS, finished);
+    return {
+      gradedAttemptsUsed: used,
+      gradedAttemptsRemaining: MAX_GRADED_ATTEMPTS - used,
     };
   }
 

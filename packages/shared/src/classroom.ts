@@ -327,3 +327,55 @@ export function csvSafeCell(value: string | number | null | undefined): string {
 export function toCsv(rows: Array<Array<string | number | null | undefined>>): string {
   return rows.map((row) => row.map(csvSafeCell).join(",")).join("\n");
 }
+
+/** Only a learner's first two finished attempts per game count for grades. */
+export const MAX_GRADED_ATTEMPTS = 2;
+
+export type GradedAttemptRow = {
+  levelId: string;
+  score: number;
+  maxScore: number;
+  createdAt: number;
+};
+
+/**
+ * The final attempt for one game: the second graded attempt when it exists,
+ * otherwise the first. Attempts past MAX_GRADED_ATTEMPTS are practice only.
+ */
+export function finalGradedAttempt<T extends { createdAt: number }>(
+  rows: T[],
+): T | null {
+  const ordered = [...rows].sort((a, b) => a.createdAt - b.createdAt);
+  const graded = ordered.slice(0, MAX_GRADED_ATTEMPTS);
+  return graded[graded.length - 1] ?? null;
+}
+
+/**
+ * Overall module score: sums every game's final attempt. Games not played
+ * yet count as 0 out of their max (from `gameMaxScores`) when known.
+ */
+export function moduleFinalScore(
+  rows: GradedAttemptRow[],
+  gameMaxScores?: Map<string, number>,
+): { score: number; maxScore: number } | null {
+  const byLevel = new Map<string, GradedAttemptRow[]>();
+  for (const row of rows) {
+    const list = byLevel.get(row.levelId) ?? [];
+    list.push(row);
+    byLevel.set(row.levelId, list);
+  }
+  if (byLevel.size === 0) return null;
+  let score = 0;
+  let maxScore = 0;
+  const levelIds = new Set([...byLevel.keys(), ...(gameMaxScores?.keys() ?? [])]);
+  for (const levelId of levelIds) {
+    const final = finalGradedAttempt(byLevel.get(levelId) ?? []);
+    if (final) {
+      score += final.score;
+      maxScore += final.maxScore;
+    } else {
+      maxScore += gameMaxScores?.get(levelId) ?? 0;
+    }
+  }
+  return { score, maxScore };
+}

@@ -1,8 +1,9 @@
-import { UNLIMITED_LEARNING } from "@jose/shared";
+import { HEARTS_EMPTY_CODE, UNLIMITED_LEARNING } from "@jose/shared";
 import { ChestPlayer } from "@/components/chest-player";
 import { GamePlayer } from "@/components/game-player";
 import { AppShell } from "@/components/learning-shell";
 import { LessonPlayer } from "@/components/lesson-player";
+import { OutOfLives } from "@/components/out-of-lives";
 import { RecoveryState } from "@/components/recovery-state";
 import { SignInRequired } from "@/components/sign-in-required";
 import { fetchPlayLevel } from "@/lib/server-api";
@@ -31,6 +32,13 @@ export default async function PlayLevelPage({ params }: Props) {
       return (
         <AppShell>
           <SignInRequired />
+        </AppShell>
+      );
+    }
+    if (result.code === HEARTS_EMPTY_CODE) {
+      return (
+        <AppShell>
+          <OutOfLives moduleId={moduleId} />
         </AppShell>
       );
     }

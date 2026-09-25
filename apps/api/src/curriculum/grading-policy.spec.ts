@@ -91,9 +91,9 @@ describe("explicit grading policy (C)", () => {
 
     const gb = await classroom.gradebook(teacher, klass.id, { limit: 20 });
     const row = gb.assignments.find((x) => x.id === a.id)!.members.find((m) => m.learnerId === studentAccount.learnerId)!;
+    // Only the first two attempts count; the 2nd (9) is final, the 3rd is practice.
     expect(row.bestNumerator).toBe(9);
-    expect(row.latestNumerator).toBe(7);
-    // Default best => effective is best.
+    expect(row.latestNumerator).toBe(9);
     expect((row as { effectiveNumerator?: number | null }).effectiveNumerator).toBe(9);
     expect((row as { gradingPolicy?: string }).gradingPolicy).toBe("best");
     // Raw attempts preserved.
@@ -111,7 +111,8 @@ describe("explicit grading policy (C)", () => {
     await seedAttempt(fresh.learnerId, 4, t);
     const gb = await classroom.gradebook(teacher, klass.id, { limit: 20 });
     const row = gb.assignments.find((x) => x.id === a.id)!.members.find((m) => m.learnerId === fresh.learnerId)!;
-    expect(row.bestNumerator).toBe(10);
+    // The second attempt is final even when the first scored higher.
+    expect(row.bestNumerator).toBe(4);
     expect(row.latestNumerator).toBe(4);
     expect((row as { effectiveNumerator?: number | null }).effectiveNumerator).toBe(4);
 
