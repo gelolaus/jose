@@ -1,3 +1,4 @@
+import { UNLIMITED_LEARNING } from "@jose/shared";
 import { ChestPlayer } from "@/components/chest-player";
 import { GamePlayer } from "@/components/game-player";
 import { AppShell } from "@/components/learning-shell";
@@ -68,7 +69,7 @@ export default async function PlayLevelPage({ params }: Props) {
               {data.level.sectionTitle}
             </p>
             <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#12122e]">
-              Unlimited learning
+              {UNLIMITED_LEARNING ? "Unlimited learning" : `Lives ${data.learner.hearts}`}
             </span>
           </div>
         </header>

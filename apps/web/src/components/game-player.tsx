@@ -19,6 +19,7 @@ import {
 } from "@/lib/path-api";
 import {
   HEARTS_EMPTY_CODE,
+  UNLIMITED_LEARNING,
   firstTryScore,
   pieceCount,
   type AssessmentGame,
@@ -295,7 +296,7 @@ export function GamePlayer({
         title={title}
         hint={hintFor(game.type)}
         hearts={hearts}
-        showHearts={false}
+        showHearts={!UNLIMITED_LEARNING}
         progress={labelFor(game.type)}
         scene={game.type}
         wide

@@ -10,6 +10,7 @@ import {
   modulesResponseSchema,
   pathResponseSchema,
   type SessionUser,
+  UNLIMITED_LEARNING,
 } from "@jose/shared";
 import { eq } from "drizzle-orm";
 import { AppModule } from "../app.module";
@@ -133,7 +134,7 @@ describe("CurriculumService", () => {
     expect(after.some((row) => row.id === created.id)).toBe(false);
   });
 
-  it("records path misses for practice without spending hearts or locking the game", async () => {
+  it("spends a Life per module-game miss unless unlimited learning is on", async () => {
     await service.completeLevel("ateneo-welcome", student.learnerId);
     await database.db
       .update(learners)
@@ -144,7 +145,9 @@ describe("CurriculumService", () => {
       idempotencyKey: `miss-${randomUUID()}`,
     });
     const afterMiss = await service.getLearner(student.learnerId);
-    expect(afterMiss.hearts).toBe(before.hearts);
+    expect(afterMiss.hearts).toBe(
+      UNLIMITED_LEARNING ? before.hearts : before.hearts - 1,
+    );
 
     await database.db
       .update(learners)

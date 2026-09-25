@@ -115,3 +115,11 @@ export function firstTryScore(pieces: number, misses: number): {
   const score = Math.max(0, maxScore - Math.max(0, misses));
   return { score, maxScore, stars: starsFromMisses(misses, maxScore) };
 }
+
+/**
+ * Master switch for "unlimited learning". When true, module games never cost
+ * Lives and XP is only granted on a level's first completion. When false
+ * (Duolingo-style), every miss in a module game costs a Life and every won
+ * module game earns XP. Practice games are never affected.
+ */
+export const UNLIMITED_LEARNING = false;
