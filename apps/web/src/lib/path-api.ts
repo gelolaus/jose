@@ -34,6 +34,7 @@ import {
   jmmImportPreviewResponseSchema,
   jmmImportCommitResponseSchema,
   artifactsResponseSchema,
+  dailyGoalSchema,
   teachModuleSchema,
   type ArtifactsResponse,
   type ChestContent,
@@ -145,13 +146,27 @@ export function isUnauthorizedError(error: unknown): boolean {
   return error instanceof ApiError && error.status === 401;
 }
 
+/** Zod learner objects drop unknown keys. Keep the optional daily goal when the server sent one. */
+function keepDailyGoal<T>(json: unknown, parsed: T): T {
+  if (!parsed || typeof parsed !== "object" || !("learner" in parsed)) return parsed;
+  const learner = (parsed as { learner?: unknown }).learner;
+  if (!learner || typeof learner !== "object") return parsed;
+  const raw = json as { learner?: { dailyGoal?: unknown } } | null;
+  const goal = dailyGoalSchema.safeParse(raw?.learner?.dailyGoal);
+  if (!goal.success) return parsed;
+  return {
+    ...(parsed as object),
+    learner: { ...(learner as object), dailyGoal: goal.data },
+  } as T;
+}
+
 export async function fetchModules(options?: ApiCallOptions): Promise<
   | { ok: true; data: ModulesResponse }
   | { ok: false; error: string; status?: number }
 > {
   try {
     const json = await apiFetch("/modules", undefined, options);
-    return { ok: true, data: modulesResponseSchema.parse(json) };
+    return { ok: true, data: keepDailyGoal(json, modulesResponseSchema.parse(json)) };
   } catch (error) {
     return {
       ok: false,
@@ -167,7 +182,7 @@ export async function fetchModulePath(
 ): Promise<{ ok: true; data: PathResponse } | { ok: false; error: string; status?: number }> {
   try {
     const json = await apiFetch(`/modules/${moduleId}`, undefined, options);
-    return { ok: true, data: pathResponseSchema.parse(json) };
+    return { ok: true, data: keepDailyGoal(json, pathResponseSchema.parse(json)) };
   } catch (error) {
     return {
       ok: false,
@@ -183,7 +198,7 @@ export async function fetchDemoPath(options?: ApiCallOptions): Promise<
 > {
   try {
     const json = await apiFetch("/path/demo", undefined, options);
-    return { ok: true, data: pathResponseSchema.parse(json) };
+    return { ok: true, data: keepDailyGoal(json, pathResponseSchema.parse(json)) };
   } catch (error) {
     return {
       ok: false,
@@ -202,7 +217,7 @@ export async function fetchPlayLevel(
 > {
   try {
     const json = await apiFetch(`/levels/${levelId}`, undefined, options);
-    return { ok: true, data: playLevelResponseSchema.parse(json) };
+    return { ok: true, data: keepDailyGoal(json, playLevelResponseSchema.parse(json)) };
   } catch (error) {
     return {
       ok: false,
@@ -218,7 +233,7 @@ export async function completeLevel(levelId: string) {
     method: "POST",
     body: "{}",
   });
-  return attemptResultSchema.parse(json);
+  return keepDailyGoal(json, attemptResultSchema.parse(json));
 }
 
 
@@ -243,7 +258,7 @@ export async function recordMiss(levelId: string, idempotencyKey: string) {
     method: "POST",
     body: JSON.stringify(missBodySchema.parse({ idempotencyKey })),
   });
-  return missResponseSchema.parse(json);
+  return keepDailyGoal(json, missResponseSchema.parse(json));
 }
 
 export async function fetchPracticeReview(options?: ApiCallOptions): Promise<
@@ -290,7 +305,7 @@ export async function submitPracticeAttempt(body: {
     method: "POST",
     body: JSON.stringify(body),
   });
-  return practiceAttemptResultSchema.parse(json);
+  return keepDailyGoal(json, practiceAttemptResultSchema.parse(json));
 }
 
 export async function fetchProfileStats(options?: ApiCallOptions): Promise<
@@ -328,7 +343,7 @@ export async function finishAttempt(
     method: "POST",
     body: JSON.stringify(body),
   });
-  return finishAttemptResultSchema.parse(json);
+  return keepDailyGoal(json, finishAttemptResultSchema.parse(json));
 }
 
 export async function grantTeachCollaborator(moduleId: string, email: string) {

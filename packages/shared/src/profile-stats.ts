@@ -2,6 +2,29 @@ import { z } from "zod";
 import { learnerSchema } from "./path";
 import { XP_RULES_COPY, STREAK_RULES_COPY } from "./streak";
 
+/** Snapshot of the published module the learner cleared. Never rewritten later. */
+export const moduleBadgeSchema = z.object({
+  moduleId: z.string().min(1),
+  title: z.string().min(1),
+  subtitle: z.string(),
+  coverColor: z.string(),
+  levelCount: z.number().int().nonnegative(),
+  earnedAt: z.number().int(),
+  publishedRevisionId: z.string().nullable(),
+  stillPublished: z.boolean(),
+});
+
+/** One path level per Asia/Manila day. Derived from learner_progress, not a client counter. */
+export const dailyGoalSchema = z.object({
+  met: z.boolean(),
+  completedLevelsToday: z.number().int().nonnegative(),
+  targetLevels: z.literal(1),
+});
+
+export const studentLearnerSchema = learnerSchema.extend({
+  dailyGoal: dailyGoalSchema.optional(),
+});
+
 export const achievementIdSchema = z.enum([
   "on-the-path",
   "first-treasure",
@@ -27,7 +50,7 @@ export const moduleProgressSummarySchema = z.object({
 });
 
 export const profileStatsResponseSchema = z.object({
-  learner: learnerSchema,
+  learner: studentLearnerSchema,
   modules: z.array(moduleProgressSummarySchema),
   totals: z.object({
     completedLevels: z.number().int().nonnegative(),
@@ -35,6 +58,8 @@ export const profileStatsResponseSchema = z.object({
     chestsOpened: z.number().int().nonnegative(),
   }),
   achievements: z.array(achievementSchema),
+  /** Newest earnedAt first. Omitted on older payloads. */
+  badges: z.array(moduleBadgeSchema).default([]),
   rules: z.object({
     xp: z.string(),
     streak: z.string(),
@@ -44,6 +69,8 @@ export const profileStatsResponseSchema = z.object({
 
 export type AchievementId = z.infer<typeof achievementIdSchema>;
 export type Achievement = z.infer<typeof achievementSchema>;
+export type ModuleBadge = z.infer<typeof moduleBadgeSchema>;
+export type DailyGoal = z.infer<typeof dailyGoalSchema>;
 export type ProfileStatsResponse = z.infer<typeof profileStatsResponseSchema>;
 
 export const HEARTS_RULES_COPY =

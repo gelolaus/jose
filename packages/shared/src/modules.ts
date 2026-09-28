@@ -7,6 +7,7 @@ import { chestContentSchema } from "./artifacts";
 import { MAX_ATTEMPT_PAYLOAD_BYTES, serializedJsonBytes } from "./limits";
 import { continueLearningSchema } from "./continue";
 import { lessonContentSchema } from "./games";
+import { dailyGoalSchema, moduleBadgeSchema } from "./profile-stats";
 import {
   gameTypeSchema,
   hexColorSchema,
@@ -106,12 +107,18 @@ export const missResponseSchema = z.object({
 export const attemptResultSchema = z.object({
   completed: z.boolean(),
   firstTime: z.boolean(),
-  learner: learnerSchema,
+  learner: learnerSchema.extend({
+    dailyGoal: dailyGoalSchema.optional(),
+  }),
   nextLevelId: z.string().min(1).nullable().optional(),
   continueHref: z.string().min(1).optional(),
   contentRevisionId: z.string().min(1).nullable().optional(),
   artifactAwarded: z.boolean().optional(),
   lessonCreditApplied: z.boolean().optional(),
+  /** Present only on the response that first inserts the badge; later completions send null. */
+  moduleBadge: moduleBadgeSchema.nullable().optional(),
+  xpAwarded: z.number().int().nonnegative().optional(),
+  streakIncreased: z.boolean().optional(),
 });
 
 export type ModuleCard = z.infer<typeof moduleCardSchema>;

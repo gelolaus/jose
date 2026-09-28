@@ -1,3 +1,5 @@
+import { UNLIMITED_LEARNING } from "./hearts";
+
 /** APC default calendar for qualifying learning activity. */
 export const LEARNING_TIMEZONE = "Asia/Manila";
 
@@ -75,5 +77,6 @@ export function applyQualifyingActivity(
 export const STREAK_RULES_COPY =
   "A day of streak counts when you complete a lesson, game, or practice review in Asia/Manila time. Replaying the same day does not add extra streak. Missing a Manila calendar day resets the count to 1 on your next activity.";
 
-export const XP_RULES_COPY =
-  "You earn 10 XP the first time you complete each path level. Replays and practice reviews do not award path XP and do not mark formal assignments complete.";
+export const XP_RULES_COPY = UNLIMITED_LEARNING
+  ? "You earn 10 XP the first time you complete each path level. Replays and practice reviews do not award path XP and do not mark formal assignments complete."
+  : "You earn 10 XP the first time you complete each path level. A passing replay of a path game awards 5 XP. Practice reviews do not award path XP and do not mark formal assignments complete.";

@@ -22,6 +22,7 @@ import {
   dispatchesGameSchema,
   editorialGameSchema,
 } from "./advanced-games";
+import { dailyGoalSchema, moduleBadgeSchema } from "./profile-stats";
 import { learnerSchema } from "./path";
 
 export const attemptModeSchema = z.enum(["assessment", "practice"]);
@@ -329,13 +330,19 @@ export const finishAttemptResultSchema = z.object({
   score: z.number().int().nonnegative(),
   maxScore: z.number().int().nonnegative(),
   stars: z.union([z.literal(1), z.literal(2), z.literal(3)]),
-  learner: learnerSchema,
+  learner: learnerSchema.extend({
+    dailyGoal: dailyGoalSchema.optional(),
+  }),
   /** True when this response reused a prior finish (idempotent retry). */
   deduplicated: z.boolean(),
   nextLevelId: z.string().min(1).nullable().optional(),
   continueHref: z.string().min(1).optional(),
   gradedAttemptsUsed: z.number().int().nonnegative().optional(),
   gradedAttemptsRemaining: z.number().int().nonnegative().optional(),
+  /** Present only on the response that first inserts the badge; later completions send null. */
+  moduleBadge: moduleBadgeSchema.nullable().optional(),
+  xpAwarded: z.number().int().nonnegative().optional(),
+  streakIncreased: z.boolean().optional(),
 });
 
 export type FinishAttemptResult = z.infer<typeof finishAttemptResultSchema>;

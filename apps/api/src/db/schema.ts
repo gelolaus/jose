@@ -513,6 +513,30 @@ export const practiceReviews = sqliteTable(
   }),
 );
 
+/**
+ * Permanent module badges. No foreign key to modules or module_revisions:
+ * unpublish, archive, or a later revision must not delete or rewrite the row.
+ * Snapshot columns are what the profile renders forever.
+ */
+export const learnerModuleBadges = sqliteTable(
+  "learner_module_badges",
+  {
+    learnerId: text("learner_id")
+      .notNull()
+      .references(() => learners.id, { onDelete: "cascade" }),
+    moduleId: text("module_id").notNull(),
+    titleSnapshot: text("title_snapshot").notNull(),
+    subtitleSnapshot: text("subtitle_snapshot").notNull(),
+    coverColorSnapshot: text("cover_color_snapshot").notNull(),
+    publishedRevisionId: text("published_revision_id"),
+    levelCount: integer("level_count").notNull(),
+    earnedAt: integer("earned_at").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.learnerId, table.moduleId] }),
+  }),
+);
+
 /** Monotonic achievements — finishing the course never revokes these. */
 export const learnerAchievements = sqliteTable(
   "learner_achievements",

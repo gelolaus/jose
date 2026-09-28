@@ -737,6 +737,167 @@ export const migration016AssignedSnapshots: Migration = {
   },
 };
 
+type BadgeBackfillCandidate = {
+  learnerId: string;
+  moduleId: string;
+  title: string;
+  subtitle: string;
+  coverColor: string;
+  publishedRevisionId: string;
+  levelCount: number;
+  earnedAt: number;
+  revisionNumber: number;
+};
+
+function snapshotBadgeFields(raw: string): {
+  title: string;
+  subtitle: string;
+  coverColor: string;
+  levelIds: string[];
+} | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const snap = parsed as {
+    module?: { title?: unknown; subtitle?: unknown; coverColor?: unknown };
+    sections?: Array<{ levels?: Array<{ id?: unknown }> }>;
+  };
+  const title = snap.module?.title;
+  const subtitle = snap.module?.subtitle;
+  const coverColor = snap.module?.coverColor;
+  if (typeof title !== "string" || !title.trim()) return null;
+  if (typeof subtitle !== "string") return null;
+  if (typeof coverColor !== "string" || !coverColor.trim()) return null;
+  const levelIds: string[] = [];
+  for (const section of snap.sections ?? []) {
+    for (const level of section.levels ?? []) {
+      if (typeof level?.id === "string" && level.id) levelIds.push(level.id);
+    }
+  }
+  return {
+    title,
+    subtitle,
+    coverColor,
+    levelIds: [...new Set(levelIds)],
+  };
+}
+
+/**
+ * One badge per learner+module from historical published revisions.
+ * earned_at is the earliest max(completed_at) among revisions whose every
+ * snapshot level is already in learner_progress. Existing rows are left alone.
+ */
+export async function backfillLearnerModuleBadges(client: Client): Promise<void> {
+  const revisions = await client.execute(
+    `SELECT id, module_id, snapshot_json, published_at, revision_number
+     FROM module_revisions
+     WHERE published_at IS NOT NULL`,
+  );
+  const progress = await client.execute(
+    `SELECT learner_id, level_id, completed_at FROM learner_progress`,
+  );
+  const byLearner = new Map<string, Map<string, number>>();
+  for (const row of progress.rows) {
+    const learnerId = String(row.learner_id ?? "");
+    const levelId = String(row.level_id ?? "");
+    const completedAt = Number(row.completed_at ?? 0);
+    if (!learnerId || !levelId) continue;
+    const levels = byLearner.get(learnerId) ?? new Map<string, number>();
+    const prior = levels.get(levelId);
+    if (prior == null || completedAt > prior) levels.set(levelId, completedAt);
+    byLearner.set(learnerId, levels);
+  }
+
+  const best = new Map<string, BadgeBackfillCandidate>();
+  for (const row of revisions.rows) {
+    const revisionId = String(row.id ?? "");
+    const moduleId = String(row.module_id ?? "");
+    const snapshotJson = String(row.snapshot_json ?? "");
+    const revisionNumber = Number(row.revision_number ?? 0);
+    if (!revisionId || !moduleId || row.published_at == null) continue;
+    const fields = snapshotBadgeFields(snapshotJson);
+    if (!fields || fields.levelIds.length === 0) continue;
+    for (const [learnerId, levels] of byLearner) {
+      let earnedAt = 0;
+      let complete = true;
+      for (const levelId of fields.levelIds) {
+        const at = levels.get(levelId);
+        if (at == null) {
+          complete = false;
+          break;
+        }
+        if (at > earnedAt) earnedAt = at;
+      }
+      if (!complete) continue;
+      const key = `${learnerId}\0${moduleId}`;
+      const current = best.get(key);
+      if (
+        !current ||
+        earnedAt < current.earnedAt ||
+        (earnedAt === current.earnedAt && revisionNumber < current.revisionNumber)
+      ) {
+        best.set(key, {
+          learnerId,
+          moduleId,
+          title: fields.title,
+          subtitle: fields.subtitle,
+          coverColor: fields.coverColor,
+          publishedRevisionId: revisionId,
+          levelCount: fields.levelIds.length,
+          earnedAt,
+          revisionNumber,
+        });
+      }
+    }
+  }
+
+  for (const candidate of best.values()) {
+    await client.execute({
+      sql: `INSERT INTO learner_module_badges (
+        learner_id, module_id, title_snapshot, subtitle_snapshot, cover_color_snapshot,
+        published_revision_id, level_count, earned_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(learner_id, module_id) DO NOTHING`,
+      args: [
+        candidate.learnerId,
+        candidate.moduleId,
+        candidate.title,
+        candidate.subtitle,
+        candidate.coverColor,
+        candidate.publishedRevisionId,
+        candidate.levelCount,
+        candidate.earnedAt,
+      ],
+    });
+  }
+}
+
+/** Permanent per-module badges plus a one-shot backfill from published revisions. */
+export const migration017LearnerModuleBadges: Migration = {
+  id: "017_learner_module_badges",
+  async up(client) {
+    await client.execute("PRAGMA foreign_keys = ON");
+    await client.execute(
+      `CREATE TABLE IF NOT EXISTS learner_module_badges (
+        learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+        module_id TEXT NOT NULL,
+        title_snapshot TEXT NOT NULL,
+        subtitle_snapshot TEXT NOT NULL,
+        cover_color_snapshot TEXT NOT NULL,
+        published_revision_id TEXT,
+        level_count INTEGER NOT NULL,
+        earned_at INTEGER NOT NULL,
+        PRIMARY KEY (learner_id, module_id)
+      )`,
+    );
+    await backfillLearnerModuleBadges(client);
+  },
+};
+
 export const MIGRATIONS: Migration[] = [
   migration001InitialSchema,
   migration002QueryIndexes,
@@ -754,6 +915,7 @@ export const MIGRATIONS: Migration[] = [
   migration014AssignmentDetails,
   migration015GradeOverrides,
   migration016AssignedSnapshots,
+  migration017LearnerModuleBadges,
 ];
 
 export async function ensureColumn(
