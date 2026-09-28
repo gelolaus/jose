@@ -15,7 +15,7 @@ export function TeachShell({ children }: { children: ReactNode }) {
 }
 
 function TeachShellBody({ children }: { children: ReactNode }) {
-  const { canTeach, loading } = useJoseSession();
+  const { authenticated, canTeach, loading } = useJoseSession();
 
   if (loading) {
     return (
@@ -37,9 +37,11 @@ function TeachShellBody({ children }: { children: ReactNode }) {
             tools, and an APC email alone does not grant access.
           </p>
           <div className="flex flex-wrap justify-center gap-2">
-            <Link href="/login" className="jose-button">
-              School sign-in
-            </Link>
+            {!authenticated ? (
+              <Link href="/" className="jose-button">
+                School sign-in
+              </Link>
+            ) : null}
             <Link href="/learn" className="jose-button jose-button--secondary">
               Back to learning
             </Link>

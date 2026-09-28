@@ -193,9 +193,9 @@ export class AuthController {
   ) {
     if (outcome.kind === "session") {
       this.setSessionCookie(res, outcome.token, secure, sessionTtl);
-      return res.redirect(302, `${webOrigin}/login?signedIn=1`);
+      return res.redirect(302, `${webOrigin}/learn`);
     }
-    const url = new URL(`${webOrigin}/login`);
+    const url = new URL(`${webOrigin}/`);
     url.searchParams.set("reason", outcome.reason);
     return res.redirect(302, url.toString());
   }

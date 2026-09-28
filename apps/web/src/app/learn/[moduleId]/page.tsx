@@ -2,7 +2,7 @@ import { AppShell } from "@/components/learning-shell";
 import { PathView } from "@/components/path-view";
 import { RecoveryState } from "@/components/recovery-state";
 import { TopBar } from "@/components/top-bar";
-import { SignInRequired } from "@/components/sign-in-required";
+import { redirectToLanding } from "@/lib/landing-gate";
 import { fetchModulePath } from "@/lib/server-api";
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
@@ -25,13 +25,7 @@ export default async function ModulePathPage({ params }: Props) {
   const result = await fetchModulePath(moduleId);
 
   if (!result.ok) {
-    if (result.status === 401) {
-      return (
-        <AppShell>
-          <SignInRequired />
-        </AppShell>
-      );
-    }
+    if (result.status === 401) redirectToLanding();
     if (result.status === 404) notFound();
     return (
       <AppShell>

@@ -73,7 +73,7 @@ describe("Microsoft APC admission (issue #5)", () => {
     const state = await startLogin();
     const callback = await completeMock(state, claims);
     expect(callback.status).toBe(302);
-    expect(String(callback.headers.location)).toContain("/login?signedIn=1");
+    expect(String(callback.headers.location)).toContain("/learn");
     const session = readSetCookie(callback.headers["set-cookie"], SESSION_COOKIE);
     expect(session).toBeTruthy();
     const me = await request(app.getHttpServer())
@@ -99,7 +99,7 @@ describe("Microsoft APC admission (issue #5)", () => {
     });
 
     expect(callback.status).toBe(302);
-    expect(String(callback.headers.location)).toContain("/login?signedIn=1");
+    expect(String(callback.headers.location)).toContain("/learn");
     const session = readSetCookie(callback.headers["set-cookie"], SESSION_COOKIE);
     expect(session).toBeTruthy();
     const me = await request(app.getHttpServer())

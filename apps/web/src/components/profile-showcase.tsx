@@ -169,7 +169,7 @@ export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
             </button>
           ) : null}
           {!loading && !authenticated ? (
-            <Link href="/login" className="profile-sheet__wood-button">School sign-in</Link>
+            <Link href="/" className="profile-sheet__wood-button">School sign-in</Link>
           ) : null}
         </div>
       </div>

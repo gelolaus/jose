@@ -35,7 +35,7 @@ export default async function AdminTeachersPage() {
               : loadError}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/login" className="jose-button">
+          <Link href="/" className="jose-button">
             School sign-in
           </Link>
           <Link href="/profile" className="min-h-11 rounded-full bg-white px-5 py-3 font-extrabold ring-1 ring-black/10">
