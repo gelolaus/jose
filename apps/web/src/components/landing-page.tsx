@@ -6,6 +6,8 @@ import Link from "next/link";
 
 export type LandingSignInState = {
   reason?: string;
+  /** Microsoft returned, but this browser has no Jose session. */
+  sessionMissing?: boolean;
   mode: string;
   mockEnabled: boolean;
   demoMode: boolean;
@@ -65,6 +67,16 @@ export function LandingPage({ signIn }: { signIn: LandingSignInState }) {
                 {signIn.reason === "switch_account" ? "Switch Microsoft account" : "Sign-in update"}
               </strong>
               <p>{denial}</p>
+            </div>
+          ) : null}
+
+          {signIn.sessionMissing && !denial ? (
+            <div className="jose-login__banner jose-login__banner--warn" role="status">
+              <strong>Sign-in did not finish</strong>
+              <p>
+                Microsoft sent you back, but this browser does not have a Jose session.
+                Continue with Microsoft again.
+              </p>
             </div>
           ) : null}
 

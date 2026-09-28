@@ -1,4 +1,5 @@
 import { LandingPage, type LandingSignInState } from "@/components/landing-page";
+import { rethrowIfNavigation } from "@/lib/navigation-error";
 import { fetchAuthMe, fetchAuthStatus } from "@/lib/server-api";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -18,16 +19,21 @@ export default async function HomePage({
 }) {
   const params = await searchParams;
   const reason = typeof params.reason === "string" ? params.reason : undefined;
+  const signedInFlag = params.signedIn === "1" || params.signedIn === "true";
+  let sessionMissing = false;
 
   try {
     const me = await fetchAuthMe();
     if (me.authenticated) redirect("/learn");
-  } catch {
-    // API down: still show the landing page instead of dumping the visitor into Learn.
+    sessionMissing = signedInFlag;
+  } catch (error) {
+    // redirect() throws. Swallowing it left signed-in people on this page.
+    rethrowIfNavigation(error);
   }
 
   let signIn: LandingSignInState = {
     reason,
+    sessionMissing,
     mode: "unknown",
     mockEnabled: false,
     demoMode: false,
@@ -40,6 +46,7 @@ export default async function HomePage({
     const ready = status.mode === "microsoft" || status.mode === "mock";
     signIn = {
       reason,
+      sessionMissing,
       mode: status.mode,
       mockEnabled: status.mockEnabled,
       demoMode: status.demoMode,

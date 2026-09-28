@@ -160,10 +160,11 @@ describe("AppShell navigation and HUD", () => {
       expect(label).toHaveClass("shell-nav-label");
       expect(label.closest("a")?.querySelector("img")).not.toBeNull();
     }
-    expect(within(bottomNav as HTMLElement).getByRole("link", { name: "Settings" })).toHaveAttribute(
-      "href",
-      "/profile/preferences",
-    );
+    expect(within(bottomNav as HTMLElement).queryByRole("link", { name: "Settings" })).toBeNull();
+    const settings = screen.getByRole("link", { name: "Settings" });
+    expect(settings).toHaveAttribute("href", "/profile/preferences");
+    expect(settings).toHaveClass("sidebar-settings");
+    expect(settings.querySelector("img")).toBeNull();
   });
 
   it("hides the bottom nav on a level route and keeps the sidebar", () => {

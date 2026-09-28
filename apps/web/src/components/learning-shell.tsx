@@ -6,7 +6,6 @@ import { TopBar } from "@/components/top-bar";
 import { t } from "@/lib/reading-preferences";
 import { JoseSessionProvider, useJoseSession } from "@/lib/use-jose-session";
 import { useReadingPreferences } from "@/lib/use-reading-preferences";
-import { NAVIGATION_IMAGES } from "@/lib/ui-assets";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -114,35 +113,14 @@ function AppShellBody({
         label: t(prefs.locale, tab.labelKey),
         icon: tab.icon,
       }))}
-      mobileDock={
+      footer={
         <Link
           href="/profile/preferences"
-          className={`shell-settings-link${settingsActive ? " active" : ""}`}
+          className={`sidebar-settings${settingsActive ? " active" : ""}`}
           aria-current={settingsActive ? "page" : undefined}
         >
-          <img
-            src={NAVIGATION_IMAGES["/profile/preferences"]}
-            alt=""
-            className="shell-settings-link__img"
-          />
-          <span className="shell-settings-link__label">Settings</span>
+          Settings
         </Link>
-      }
-      footer={
-        <div className={`nav-item-img ${settingsActive ? "active" : ""}`}>
-          <Link
-            href="/profile/preferences"
-            className="nav-image-link"
-            aria-label="Settings"
-            aria-current={settingsActive ? "page" : undefined}
-          >
-            <img
-              src={NAVIGATION_IMAGES["/profile/preferences"]}
-              alt="Settings"
-              className="nav-btn-img"
-            />
-          </Link>
-        </div>
       }
     >
       {children}

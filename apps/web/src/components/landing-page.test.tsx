@@ -46,6 +46,12 @@ describe("LandingPage", () => {
     expect(screen.getByText(/test identities/i)).toBeInTheDocument();
   });
 
+  it("explains when Microsoft returned without a Jose session", () => {
+    render(<LandingPage signIn={{ ...ready, sessionMissing: true }} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Sign-in did not finish");
+    expect(screen.getByRole("link", { name: "Continue with Microsoft" })).toBeInTheDocument();
+  });
+
   it("explains when Microsoft sign-in is not configured", () => {
     render(
       <LandingPage
