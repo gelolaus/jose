@@ -9,6 +9,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import "./shell-nav.css";
 
 export type JoseShellTab = {
   href: string;
@@ -26,11 +27,17 @@ function navImageFor(href: string) {
   return NAVIGATION_IMAGES[href];
 }
 
+/** Play routes own the thumb zone, so the fixed bottom nav stays off. */
+function isLevelPlayRoute(pathname: string) {
+  return /^\/learn\/[^/]+\/[^/]+\/?$/.test(pathname);
+}
+
 export function JoseShell({
   children,
   topBar,
   tabs,
   extraTabs = [],
+  mobileDock,
   accent = "learn",
   brandTitle = "Jose",
   brandSubtitle,
@@ -41,21 +48,26 @@ export function JoseShell({
   topBar?: ReactNode;
   tabs: JoseShellTab[];
   extraTabs?: JoseShellTab[];
+  mobileDock?: ReactNode;
   accent?: "learn" | "teach";
   brandTitle?: string;
   brandSubtitle?: ReactNode;
   footer?: ReactNode;
   navLabel?: string;
 }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const allTabs = [...tabs, ...extraTabs];
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const levelRoute = isLevelPlayRoute(pathname);
 
   return (
     <div
-      className="jose-shell relative flex h-dvh overflow-hidden bg-transparent md:grid"
+      className={`jose-shell relative flex h-dvh overflow-hidden bg-transparent md:grid${
+        levelRoute ? " jose-shell--level" : ""
+      }`}
       data-accent={accent}
       data-sidebar-collapsed={sidebarCollapsed}
+      data-bottom-nav={levelRoute ? "hidden" : "shown"}
     >
       <SkipLink />
       <ThemeDocumentSync />
@@ -125,37 +137,39 @@ export function JoseShell({
         >
           {children}
         </main>
-        <nav
-          className="jose-bottom-nav shrink-0 border-t border-[var(--jose-rule)] bg-[var(--jose-paper)]/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] backdrop-blur-md md:hidden"
-          aria-label={navLabel}
-        >
-          <ul className="nav-image-list nav-image-list--mobile">
-            {allTabs.map((tab) => {
-              const active = tabIsActive(pathname, tab);
-              const imageSrc = navImageFor(tab.href);
-              const Icon = tab.icon;
-              return (
-                <li
-                  key={`bottom-${tab.href}-${tab.label}`}
-                  className={`nav-item-img ${active ? "active" : ""}`}
-                >
-                  <Link
-                    href={tab.href}
-                    aria-current={active ? "page" : undefined}
-                    aria-label={tab.label}
-                    className="nav-image-link"
-                  >
-                    {imageSrc ? (
-                      <img src={imageSrc} alt={tab.label} className="nav-btn-img" />
-                    ) : (
-                      <Icon className="nav-fallback-icon" aria-hidden />
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+        {levelRoute ? null : (
+          <div className="shell-mobile-dock">
+            <nav className="jose-bottom-nav shrink-0 md:hidden" aria-label={navLabel}>
+              {mobileDock}
+              <ul className="nav-image-list nav-image-list--mobile">
+                {allTabs.map((tab) => {
+                  const active = tabIsActive(pathname, tab);
+                  const imageSrc = navImageFor(tab.href);
+                  const Icon = tab.icon;
+                  return (
+                    <li
+                      key={`bottom-${tab.href}-${tab.label}`}
+                      className={`nav-item-img ${active ? "active" : ""}`}
+                    >
+                      <Link
+                        href={tab.href}
+                        aria-current={active ? "page" : undefined}
+                        className="nav-image-link shell-bottom-link"
+                      >
+                        {imageSrc ? (
+                          <img src={imageSrc} alt="" className="nav-btn-img" />
+                        ) : (
+                          <Icon className="nav-fallback-icon" aria-hidden />
+                        )}
+                        <span className="shell-nav-label">{tab.label}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+          </div>
+        )}
       </div>
     </div>
   );

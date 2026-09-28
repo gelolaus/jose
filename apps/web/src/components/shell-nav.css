@@ -1,0 +1,200 @@
+/* Mobile shell chrome. Desktop sidebar art stays on the global nav rules. */
+
+.shell-teacher-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 44px;
+  padding: 0 0.75rem;
+  border-bottom: 1px solid var(--jose-rule);
+  background: var(--jose-paper);
+}
+
+.shell-teacher-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 0.35rem;
+  color: var(--jose-sky);
+  font-size: 0.875rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.shell-streak-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid var(--jose-rule);
+  background: var(--jose-paper);
+}
+
+.shell-streak-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.15rem 0.7rem 0.15rem 0.35rem;
+  border: 1px solid var(--jose-rule);
+  border-radius: 999px;
+  background: var(--jose-surface-elevated);
+  color: var(--jose-ink);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.shell-streak-chip__icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.shell-mobile-dock {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  border-top: 1px solid var(--jose-rule);
+  background: color-mix(in srgb, var(--jose-paper) 95%, transparent);
+  padding-bottom: max(0.35rem, env(safe-area-inset-bottom));
+  backdrop-filter: blur(12px);
+}
+
+.shell-mobile-dock .jose-bottom-nav {
+  position: static;
+  z-index: auto;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  border-top: 0;
+  background: transparent;
+  padding-bottom: 0;
+  backdrop-filter: none;
+}
+
+.shell-settings-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.1rem 0.75rem;
+  color: var(--jose-ink);
+  font-size: 0.875rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-decoration: none;
+}
+
+.shell-settings-link.active {
+  background: rgba(201, 168, 76, 0.13);
+}
+
+.shell-settings-link__img {
+  width: auto;
+  height: 1.75rem;
+  max-width: 7.25rem;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.shell-settings-link__label {
+  min-width: 0;
+}
+
+.shell-mobile-dock .nav-image-list--mobile {
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 0;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.15rem 0.1rem 0.2rem;
+  overflow-x: hidden;
+}
+
+.shell-mobile-dock .nav-image-list--mobile .nav-item-img {
+  min-width: 0;
+  width: auto;
+  max-width: 100%;
+  flex: 1 1 0;
+  padding: 0.05rem;
+}
+
+.shell-mobile-dock .shell-bottom-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.05rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.1rem 0;
+}
+
+.shell-mobile-dock .nav-image-list--mobile .nav-btn-img {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+
+.shell-mobile-dock .nav-fallback-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+}
+
+.shell-nav-label {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--jose-ink);
+  font-size: clamp(0.6rem, 2.85vw, 0.75rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.shell-teacher-link:focus-visible,
+.shell-settings-link:focus-visible,
+.shell-bottom-link:focus-visible {
+  outline: 3px solid var(--jose-gold);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .jose-shell:not(.jose-shell--level) .jose-shell-main {
+    padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+  }
+
+  .jose-shell--level .jose-shell-main {
+    padding-bottom: 0;
+  }
+}
+
+@media (min-width: 768px) {
+  .shell-mobile-dock {
+    display: none;
+  }
+}
