@@ -1686,10 +1686,16 @@ html[data-theme="dark"] .path-section {
   box-shadow: 0 1px 0 rgb(26 26 62 / 10%);
 }
 @media (max-width: 767px) {
-  .path-node-label {
+  .path-section {
+    min-height: auto;
+  }
+
+  .path-section .path-node-label {
     max-width: clamp(4.5rem, 25vw, 9rem);
     overflow-wrap: anywhere;
+    white-space: normal;
     font-size: clamp(0.75rem, 3.5vw, 1rem);
+    line-height: 1.25;
   }
 }
 html[data-theme="dark"] .path-node-label {
