@@ -118,15 +118,17 @@ describe("ProfileShowcase", () => {
     expect(screen.getByText("First treasure · Locked").closest("li")).toHaveStyle({ opacity: "0.45" });
   });
 
-  it("never renders Teacher area for teachers; admins keep Manage teachers", () => {
+  it("puts Settings and Teacher area in the account panel for teachers", () => {
     (session.value as { canTeach: boolean; canAdmin: boolean }).canTeach = true;
     (session.value as { canAdmin: boolean }).canAdmin = false;
     const { unmount } = render(<ProfileShowcase stats={stats} />);
-    expect(screen.queryByRole("link", { name: /teacher area/i })).toBeNull();
+    expect(screen.getByRole("link", { name: /settings/i })).toHaveAttribute("href", "/profile/preferences");
+    expect(screen.getByRole("link", { name: /teacher area/i })).toHaveAttribute("href", "/teach");
+    expect(screen.queryByRole("link", { name: /manage teachers/i })).toBeNull();
     unmount();
     (session.value as { canAdmin: boolean }).canAdmin = true;
     render(<ProfileShowcase stats={stats} />);
-    expect(screen.queryByRole("link", { name: /teacher area/i })).toBeNull();
+    expect(screen.getByRole("link", { name: /teacher area/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /manage teachers/i })).toBeInTheDocument();
   });
 });

@@ -25,7 +25,7 @@ function formatEarned(epochMs: number) {
 
 export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
   const identity = useExplorerIdentity(stats.learner.displayName);
-  const { authenticated, canAdmin, loading, user } = useJoseSession();
+  const { authenticated, canAdmin, canTeach, loading, user } = useJoseSession();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
 
@@ -229,7 +229,10 @@ export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
             <section className="profile-sheet__panel profile-sheet__panel--help" aria-labelledby="account-heading">
               <h2 id="account-heading">Account &amp; Help</h2>
               <ul className="profile-sheet__links">
-                <li><Link href="/profile/preferences"><span aria-hidden="true">⚙</span> Account Settings</Link></li>
+                <li><Link href="/profile/preferences"><span aria-hidden="true">⚙</span> Settings</Link></li>
+                {!loading && canTeach ? (
+                  <li><Link href="/teach"><span aria-hidden="true">✎</span> Teacher area</Link></li>
+                ) : null}
                 <li><Link href="/learn#classes"><span aria-hidden="true">▣</span> My Classes</Link></li>
                 {!loading && canAdmin ? (
                   <li><Link href="/admin/teachers"><span aria-hidden="true">▣</span> Manage Teachers</Link></li>
