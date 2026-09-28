@@ -17,6 +17,7 @@ import {
 } from "./timeline-grade";
 import { PlaceGhost, usePlaceDrag } from "./use-place-drag";
 import { GameBoard } from "./game-board";
+import { useReportSessionProgress } from "./game-stage";
 
 function useWideScreen() {
   const [wide, setWide] = useState(false);
@@ -151,6 +152,17 @@ function TimelinePlay({
   const [placed, setPlaced] = useState<Record<number, string>>({});
   const [locked, setLocked] = useState<Record<string, true>>({});
   const [shake, setShake] = useState(false);
+  const report = useReportSessionProgress();
+  const placedCount = Object.keys(placed).length;
+  useEffect(() => {
+    const total = game.items.length;
+    if (total < 1) return;
+    report({
+      label: `${placedCount} of ${total} events placed`,
+      value: placedCount,
+      max: total,
+    });
+  }, [game.items.length, placedCount, report]);
   const [bank, setBank] = useState(game.items);
   const [hintsRevealed, setHintsRevealed] = useState(false);
   const missesRef = useRef(0);

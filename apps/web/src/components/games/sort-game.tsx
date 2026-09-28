@@ -14,6 +14,7 @@ import {
 } from "./sort-grade";
 import { PlaceGhost, usePlaceDrag } from "./use-place-drag";
 import { GameBoard } from "./game-board";
+import { useReportSessionProgress } from "./game-stage";
 
 const CHEST_BODY = ["#d4daf0", "#f0d8de", "#f5e6b8", "#f0d4c4"] as const;
 const CHEST_SHADOW = ["#1a2a5e", "#7a1a2e", "#b8860b", "#a0522d"] as const;
@@ -81,6 +82,17 @@ function SortPlay({
   const [placed, setPlaced] = useState<Record<string, string>>({});
   const [locked, setLocked] = useState<Record<string, true>>({});
   const [shake, setShake] = useState(false);
+  const report = useReportSessionProgress();
+  const placedCount = Object.keys(placed).length;
+  useEffect(() => {
+    const total = game.items.length;
+    if (total < 1) return;
+    report({
+      label: `${placedCount} of ${total} cards placed`,
+      value: placedCount,
+      max: total,
+    });
+  }, [game.items.length, placedCount, report]);
   const missesRef = useRef(0);
   const { playCue } = useMotionSound();
   const wide = useWideScreen();

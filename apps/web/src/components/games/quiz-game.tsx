@@ -10,6 +10,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useMotionSound } from "@/lib/motion-sound";
 import { GameBoard } from "./game-board";
+import { useReportSessionProgress } from "./game-stage";
 import type { PlayBoardProps, WhyPayload } from "./play-types";
 
 type QuizPlayContent = QuizContent | AssessmentQuiz;
@@ -63,14 +64,27 @@ function QuizPlay({
   const [index, setIndex] = useState(0);
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [answerReady, setAnswerReady] = useState(false);
+  const [missed, setMissed] = useState(false);
   const [correctPanel, setCorrectPanel] = useState<WhyPayload | null>(null);
   const [revealedId, setRevealedId] = useState<string | null>(null);
+  const report = useReportSessionProgress();
   const missesRef = useRef(0);
   const choicesRef = useRef<(string | number)[]>([]);
   const { playCue } = useMotionSound();
   const question = game.questions[index]!;
   const last = index === game.questions.length - 1;
   const authored = authoredQuestion(game, index);
+
+  useEffect(() => {
+    const total = game.questions.length;
+    if (total < 1) return;
+    const showNext = answerReady && index < total - 1;
+    report({
+      label: `Question ${showNext ? index + 2 : index + 1} of ${total}`,
+      value: answerReady ? Math.min(total, index + 1) : index,
+      max: total,
+    });
+  }, [answerReady, game.questions.length, index, report]);
 
   // Keep server and initial client markup identical, then shuffle once per game.
   const [orders, setOrders] = useState(() =>
@@ -136,18 +150,17 @@ function QuizPlay({
       }
       playCue("reject");
       missesRef.current += 1;
-      if (result.feedback) {
-        const miss = await onMiss({
-          title: result.feedback.title,
-          body: result.feedback.body,
-          tone: "miss",
-        });
-        if (miss === "empty") return;
-      } else {
-        const miss = await onMiss(null);
-        if (miss === "empty") return;
-      }
-      setAnswerReady(true);
+      setMissed(true);
+      const miss = result.feedback
+        ? await onMiss({
+            title: result.feedback.title,
+            body: result.feedback.body,
+            tone: "miss",
+          })
+        : await onMiss(null);
+      if (miss === "empty") return;
+      setPickedId(null);
+      setMissed(false);
       return;
     }
 
@@ -161,20 +174,18 @@ function QuizPlay({
       return;
     }
     playCue("reject");
-    const correct = authored.choices.find((choice) => choice.id === authored.correctChoiceId);
-    const source = authored.sources?.find((entry) => entry.id === authored.correctChoiceId);
+    const source = authored.sources?.find((entry) => entry.id === choiceId);
+    missesRef.current += 1;
+    setMissed(true);
     const result = await onMiss({
-      title: correct?.text ?? "Correct evidence",
-      body:
-        authored.why?.trim() ||
-        `The strongest answer is ${correct?.text ?? "the marked choice"}.`,
+      title: "Not quite",
+      body: authored.why?.trim() || "That choice does not fit. Try another one.",
       tone: "miss",
       sourceLabel: source?.citation || source?.label,
     });
-    missesRef.current += 1;
-    setRevealedId(authored.correctChoiceId);
     if (result === "empty") return;
-    setAnswerReady(true);
+    setPickedId(null);
+    setMissed(false);
   }
 
   function next() {
@@ -194,6 +205,7 @@ function QuizPlay({
     setIndex((i) => i + 1);
     setPickedId(null);
     setAnswerReady(false);
+    setMissed(false);
     setCorrectPanel(null);
     setRevealedId(null);
   }
@@ -234,15 +246,11 @@ function QuizPlay({
         {orderedChoices.map((choice) => {
           if (!choice) return null;
           const selected = pickedId === choice.id;
-          const right = choice.id === (authored?.correctChoiceId ?? revealedId);
-          let tone =
-            "quiz-answer--idle motion-control";
-          if (pickedId !== null && selected && right)
-            tone = "quiz-answer--correct motion-accept";
-          else if (pickedId !== null && selected && !right)
-            tone = "quiz-answer--miss snap-back";
-          else if (pickedId !== null && right)
-            tone = "quiz-answer--correct";
+          const markedCorrect = answerReady && revealedId === choice.id;
+          let tone = "quiz-answer--idle motion-control";
+          if (markedCorrect && selected) tone = "quiz-answer--correct motion-accept";
+          else if (markedCorrect) tone = "quiz-answer--correct";
+          else if (selected && missed) tone = "quiz-answer--miss snap-back";
           return (
             <li key={choice.id}>
               <button
