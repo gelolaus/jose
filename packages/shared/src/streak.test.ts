@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { UNLIMITED_LEARNING } from "./hearts";
 import {
   applyQualifyingActivity,
   calendarDayInTimeZone,
   previousCalendarDay,
+  XP_RULES_COPY,
 } from "./streak";
 
 describe("calendarDayInTimeZone", () => {
@@ -16,6 +18,19 @@ describe("calendarDayInTimeZone", () => {
 describe("previousCalendarDay", () => {
   it("steps back one calendar day", () => {
     expect(previousCalendarDay("2026-09-06")).toBe("2026-09-05");
+  });
+});
+
+describe("XP_RULES_COPY", () => {
+  it("states first-completion XP and the replay rule that the server uses", () => {
+    expect(XP_RULES_COPY).toContain("10 XP");
+    expect(XP_RULES_COPY).toMatch(/practice reviews do not award path XP/i);
+    if (UNLIMITED_LEARNING) {
+      expect(XP_RULES_COPY).toMatch(/Replays and practice reviews do not award path XP/);
+    } else {
+      expect(XP_RULES_COPY).toContain("5 XP");
+      expect(XP_RULES_COPY).toMatch(/passing replay/i);
+    }
   });
 });
 

@@ -22,6 +22,7 @@ import {
   applyHeartDrip,
   applyLessonCredit,
   applyQualifyingActivity,
+  calendarDayInTimeZone,
   learnerLivesFields,
   LESSON_CREDIT_MS,
   applyTemplateBodySchema,
@@ -112,6 +113,7 @@ import {
   type Learner,
   type LessonBlocks,
   type LessonEditorial,
+  type ModuleBadge,
   type ModulesResponse,
   type ModuleRevisionSnapshot,
   type NodeKind,
@@ -136,6 +138,7 @@ import {
   gameContent,
   learnerAchievements,
   learnerArtifacts,
+  learnerModuleBadges,
   learners,
   learnerProgress,
   learningMisses,
@@ -153,6 +156,21 @@ import {
 } from "../db/schema";
 
 const FIRST_COMPLETE_XP = 10;
+const REPLAY_PASS_XP = 5;
+
+type CompletionWrite = {
+  first: boolean;
+  moduleBadge: ModuleBadge | null;
+  xpAwarded: number;
+};
+
+type StudentOutline = {
+  title: string;
+  subtitle: string;
+  coverColor: string;
+  levelIds: string[];
+  sections: Array<{ levelIds: string[]; chestIds: string[] }>;
+};
 
 type MutationFaultStep =
   | "after-module-row"
@@ -241,12 +259,12 @@ export class CurriculumService {
       )
       .orderBy(desc(modules.featured), asc(modules.sortOrder));
 
-    const orderedByModule = await this.orderedLevelIdsByModules(rows.map((row) => row.id));
+    const outlines = await this.studentModuleOutlines(rows);
     const completed = await this.completedSet(learnerId);
     const continueCandidates: ContinueCandidate[] = [];
     const currentIds = rows
       .map((row) => {
-        const ordered = orderedByModule.get(row.id) ?? [];
+        const ordered = outlines.get(row.id)?.levelIds ?? [];
         const statuses = deriveLevelStatuses(ordered, completed);
         return (
           ordered.find((id) => statuses[id] === "current") ??
@@ -258,7 +276,8 @@ export class CurriculumService {
     const headlines = await this.levelHeadlines(currentIds);
     const cards = [];
     for (const row of rows) {
-      const ordered = orderedByModule.get(row.id) ?? [];
+      const outline = outlines.get(row.id);
+      const ordered = outline?.levelIds ?? [];
       const completedCount = ordered.filter((id) => completed.has(id)).length;
       const statuses = deriveLevelStatuses(ordered, completed);
       const currentId =
@@ -272,7 +291,7 @@ export class CurriculumService {
       if (currentId && headline) {
         continueCandidates.push({
           moduleId: row.id,
-          moduleTitle: row.title,
+          moduleTitle: outline?.title ?? row.title,
           featured: row.featured,
           sectionTitle: headline.sectionTitle,
           levelId: currentId,
@@ -284,9 +303,9 @@ export class CurriculumService {
       }
       cards.push({
         id: row.id,
-        title: row.title,
-        subtitle: row.subtitle,
-        coverColor: row.coverColor,
+        title: outline?.title ?? row.title,
+        subtitle: outline?.subtitle ?? row.subtitle,
+        coverColor: outline?.coverColor ?? row.coverColor,
         featured: row.featured,
         published: row.published,
         completedCount,
@@ -431,24 +450,26 @@ export class CurriculumService {
     }
     await this.ensureUnlocked(ctx.module.id, levelId, learnerId);
     return this.enqueueWrite(async () => {
-      const { first, lessonCreditApplied } = await this.db.transaction(async (tx) => {
-        const first = await this.markComplete(
-          levelId,
-          learnerId,
-          tx as unknown as JoseDb,
-          publishedRevision?.id ?? null,
-        );
-        const lessonCreditApplied =
-          kind === "lesson"
-            ? await this.applyLessonLifeCredit(levelId, learnerId, tx as unknown as JoseDb)
-            : false;
-        return { first, lessonCreditApplied };
-      });
+      const { first, lessonCreditApplied, moduleBadge, xpAwarded } = await this.db.transaction(
+        async (tx) => {
+          const award = await this.markComplete(
+            levelId,
+            learnerId,
+            tx as unknown as JoseDb,
+            publishedRevision?.id ?? null,
+          );
+          const lessonCreditApplied =
+            kind === "lesson"
+              ? await this.applyLessonLifeCredit(levelId, learnerId, tx as unknown as JoseDb)
+              : false;
+          return { ...award, first: award.first, lessonCreditApplied };
+        },
+      );
       let artifactAwarded = false;
       if (kind === "chest") {
         artifactAwarded = await this.awardChestArtifact(levelId, ctx.level.title, learnerId);
       }
-      await this.touchQualifyingActivity(learnerId);
+      const streak = await this.touchQualifyingActivity(learnerId);
       await this.syncAchievements(learnerId);
       const learner = await this.getLearner(learnerId);
       const ordered = snapshot
@@ -466,6 +487,9 @@ export class CurriculumService {
         continueHref: nextId
           ? `/learn/${ctx.module.id}/${nextId}`
           : `/learn/${ctx.module.id}`,
+        moduleBadge,
+        xpAwarded,
+        streakIncreased: streak.increased,
       };
     });
   }
@@ -688,7 +712,7 @@ export class CurriculumService {
 
     const finishedAt = Date.now();
     return this.enqueueWrite(async () => {
-      const first = await this.db.transaction(async (tx) => {
+      const outcome = await this.db.transaction(async (tx) => {
         const updated = await tx
           .update(attempts)
           .set({
@@ -709,22 +733,23 @@ export class CurriculumService {
           .where(and(eq(attempts.id, attemptId), eq(attempts.status, "open")))
           .returning({ id: attempts.id });
         if (updated.length === 0) {
-          return false;
+          return { first: false, moduleBadge: null, xpAwarded: 0 } satisfies CompletionWrite;
         }
-        const firstWin = await this.markComplete(
+        const award = await this.markComplete(
           attempt.levelId,
           learnerId,
           tx as unknown as JoseDb,
           attempt.publishedRevisionId ?? ctx.module.publishedRevisionId ?? null,
         );
-        // Duolingo-style: replayed wins keep earning XP when learning is limited.
-        if (!firstWin && !UNLIMITED_LEARNING && graded.score > 0) {
+        // Passing replays earn a smaller XP award only while learning is limited.
+        if (!award.first && !UNLIMITED_LEARNING && graded.score > 0) {
           await tx
             .update(learners)
-            .set({ xp: sql`${learners.xp} + ${FIRST_COMPLETE_XP}` })
+            .set({ xp: sql`${learners.xp} + ${REPLAY_PASS_XP}` })
             .where(eq(learners.id, learnerId));
+          return { ...award, xpAwarded: REPLAY_PASS_XP };
         }
-        return firstWin;
+        return award;
       });
 
       const [fresh] = await this.db
@@ -734,13 +759,18 @@ export class CurriculumService {
       if (!fresh || fresh.status !== "finished") {
         throw new BadRequestException("Could not finish attempt");
       }
-      await this.touchQualifyingActivity(learnerId);
+      const streak = await this.touchQualifyingActivity(learnerId);
       await this.syncAchievements(learnerId);
       return this.finishedAttemptResult(
         fresh,
         learnerId,
         fresh.finishedAt !== finishedAt,
-        first,
+        outcome.first,
+        {
+          moduleBadge: outcome.moduleBadge,
+          xpAwarded: outcome.xpAwarded,
+          streakIncreased: streak.increased,
+        },
       );
     });
   }
@@ -963,89 +993,36 @@ export class CurriculumService {
 
   async getProfileStats(learnerId: string): Promise<ProfileStatsResponse> {
     const learner = await this.getLearner(learnerId);
-    const published = await this.db
-      .select()
-      .from(modules)
-      .where(
-        and(
-          eq(modules.published, true),
-          isNull(modules.archivedAt),
-          isNull(modules.trashedAt),
-        ),
-      )
-      .orderBy(desc(modules.featured), asc(modules.sortOrder));
-    const completed = await this.completedSet(learnerId);
-    const moduleSummaries = [];
-    let totalLevels = 0;
-    let completedLevels = 0;
-    let chestsOpened = 0;
-    let anyChapterFullyComplete = false;
-    let allPublishedComplete = published.length > 0;
-
-    for (const mod of published) {
-      const ordered = await this.orderedLevelIds(mod.id);
-      const done = ordered.filter((id) => completed.has(id)).length;
-      totalLevels += ordered.length;
-      completedLevels += done;
-      if (done < ordered.length) allPublishedComplete = false;
-
-      const sectionRows = await this.db
-        .select()
-        .from(sections)
-        .where(and(eq(sections.moduleId, mod.id), isNull(sections.archivedAt)))
-        .orderBy(asc(sections.sortOrder));
-      for (const section of sectionRows) {
-        const levelRows = await this.db
-          .select()
-          .from(levels)
-          .where(and(eq(levels.sectionId, section.id), isNull(levels.archivedAt)));
-        if (
-          levelRows.length > 0 &&
-          levelRows.every((l) => completed.has(l.id))
-        ) {
-          anyChapterFullyComplete = true;
-        }
-        for (const level of levelRows) {
-          if (level.kind === "chest" && completed.has(level.id)) {
-            chestsOpened += 1;
-          }
-        }
-      }
-
-      moduleSummaries.push({
-        moduleId: mod.id,
-        title: mod.title,
-        featured: mod.featured,
-        completedCount: done,
-        totalCount: ordered.length,
-        coverColor: mod.coverColor,
-      });
-    }
-
-    await this.syncAchievements(learnerId);
-    const earnedRows = await this.db
-      .select()
-      .from(learnerAchievements)
-      .where(eq(learnerAchievements.learnerId, learnerId));
-    const previouslyEarned = new Set(earnedRows.map((r) => r.achievementId));
-    const earnedAtById = new Map(
-      earnedRows.map((r) => [r.achievementId, r.earnedAt] as const),
-    );
-
+    const progress = await this.collectStudentProgress(learnerId);
+    const prior = await this.achievementRows(learnerId);
+    await this.syncAchievements(learnerId, {
+      hasAnyProgress: progress.completedLevels > 0,
+      chestsOpened: progress.chestsOpened,
+      anyChapterFullyComplete: progress.anyChapterFullyComplete,
+      allPublishedComplete: progress.allPublishedComplete,
+      previouslyEarned: new Set(prior.map((row) => row.achievementId)),
+      earnedAtById: new Map(prior.map((row) => [row.achievementId, row.earnedAt] as const)),
+    });
+    const earnedRows = await this.achievementRows(learnerId);
     const achievements = deriveAchievements({
-      hasAnyProgress: completedLevels > 0,
-      chestsOpened,
-      anyChapterFullyComplete,
-      allPublishedComplete,
-      previouslyEarned,
-      earnedAtById,
+      hasAnyProgress: progress.completedLevels > 0,
+      chestsOpened: progress.chestsOpened,
+      anyChapterFullyComplete: progress.anyChapterFullyComplete,
+      allPublishedComplete: progress.allPublishedComplete,
+      previouslyEarned: new Set(earnedRows.map((row) => row.achievementId)),
+      earnedAtById: new Map(earnedRows.map((row) => [row.achievementId, row.earnedAt] as const)),
     });
 
     return {
       learner,
-      modules: moduleSummaries,
-      totals: { completedLevels, totalLevels, chestsOpened },
+      modules: progress.moduleSummaries,
+      totals: {
+        completedLevels: progress.completedLevels,
+        totalLevels: progress.totalLevels,
+        chestsOpened: progress.chestsOpened,
+      },
       achievements,
+      badges: await this.moduleBadgesFor(learnerId),
       rules: { ...PROFILE_RULES },
     };
   }
@@ -2776,31 +2753,304 @@ export class CurriculumService {
     }
   }
 
+  /** Published snapshot outlines, with one batched live fallback for modules that have none. */
+  private async studentModuleOutlines(
+    rows: Array<typeof modules.$inferSelect>,
+  ): Promise<Map<string, StudentOutline>> {
+    const result = new Map<string, StudentOutline>();
+    const revisionIds = rows
+      .map((row) => row.publishedRevisionId)
+      .filter((id): id is string => Boolean(id));
+    const revisionRows =
+      revisionIds.length === 0
+        ? []
+        : await this.db
+            .select()
+            .from(moduleRevisions)
+            .where(inArray(moduleRevisions.id, revisionIds));
+    const revisionById = new Map(revisionRows.map((row) => [row.id, row]));
+    const needsLive: Array<typeof modules.$inferSelect> = [];
+    for (const row of rows) {
+      const revision = row.publishedRevisionId
+        ? revisionById.get(row.publishedRevisionId)
+        : undefined;
+      if (!revision) {
+        needsLive.push(row);
+        continue;
+      }
+      try {
+        const snapshot = this.parseActiveSnapshot(revision.snapshotJson);
+        const sections = snapshot.sections.map((section) => ({
+          levelIds: section.levels.map((level) => level.id),
+          chestIds: section.levels
+            .filter((level) => level.kind === "chest")
+            .map((level) => level.id),
+        }));
+        result.set(row.id, {
+          title: snapshot.module.title,
+          subtitle: snapshot.module.subtitle,
+          coverColor: snapshot.module.coverColor,
+          levelIds: sections.flatMap((section) => section.levelIds),
+          sections,
+        });
+      } catch {
+        needsLive.push(row);
+      }
+    }
+    if (needsLive.length === 0) return result;
+
+    const liveIds = needsLive.map((row) => row.id);
+    const orderedByModule = await this.orderedLevelIdsByModules(liveIds);
+    const sectionRows = await this.db
+      .select()
+      .from(sections)
+      .where(and(inArray(sections.moduleId, liveIds), isNull(sections.archivedAt)))
+      .orderBy(asc(sections.sortOrder));
+    const levelsBySection = await this.levelsBySectionIds(
+      sectionRows.map((section) => section.id),
+    );
+    const sectionsByModule = new Map<string, typeof sectionRows>();
+    for (const section of sectionRows) {
+      const list = sectionsByModule.get(section.moduleId) ?? [];
+      list.push(section);
+      sectionsByModule.set(section.moduleId, list);
+    }
+    for (const row of needsLive) {
+      const ordered = orderedByModule.get(row.id) ?? [];
+      const orderedSet = new Set(ordered);
+      const outlineSections = (sectionsByModule.get(row.id) ?? []).map((section) => {
+        const levelRows = (levelsBySection.get(section.id) ?? []).filter((level) =>
+          orderedSet.has(level.id),
+        );
+        return {
+          levelIds: levelRows.map((level) => level.id),
+          chestIds: levelRows.filter((level) => level.kind === "chest").map((level) => level.id),
+        };
+      });
+      result.set(row.id, {
+        title: row.title,
+        subtitle: row.subtitle,
+        coverColor: row.coverColor,
+        levelIds: ordered,
+        sections: outlineSections,
+      });
+    }
+    return result;
+  }
+
+  private async collectStudentProgress(learnerId: string) {
+    const published = await this.db
+      .select()
+      .from(modules)
+      .where(
+        and(
+          eq(modules.published, true),
+          isNull(modules.archivedAt),
+          isNull(modules.trashedAt),
+        ),
+      )
+      .orderBy(desc(modules.featured), asc(modules.sortOrder));
+    const completed = await this.completedSet(learnerId);
+    const outlines = await this.studentModuleOutlines(published);
+    const moduleSummaries = [];
+    let totalLevels = 0;
+    let completedLevels = 0;
+    let chestsOpened = 0;
+    let anyChapterFullyComplete = false;
+    let allPublishedComplete = published.length > 0;
+    for (const mod of published) {
+      const outline = outlines.get(mod.id);
+      const ordered = outline?.levelIds ?? [];
+      const done = ordered.filter((id) => completed.has(id)).length;
+      totalLevels += ordered.length;
+      completedLevels += done;
+      if (done < ordered.length) allPublishedComplete = false;
+      for (const section of outline?.sections ?? []) {
+        if (
+          section.levelIds.length > 0 &&
+          section.levelIds.every((id) => completed.has(id))
+        ) {
+          anyChapterFullyComplete = true;
+        }
+        chestsOpened += section.chestIds.filter((id) => completed.has(id)).length;
+      }
+      moduleSummaries.push({
+        moduleId: mod.id,
+        title: outline?.title ?? mod.title,
+        featured: mod.featured,
+        completedCount: done,
+        totalCount: ordered.length,
+        coverColor: outline?.coverColor ?? mod.coverColor,
+      });
+    }
+    return {
+      moduleSummaries,
+      totalLevels,
+      completedLevels,
+      chestsOpened,
+      anyChapterFullyComplete,
+      allPublishedComplete,
+    };
+  }
+
+  private async achievementRows(learnerId: string) {
+    return this.db
+      .select()
+      .from(learnerAchievements)
+      .where(eq(learnerAchievements.learnerId, learnerId));
+  }
+
+  private async dailyGoalFor(learnerId: string, now: number) {
+    const rows = await this.db
+      .select({ completedAt: learnerProgress.completedAt })
+      .from(learnerProgress)
+      .where(eq(learnerProgress.learnerId, learnerId));
+    const today = calendarDayInTimeZone(now);
+    const completedLevelsToday = rows.filter(
+      (row) => calendarDayInTimeZone(row.completedAt) === today,
+    ).length;
+    return {
+      met: completedLevelsToday >= 1,
+      completedLevelsToday,
+      targetLevels: 1 as const,
+    };
+  }
+
+  private moduleStillPublished(row: typeof modules.$inferSelect | undefined) {
+    return Boolean(row && row.published && !row.archivedAt && !row.trashedAt);
+  }
+
+  private async moduleBadgesFor(learnerId: string): Promise<ModuleBadge[]> {
+    const rows = await this.db
+      .select()
+      .from(learnerModuleBadges)
+      .where(eq(learnerModuleBadges.learnerId, learnerId))
+      .orderBy(desc(learnerModuleBadges.earnedAt), asc(learnerModuleBadges.moduleId));
+    if (rows.length === 0) return [];
+    const moduleRows = await this.db
+      .select()
+      .from(modules)
+      .where(
+        inArray(
+          modules.id,
+          rows.map((row) => row.moduleId),
+        ),
+      );
+    const byId = new Map(moduleRows.map((row) => [row.id, row]));
+    return rows.map((row) => ({
+      moduleId: row.moduleId,
+      title: row.titleSnapshot,
+      subtitle: row.subtitleSnapshot,
+      coverColor: row.coverColorSnapshot,
+      levelCount: row.levelCount,
+      earnedAt: row.earnedAt,
+      publishedRevisionId: row.publishedRevisionId,
+      stillPublished: this.moduleStillPublished(byId.get(row.moduleId)),
+    }));
+  }
+
+  /** Inserts the badge once, inside the caller's progress transaction. */
+  private async awardModuleBadge(
+    executor: JoseDb,
+    learnerId: string,
+    publishedRevisionId: string | null,
+  ): Promise<ModuleBadge | null> {
+    if (!publishedRevisionId) return null;
+    const [revision] = await executor
+      .select()
+      .from(moduleRevisions)
+      .where(eq(moduleRevisions.id, publishedRevisionId));
+    if (!revision) return null;
+    let snapshot;
+    try {
+      snapshot = this.parseActiveSnapshot(revision.snapshotJson);
+    } catch {
+      return null;
+    }
+    const levelIds = [
+      ...new Set(
+        snapshot.sections.flatMap((section) => section.levels.map((level) => level.id)),
+      ),
+    ];
+    if (levelIds.length === 0) return null;
+    const progress = await executor
+      .select({
+        levelId: learnerProgress.levelId,
+        completedAt: learnerProgress.completedAt,
+      })
+      .from(learnerProgress)
+      .where(
+        and(
+          eq(learnerProgress.learnerId, learnerId),
+          inArray(learnerProgress.levelId, levelIds),
+        ),
+      );
+    const completedAtByLevel = new Map(progress.map((row) => [row.levelId, row.completedAt]));
+    let earnedAt = 0;
+    for (const levelId of levelIds) {
+      const at = completedAtByLevel.get(levelId);
+      if (at == null) return null;
+      if (at > earnedAt) earnedAt = at;
+    }
+    const [mod] = await executor.select().from(modules).where(eq(modules.id, revision.moduleId));
+    const inserted = await executor
+      .insert(learnerModuleBadges)
+      .values({
+        learnerId,
+        moduleId: revision.moduleId,
+        titleSnapshot: snapshot.module.title,
+        subtitleSnapshot: snapshot.module.subtitle,
+        coverColorSnapshot: snapshot.module.coverColor,
+        publishedRevisionId: revision.id,
+        levelCount: levelIds.length,
+        earnedAt,
+      })
+      .onConflictDoNothing()
+      .returning({ moduleId: learnerModuleBadges.moduleId });
+    if (inserted.length === 0) return null;
+    return {
+      moduleId: revision.moduleId,
+      title: snapshot.module.title,
+      subtitle: snapshot.module.subtitle,
+      coverColor: snapshot.module.coverColor,
+      levelCount: levelIds.length,
+      earnedAt,
+      publishedRevisionId: revision.id,
+      stillPublished: this.moduleStillPublished(mod),
+    };
+  }
+
   private async markComplete(
     levelId: string,
     learnerId: string,
     executor: JoseDb = this.db,
     publishedRevisionId?: string | null,
-  ): Promise<boolean> {
+  ): Promise<CompletionWrite> {
+    const completedAt = Date.now();
     const inserted = await executor
       .insert(learnerProgress)
       .values({
         learnerId,
         levelId,
-        completedAt: Date.now(),
+        completedAt,
         publishedRevisionId: publishedRevisionId ?? null,
       })
       .onConflictDoNothing()
       .returning({ levelId: learnerProgress.levelId });
     if (inserted.length === 0) {
-      return false;
+      return { first: false, moduleBadge: null, xpAwarded: 0 };
     }
     await this.maybeFault("after-progress-insert");
     await executor
       .update(learners)
       .set({ xp: sql`${learners.xp} + ${FIRST_COMPLETE_XP}` })
       .where(eq(learners.id, learnerId));
-    return true;
+    const moduleBadge = await this.awardModuleBadge(
+      executor,
+      learnerId,
+      publishedRevisionId ?? null,
+    );
+    return { first: true, moduleBadge, xpAwarded: FIRST_COMPLETE_XP };
   }
 
   private async readChestContent(
@@ -2994,7 +3244,7 @@ export class CurriculumService {
     return true;
   }
 
-  private async syncedLearner(learnerId: string): Promise<Learner> {
+  private async syncedLearner(learnerId: string) {
     const row = await this.requireLearner(learnerId);
     const now = Date.now();
     const lives = learnerLivesFields(row.hearts, row.heartsUpdatedAt, now);
@@ -3020,6 +3270,7 @@ export class CurriculumService {
       heartsUpdatedAt: lives.heartsUpdatedAt,
       nextHeartAt: lives.nextHeartAt,
       serverNow: lives.serverNow,
+      dailyGoal: await this.dailyGoalFor(learnerId, now),
     };
   }
 
@@ -3281,8 +3532,9 @@ export class CurriculumService {
       row.lastActivityDay ?? null,
       now,
     );
+    const increased = update.streak > row.streak;
     if (!update.changed && update.lastActivityDay === row.lastActivityDay) {
-      return;
+      return { increased: false };
     }
     await this.db
       .update(learners)
@@ -3291,10 +3543,14 @@ export class CurriculumService {
         lastActivityDay: update.lastActivityDay,
       })
       .where(eq(learners.id, learnerId));
+    return { increased };
   }
 
-  private async syncAchievements(learnerId: string) {
-    const statsHint = await this.achievementEvidence(learnerId);
+  private async syncAchievements(
+    learnerId: string,
+    evidence?: Awaited<ReturnType<CurriculumService["achievementEvidence"]>>,
+  ) {
+    const statsHint = evidence ?? (await this.achievementEvidence(learnerId));
     const achievements = deriveAchievements(statsHint);
     const now = Date.now();
     for (const item of achievements) {
@@ -3311,57 +3567,15 @@ export class CurriculumService {
   }
 
   private async achievementEvidence(learnerId: string) {
-    const published = await this.db
-      .select()
-      .from(modules)
-      .where(
-        and(
-          eq(modules.published, true),
-          isNull(modules.archivedAt),
-          isNull(modules.trashedAt),
-        ),
-      );
-    const completed = await this.completedSet(learnerId);
-    let totalLevels = 0;
-    let completedLevels = 0;
-    let chestsOpened = 0;
-    let anyChapterFullyComplete = false;
-    let allPublishedComplete = published.length > 0;
-    for (const mod of published) {
-      const ordered = await this.orderedLevelIds(mod.id);
-      const done = ordered.filter((id) => completed.has(id)).length;
-      totalLevels += ordered.length;
-      completedLevels += done;
-      if (done < ordered.length) allPublishedComplete = false;
-      const sectionRows = await this.db
-        .select()
-        .from(sections)
-        .where(and(eq(sections.moduleId, mod.id), isNull(sections.archivedAt)));
-      for (const section of sectionRows) {
-        const levelRows = await this.db
-          .select()
-          .from(levels)
-          .where(and(eq(levels.sectionId, section.id), isNull(levels.archivedAt)));
-        if (levelRows.length > 0 && levelRows.every((l) => completed.has(l.id))) {
-          anyChapterFullyComplete = true;
-        }
-        for (const level of levelRows) {
-          if (level.kind === "chest" && completed.has(level.id)) chestsOpened += 1;
-        }
-      }
-    }
-    void totalLevels;
-    const earnedRows = await this.db
-      .select()
-      .from(learnerAchievements)
-      .where(eq(learnerAchievements.learnerId, learnerId));
+    const progress = await this.collectStudentProgress(learnerId);
+    const earnedRows = await this.achievementRows(learnerId);
     return {
-      hasAnyProgress: completedLevels > 0,
-      chestsOpened,
-      anyChapterFullyComplete,
-      allPublishedComplete,
-      previouslyEarned: new Set(earnedRows.map((r) => r.achievementId)),
-      earnedAtById: new Map(earnedRows.map((r) => [r.achievementId, r.earnedAt] as const)),
+      hasAnyProgress: progress.completedLevels > 0,
+      chestsOpened: progress.chestsOpened,
+      anyChapterFullyComplete: progress.anyChapterFullyComplete,
+      allPublishedComplete: progress.allPublishedComplete,
+      previouslyEarned: new Set(earnedRows.map((row) => row.achievementId)),
+      earnedAtById: new Map(earnedRows.map((row) => [row.achievementId, row.earnedAt] as const)),
     };
   }
 
@@ -3455,10 +3669,19 @@ export class CurriculumService {
     learnerId: string,
     deduplicated: boolean,
     firstTime?: boolean,
+    extras?: {
+      moduleBadge: ModuleBadge | null;
+      xpAwarded: number;
+      streakIncreased: boolean;
+    },
   ): Promise<FinishAttemptResult> {
     const learner = await this.getLearner(learnerId);
     const ctx = await this.requireStudentVisibleLevel(attempt.levelId);
-    const ordered = await this.orderedLevelIds(ctx.module.id);
+    const published = await this.publishedRevisionOrNull(ctx.module);
+    const snapshot = published ? this.parseActiveSnapshot(published.snapshotJson) : null;
+    const ordered = snapshot
+      ? snapshot.sections.flatMap((section) => section.levels.map((level) => level.id))
+      : await this.orderedLevelIds(ctx.module.id);
     const nextId = nextLevelAfter(ordered, attempt.levelId);
     return {
       attemptId: attempt.id,
@@ -3475,6 +3698,9 @@ export class CurriculumService {
         ? `/learn/${ctx.module.id}/${nextId}`
         : `/learn/${ctx.module.id}`,
       ...(await this.gradedAttemptCounts(attempt.levelId, learnerId)),
+      moduleBadge: extras?.moduleBadge ?? null,
+      xpAwarded: extras?.xpAwarded ?? 0,
+      streakIncreased: extras?.streakIncreased ?? false,
     };
   }
 

@@ -30,6 +30,7 @@ const TABLE_ORDER = [
   "practice_reviews",
   "learning_misses",
   "miss_receipts",
+  "learner_module_badges",
   "learner_achievements",
   "learner_artifacts",
   "bookmarks",

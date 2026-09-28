@@ -14,6 +14,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+function formatEarned(epochMs: number) {
+  return new Intl.DateTimeFormat("en-PH", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(epochMs));
+}
+
 export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
   const identity = useExplorerIdentity(stats.learner.displayName);
   const { authenticated, canAdmin, loading, user } = useJoseSession();
@@ -28,16 +37,17 @@ export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
   const AvatarEmblem = avatar.icon;
   const displayName = stats.learner.displayName || identity.displayName;
   const { hearts, streak, xp } = stats.learner;
+  const badges = stats.badges ?? [];
+  const earnedModuleIds = new Set(badges.map((badge) => badge.moduleId));
+  const lockedModules = stats.modules.filter((module) => !earnedModuleIds.has(module.moduleId));
   const latestAchievements = stats.achievements
     .filter((achievement) => achievement.unlocked)
     .sort((a, b) => (b.earnedAt ?? 0) - (a.earnedAt ?? 0))
     .slice(0, 2);
+  const newestBadge = badges[0];
   const inProgressModule = stats.modules.find(
     (module) => module.completedCount > 0 && module.completedCount < module.totalCount,
   );
-  const completedBooks = stats.modules
-    .map((module, index) => ({ module, cover: moduleBookImage(index) }))
-    .filter(({ module }) => module.totalCount > 0 && module.completedCount >= module.totalCount);
 
   async function onSignOut() {
     setSigningOut(true);
@@ -56,12 +66,8 @@ export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
         <div className="profile-sheet__crest" aria-hidden="true">✦ Character Sheet ✦</div>
 
         <section className="profile-sheet__core" aria-labelledby="profile-name">
-          <div className="profile-sheet__avatar-frame">
-            <img
-              src="/assets/ui/profile/warrior-avatar.png"
-              alt="Pixel-art Filipino warrior avatar"
-              className="profile-sheet__avatar-img"
-            />
+          <div className="profile-sheet__avatar-frame" role="img" aria-label={`${avatar.label} avatar`}>
+            <AvatarEmblem aria-hidden="true" size={64} strokeWidth={2.25} />
             <span className="profile-sheet__avatar-emblem" title={`Selected emblem: ${avatar.label}`}>
               <AvatarEmblem aria-hidden="true" size={18} strokeWidth={2.5} />
               <span className="sr-only">Selected emblem: {avatar.label}</span>
@@ -96,33 +102,90 @@ export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
         <div className="profile-sheet__lower">
           <section className="profile-sheet__bookshelf" aria-labelledby="completed-books-heading">
             <div className="profile-sheet__shelf-heading">
-              <h2 id="completed-books-heading">Completed Books</h2>
-              <span>{completedBooks.length} / {stats.modules.length}</span>
+              <h2 id="completed-books-heading" style={{ minWidth: 0 }}>Completed Books</h2>
+              <span>{badges.length} earned</span>
             </div>
-            {completedBooks.length > 0 ? (
+            {badges.length > 0 ? (
               <ul className="profile-sheet__book-list">
-                {completedBooks.map(({ module, cover }) => (
-                  <li key={module.moduleId}>
-                    <Link href={`/learn/${module.moduleId}`} aria-label={`${module.title}, completed book`}>
-                      <img src={cover} alt="" className="profile-sheet__book-cover" />
-                      <span>{module.title}</span>
-                    </Link>
-                  </li>
-                ))}
+                {badges.map((badge, index) => {
+                  const cover = moduleBookImage(index);
+                  const earned = formatEarned(badge.earnedAt);
+                  const body = (
+                    <>
+                      <img
+                        src={cover}
+                        alt=""
+                        className="profile-sheet__book-cover"
+                        style={{ backgroundColor: badge.coverColor }}
+                      />
+                      <span>{badge.title}</span>
+                      <span>{earned}</span>
+                    </>
+                  );
+                  return (
+                    <li key={badge.moduleId}>
+                      {badge.stillPublished ? (
+                        <Link href={`/learn/${badge.moduleId}`} aria-label={`${badge.title}, module badge, earned ${earned}`}>
+                          {body}
+                        </Link>
+                      ) : (
+                        <div
+                          aria-label={`${badge.title}, retired module`}
+                          style={{
+                            display: "flex",
+                            width: "clamp(64px, 18vw, 90px)",
+                            minHeight: 44,
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: "0.3rem",
+                            color: "#fff0d1",
+                            fontSize: "0.68rem",
+                            textAlign: "center",
+                            overflowWrap: "anywhere",
+                          }}
+                        >
+                          {body}
+                          <span>Retired module</span>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <div className="profile-sheet__shelf-empty">
                 <p>No completed books yet</p>
-                <span>Finish every level in a module to add its book to this shelf.</span>
+                <span>Finish every level in a module to add its badge.</span>
                 <Link href="/learn">Explore modules</Link>
               </div>
             )}
+            {lockedModules.length > 0 ? (
+              <div aria-labelledby="locked-badges-heading">
+                <h3 id="locked-badges-heading">Still to earn</h3>
+                <ul className="profile-sheet__log">
+                  {lockedModules.map((module) => (
+                    <li key={module.moduleId} style={{ overflowWrap: "anywhere" }}>
+                      <img src="/assets/path-book-pixel.png" alt="" />
+                      <span>
+                        {module.title}: {module.completedCount}/{module.totalCount}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </section>
 
           <aside className="profile-sheet__side" aria-label="Status and settings">
             <section className="profile-sheet__panel" aria-labelledby="activity-heading">
               <h2 id="activity-heading">Adventure Log</h2>
               <ul className="profile-sheet__log">
+                {newestBadge ? (
+                  <li>
+                    <img src="/assets/ui/hud/agimat-sun.png" alt="" />
+                    <span>Badge earned: {newestBadge.title}</span>
+                  </li>
+                ) : null}
                 {latestAchievements.map((achievement) => (
                   <li key={achievement.id}>
                     <img src="/assets/ui/hud/agimat-sun.png" alt="" />
@@ -139,6 +202,27 @@ export function ProfileShowcase({ stats }: { stats: ProfileStatsResponse }) {
                   <img src="/assets/ui/hud/kalan-fire.png" alt="" />
                   <span>Current streak: {streak} {streak === 1 ? "day" : "days"}</span>
                 </li>
+              </ul>
+            </section>
+
+            <section className="profile-sheet__panel" aria-labelledby="achievements-heading">
+              <h2 id="achievements-heading">Achievements</h2>
+              <ul className="profile-sheet__log">
+                {stats.achievements.map((achievement) => (
+                  <li
+                    key={achievement.id}
+                    data-achievement-id={achievement.id}
+                    style={{ opacity: achievement.unlocked ? 1 : 0.45 }}
+                  >
+                    <img src="/assets/ui/hud/agimat-sun.png" alt="" />
+                    <span>
+                      {achievement.title}
+                      {achievement.unlocked && achievement.earnedAt
+                        ? ` · ${formatEarned(achievement.earnedAt)}`
+                        : " · Locked"}
+                    </span>
+                  </li>
+                ))}
               </ul>
             </section>
 

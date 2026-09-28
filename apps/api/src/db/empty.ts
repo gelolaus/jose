@@ -62,6 +62,7 @@ const CHILD_FIRST_TABLES = [
   "sessions",
   "external_identities",
   "learner_artifacts",
+  "learner_module_badges",
   "learner_achievements",
   "practice_reviews",
   "practice_attempts",
