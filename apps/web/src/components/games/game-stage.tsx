@@ -2,12 +2,31 @@
 
 import Link from "next/link";
 import { Heart, Star } from "lucide-react";
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { SoundFocusControls, useFocusMode, useMotionSound } from "@/lib/motion-sound";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import type { GameContent } from "@jose/shared";
 import { hintFor } from "@/lib/game-copy";
+import type { SessionProgress } from "./session-progress";
+import { SessionRewardBeat, type SessionReward } from "./session-reward";
 import type { WhyPayload } from "./play-types";
+import "../session-play.css";
+
+const SessionProgressContext = createContext<(progress: SessionProgress) => void>(() => {});
+
+export function useReportSessionProgress() {
+  return useContext(SessionProgressContext);
+}
 
 export function HeartsHud({ hearts, max = 5 }: { hearts: number; max?: number }) {
   return (
@@ -70,7 +89,7 @@ export function WhySheet({
     why.tone === "success" ? "Why this works" : why.tone === "explain" ? "Take a look" : "Not quite";
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 p-4 sm:items-center">
+    <div className="session-why fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 sm:items-center">
       <div
         ref={dialogRef}
         role="dialog"
@@ -131,6 +150,7 @@ export function StarCelebration({
   retrySaveLabel = "Retry saving",
   playAgainLabel = "Play again",
   continueLabel = "Continue",
+  reward = null,
 }: {
   timedOut?: boolean;
   title: string;
@@ -147,6 +167,7 @@ export function StarCelebration({
   retrySaveLabel?: string;
   playAgainLabel?: string;
   continueLabel?: string;
+  reward?: SessionReward | null;
 }) {
   const playAgain = onPlayAgain ?? onRetry;
   const { playCue, cancelStale, reducedMotion } = useMotionSound();
@@ -156,7 +177,7 @@ export function StarCelebration({
   }, [playCue, cancelStale]);
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center gap-4 px-6 py-12 text-center">
+    <div className="session-celebration mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center gap-4 px-6 py-12 text-center">
       <div className="game-celebration-stars flex gap-2">
         {[1, 2, 3].map((n) => (
           <Star
@@ -184,7 +205,8 @@ export function StarCelebration({
         </p>
       ) : null}
       {error ? <p className="text-sm font-bold text-rose-600" role="alert">{error}</p> : null}
-      <div className="mt-2 flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
+      <SessionRewardBeat reward={reward} />
+      <div className="session-celebration__actions mt-2 flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
         {onRetrySave ? (
           <button
             type="button"
@@ -250,6 +272,7 @@ export function GameFrame({
   hint,
   hearts,
   progress,
+  initialProgress = null,
   showHearts,
   wide,
   scene,
@@ -259,37 +282,65 @@ export function GameFrame({
   hint: string;
   hearts?: number;
   progress?: string;
+  initialProgress?: SessionProgress | null;
   showHearts?: boolean;
   wide?: boolean;
   scene?: GameContent["type"];
   children: ReactNode;
 }) {
   const [focus] = useFocusMode();
+  const [live, setLive] = useState<SessionProgress | null>(initialProgress);
+  const report = useCallback((next: SessionProgress) => {
+    setLive((prev) =>
+      prev && prev.label === next.label && prev.value === next.value && prev.max === next.max
+        ? prev
+        : next,
+    );
+  }, []);
+  const label = live?.label ?? progress;
+  const bar = live && live.max > 0 ? live : null;
   return (
-    <div
-      data-game-stage={scene}
-      className={`game-stage mx-auto w-full px-4 py-3 sm:px-6 sm:py-8 ${wide && scene !== "quiz" && scene !== "blank" ? "max-w-5xl" : "max-w-3xl"} ${
-        scene ? `game-stage--${scene}` : ""
-      } ${focus ? "jose-focus" : ""}`}
-    >
-      <div className="mb-2.5 flex items-start justify-between gap-3 sm:mb-5">
-        <div className="min-w-0">
-          <h1 className="font-display text-xl font-extrabold tracking-tight text-[var(--jose-text)] sm:text-4xl">
-            {title}
-          </h1>
-          {(!scene || hint !== hintFor(scene)) ? <p className="mt-1 text-sm font-semibold text-[var(--jose-text-muted)]">{hint}</p> : null}
+    <SessionProgressContext.Provider value={report}>
+      <div
+        data-game-stage={scene}
+        className={`game-stage mx-auto w-full px-4 py-3 sm:px-6 sm:py-8 ${wide && scene !== "quiz" && scene !== "blank" ? "max-w-5xl" : "max-w-3xl"} ${
+          scene ? `game-stage--${scene}` : ""
+        } ${focus ? "jose-focus" : ""}`}
+      >
+        <div className="mb-2.5 flex items-start justify-between gap-3 sm:mb-5">
+          <div className="min-w-0">
+            <h1 className="font-display text-xl font-extrabold tracking-tight text-[var(--jose-text)] sm:text-4xl">
+              {title}
+            </h1>
+            {(!scene || hint !== hintFor(scene)) ? <p className="mt-1 text-sm font-semibold text-[var(--jose-text-muted)]">{hint}</p> : null}
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            {showHearts && hearts !== undefined ? <HeartsHud hearts={hearts} /> : null}
+            <SoundFocusControls />
+          </div>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          {showHearts && hearts !== undefined ? <HeartsHud hearts={hearts} /> : null}
-          {progress ? (
-            <p className="text-xs font-extrabold tracking-wide text-[var(--jose-accent)] sm:block">
-              {progress}
-            </p>
-          ) : null}
-          <SoundFocusControls />
-        </div>
+        {label ? (
+          <div className="session-progress" data-testid="session-progress">
+            <p className="session-progress__label">{label}</p>
+            {bar ? (
+              <div
+                className="session-progress__track"
+                role="progressbar"
+                aria-label={bar.label}
+                aria-valuemin={0}
+                aria-valuemax={bar.max}
+                aria-valuenow={bar.value}
+              >
+                <div
+                  className="session-progress__fill"
+                  style={{ width: `${Math.min(100, Math.max(0, (bar.value / bar.max) * 100))}%` }}
+                />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {children}
       </div>
-      {children}
-    </div>
+    </SessionProgressContext.Provider>
   );
 }

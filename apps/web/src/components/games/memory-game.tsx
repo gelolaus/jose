@@ -12,6 +12,7 @@ import {
   formatClock,
 } from "./memory-round";
 import { GameBoard } from "./game-board";
+import { useReportSessionProgress } from "./game-stage";
 import type { PlayBoardProps } from "./play-types";
 
 type Card = {
@@ -101,6 +102,16 @@ function MemoryPlay({ game, disabled, onFinish, onEvaluate }: { game: MemoryPlay
   const [cards, setCards] = useState(() => author ? buildDeck(game.pairs) : assessmentCards(game));
   const [flipped, setFlipped] = useState<string[]>([]);
   const [matched, setMatched] = useState<Set<string>>(new Set());
+  const report = useReportSessionProgress();
+  const pairsMatched = matched.size / 2;
+  useEffect(() => {
+    if (pairCount < 1) return;
+    report({
+      label: `${pairsMatched} of ${pairCount} pairs matched`,
+      value: pairsMatched,
+      max: pairCount,
+    });
+  }, [pairCount, pairsMatched, report]);
   const [locked, setLocked] = useState(false);
   const [started, setStarted] = useState(false);
   const [remainingMs, setRemainingMs] = useState(duration);

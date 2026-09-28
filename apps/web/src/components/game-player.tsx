@@ -41,6 +41,12 @@ import {
 import { MemoryGame } from "./games/memory-game";
 import type { WhyPayload } from "./games/play-types";
 import { QuizGame } from "./games/quiz-game";
+import { openingProgress } from "./games/session-progress";
+import {
+  hasSessionReward,
+  readSessionReward,
+  type SessionReward,
+} from "./games/session-reward";
 import { SortGame } from "./games/sort-game";
 import { TimelineGame } from "./games/timeline-game";
 
@@ -123,6 +129,7 @@ export function GamePlayer({
   });
   const [busy, setBusy] = useState(false);
   const [remainingAfter, setRemainingAfter] = useState<number | null>(null);
+  const [reward, setReward] = useState<SessionReward | null>(null);
   const [error, setError] = useState<string | null>(() =>
     resume
       ? "Your result was kept on this device. Retry saving when you are back online."
@@ -172,6 +179,8 @@ export function GamePlayer({
         setRemainingAfter(finished.gradedAttemptsRemaining);
       }
       setSavePhase("saved");
+      const earned = readSessionReward(finished);
+      setReward(hasSessionReward(earned) ? earned : null);
       persistDraft(next, "saved");
       clearAttemptDraft({ accountId, levelId, revision });
     } catch (err) {
@@ -293,8 +302,10 @@ export function GamePlayer({
               }
             : undefined
         }
+        reward={savePhase === "saved" ? reward : null}
         onPlayAgain={() => {
           clearAttemptDraft({ accountId, levelId, revision });
+          setReward(null);
           setBusy(true);
           router.refresh();
         }}
@@ -328,7 +339,8 @@ export function GamePlayer({
         hint={hintFor(game.type)}
         hearts={hearts}
         showHearts={!UNLIMITED_LEARNING}
-        progress={labelFor(game.type)}
+        initialProgress={openingProgress(game)}
+        progress={openingProgress(game) ? undefined : labelFor(game.type)}
         scene={game.type}
         wide
       >

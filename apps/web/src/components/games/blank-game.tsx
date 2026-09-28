@@ -11,6 +11,7 @@ import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useMotionSound } from "@/lib/motion-sound";
 import { GameBoard } from "./game-board";
+import { useReportSessionProgress } from "./game-stage";
 import type { PlayBoardProps } from "./play-types";
 
 type BlankPlayContent = BlankContent | AssessmentBlank;
@@ -76,13 +77,27 @@ function BlankPlay({
   }, [author, game.items]);
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
+  const [accepted, setAccepted] = useState(false);
+  const [missed, setMissed] = useState(false);
   const [revealed, setRevealed] = useState<string | null>(null);
+  const report = useReportSessionProgress();
   const missesRef = useRef(0);
   const wordsRef = useRef<string[]>([]);
   const { playCue } = useMotionSound();
   const item = game.items[index]!;
   const last = index === game.items.length - 1;
   const authoredItem = author ? game.items[index]! : null;
+
+  useEffect(() => {
+    const total = game.items.length;
+    if (total < 1) return;
+    const showNext = accepted && index < total - 1;
+    report({
+      label: `Sentence ${showNext ? index + 2 : index + 1} of ${total}`,
+      value: accepted ? Math.min(total, index + 1) : index,
+      max: total,
+    });
+  }, [accepted, game.items.length, index, report]);
 
   async function choose(word: string) {
     if (disabled || picked) return;
@@ -98,20 +113,22 @@ function BlankPlay({
       if (result.correct) {
         playCue("accept");
         setRevealed(word);
+        setAccepted(true);
         return;
       }
       playCue("reject");
       missesRef.current += 1;
-      if (result.feedback) {
-        const miss = await onMiss({
-          title: result.feedback.title,
-          body: result.feedback.body,
-          tone: "miss",
-        });
-        if (miss === "empty") return;
-      } else {
-        await onMiss(null);
-      }
+      setMissed(true);
+      const miss = result.feedback
+        ? await onMiss({
+            title: result.feedback.title,
+            body: result.feedback.body,
+            tone: "miss",
+          })
+        : await onMiss(null);
+      if (miss === "empty") return;
+      setPicked(null);
+      setMissed(false);
       return;
     }
 
@@ -119,29 +136,32 @@ function BlankPlay({
     const right = normalizeBlankKey(word) === normalizeBlankKey(authoredItem.answer);
     if (right) {
       playCue("accept");
-      setRevealed(authoredItem.answer);
+      setRevealed(word);
+      setAccepted(true);
       return;
     }
     playCue("reject");
     const distractorWhy = authoredItem.distractors?.find(
       (entry) => normalizeBlankKey(entry.text) === normalizeBlankKey(word),
     )?.why;
+    missesRef.current += 1;
+    setMissed(true);
     const result = await onMiss({
-      title: authoredItem.answer,
+      title: "Not quite",
       body:
         distractorWhy?.trim() ||
         authoredItem.why?.trim() ||
-        `The missing word is ${authoredItem.answer}.`,
+        "That word does not restore the passage.",
       tone: "miss",
       sourceLabel: authoredItem.source?.citation || authoredItem.source?.label,
     });
-    missesRef.current += 1;
-    setRevealed(authoredItem.answer);
     if (result === "empty") return;
+    setPicked(null);
+    setMissed(false);
   }
 
   function next() {
-    if (!picked) return;
+    if (!accepted || !picked) return;
     if (last) {
       onFinish(game.items.length - missesRef.current, game.items.length, missesRef.current, {
         type: "blank",
@@ -151,19 +171,14 @@ function BlankPlay({
     }
     setIndex((i) => i + 1);
     setPicked(null);
+    setAccepted(false);
+    setMissed(false);
     setRevealed(null);
   }
 
   const filled = picked ?? "_____";
   const sentence = item.sentence.replace("___", filled);
-  const rightPick =
-    picked !== null &&
-    (onEvaluate
-      ? revealed !== null && normalizeBlankKey(picked) === normalizeBlankKey(revealed)
-      : Boolean(
-          authoredItem &&
-            normalizeBlankKey(picked) === normalizeBlankKey(authoredItem.answer),
-        ));
+  const rightPick = accepted && picked !== null;
 
   return (
     <GameBoard scene="blank" step={`Sentence ${index + 1} of ${game.items.length}`}>
@@ -181,15 +196,10 @@ function BlankPlay({
       <div className="flex flex-wrap gap-2">
         {banks[index]!.map((word) => {
           const on = picked === word;
-          const right =
-            authoredItem
-              ? normalizeBlankKey(word) === normalizeBlankKey(authoredItem.answer)
-              : revealed !== null && normalizeBlankKey(word) === normalizeBlankKey(revealed);
           let tone =
             "bg-[var(--jose-surface-elevated)] text-[var(--jose-text)] ring-[var(--jose-rule)] motion-control";
-          if (picked && on && right) tone = "bg-[#1a2a5e] text-white ring-[#1a1a3e] motion-accept";
-          else if (picked && on && !right) tone = "bg-[#5a0a1e] text-white ring-[#5a0a1e]";
-          else if (picked && right) tone = "bg-[#1a2a5e]/20 text-[#0a0a1a] ring-[#1a2a5e]";
+          if (accepted && on) tone = "bg-[#1a2a5e] text-white ring-[#1a1a3e] motion-accept";
+          else if (missed && on) tone = "bg-[#5a0a1e] text-white ring-[#5a0a1e]";
           return (
             <button
               key={word}
@@ -216,7 +226,7 @@ function BlankPlay({
           ) : null}
         </div>
       ) : null}
-      {picked ? (
+      {accepted ? (
         <button
           type="button"
           onClick={next}

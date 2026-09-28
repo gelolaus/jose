@@ -1,10 +1,17 @@
 "use client";
 
 import { completeLevel } from "@/lib/path-api";
+import {
+  hasSessionReward,
+  readSessionReward,
+  SessionRewardBeat,
+  type SessionReward,
+} from "@/components/games/session-reward";
 import type { ChestContent } from "@jose/shared";
 import { BookOpen, Gift, Map, ScrollText } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import "./session-play.css";
 
 const KIND_ICON = {
   map: Map,
@@ -31,6 +38,7 @@ export function ChestPlayer({
   const [opened, setOpened] = useState(false);
   const [duplicate, setDuplicate] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reward, setReward] = useState<SessionReward | null>(null);
   const Icon = KIND_ICON[chest.artifact.kind] ?? Gift;
 
   async function onCollect() {
@@ -38,6 +46,8 @@ export function ChestPlayer({
     setError(null);
     try {
       const result = await completeLevel(levelId);
+      const earned = readSessionReward(result);
+      setReward(hasSessionReward(earned) ? earned : null);
       setDuplicate(result.artifactAwarded === false);
       setOpened(true);
     } catch (err) {
@@ -56,42 +66,48 @@ export function ChestPlayer({
 
   if (!opened) {
     return (
-      <div className="mx-auto flex min-h-full w-full max-w-lg flex-col items-center justify-center gap-5 px-6 py-16 text-center">
-        <div className="flex size-28 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 shadow-md">
-          <Gift className="size-14" strokeWidth={2.2} aria-hidden />
+      <div className="session-play">
+        <div className="session-play__scroll session-play__scroll--center">
+          <div className="flex size-28 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 shadow-md">
+            <Gift className="size-14" strokeWidth={2.2} aria-hidden />
+          </div>
+          <h1 className="font-display text-4xl font-semibold tracking-tight text-[var(--jose-ink)]">
+            {title}
+          </h1>
+          <p className="text-lg text-[var(--jose-ink-muted)]">{chest.message}</p>
+          <p className="text-sm font-semibold text-[var(--jose-ink-muted)]">
+            {chest.achievementCriteria}
+          </p>
+          {chest.artifact.approvalStatus === "draft" ? (
+            <p className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-950 ring-1 ring-amber-200">
+              Draft artifact — a teacher should approve provenance before publishing
+              this stop.
+            </p>
+          ) : null}
         </div>
-        <h1 className="font-display text-4xl font-semibold tracking-tight text-[var(--jose-ink)]">
-          {title}
-        </h1>
-        <p className="text-lg text-[var(--jose-ink-muted)]">{chest.message}</p>
-        <p className="text-sm font-semibold text-[var(--jose-ink-muted)]">
-          {chest.achievementCriteria}
-        </p>
-        {chest.artifact.approvalStatus === "draft" ? (
-          <p className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-950 ring-1 ring-amber-200">
-            Draft artifact — a teacher should approve provenance before publishing
-            this stop.
-          </p>
-        ) : null}
-        {error ? (
-          <p className="text-sm font-semibold text-[#7a1a2e]" role="alert">
-            {error}
-          </p>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => void onCollect()}
-          disabled={busy}
-          className="rounded-xl bg-[var(--jose-ink)] px-7 py-3.5 text-base font-semibold text-[var(--jose-paper)] shadow-md disabled:opacity-60"
-        >
-          {busy ? "Saving…" : "Collect journal artifact"}
-        </button>
+        <div className="session-play__footer">
+          {error ? (
+            <p className="mb-2 text-sm font-semibold text-[#7a1a2e]" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => void onCollect()}
+            disabled={busy}
+            className="jose-button session-play__continue"
+          >
+            {busy ? "Saving…" : "Collect journal artifact"}
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-lg flex-col gap-5 px-6 py-12">
+    <div className="session-play">
+      <div className="session-play__scroll">
+      <div className="flex flex-col gap-5">
       <div className="flex items-center gap-3">
         <div className="flex size-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
           <Icon className="size-7" aria-hidden />
@@ -130,13 +146,18 @@ export function ChestPlayer({
           Saved to your journal. Revisit it anytime from Profile.
         </p>
       )}
-      <button
-        type="button"
-        onClick={onContinue}
-        className="rounded-xl bg-[var(--jose-ink)] px-7 py-3.5 text-base font-semibold text-[var(--jose-paper)] shadow-md"
-      >
-        {nextLevelId ? "Continue to next" : "Continue"}
-      </button>
+      <SessionRewardBeat reward={reward} />
+      </div>
+      </div>
+      <div className="session-play__footer">
+        <button
+          type="button"
+          onClick={onContinue}
+          className="jose-button session-play__continue"
+        >
+          {nextLevelId ? "Continue to next" : "Continue"}
+        </button>
+      </div>
     </div>
   );
 }
