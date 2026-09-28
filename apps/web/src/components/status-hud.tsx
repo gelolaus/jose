@@ -1,4 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
+import "./home-mobile.css";
 
 type StatusHudProps = {
   xp: number;
@@ -7,6 +8,9 @@ type StatusHudProps = {
   variant?: "header" | "profile";
 };
 
+/** Four or more glyphs ("120 XP") overflow a third-width plaque at 320px. */
+const GLYPHS_BEFORE_TEXT = 4;
+
 const hudPanels = {
   xp: "/assets/ui/hud/wood-panel-xp.png",
   streak: "/assets/ui/hud/wood-panel-fire.png",
@@ -14,21 +18,34 @@ const hudPanels = {
 };
 
 function HudValue({ value }: { value: string }) {
+  const glyphCount = [...value].filter((character) => character !== " ").length;
+  const useText = glyphCount >= GLYPHS_BEFORE_TEXT;
+
   return (
-    <span className="jose-status-hud__value" aria-hidden="true">
-      {[...value].map((character, index) =>
-        character === " " ? (
-          <span key={index} className="jose-status-hud__space" />
-        ) : (
-          <img
-            key={index}
-            src={`/assets/ui/hud/glyphs/${character.toLowerCase()}.svg`}
-            alt=""
-            className="jose-status-hud__glyph"
-          />
-        ),
-      )}
-    </span>
+    <>
+      <span
+        className={useText ? "jose-status-hud__value jose-status-hud__value--long" : "jose-status-hud__value"}
+        aria-hidden="true"
+      >
+        {[...value].map((character, index) =>
+          character === " " ? (
+            <span key={index} className="jose-status-hud__space" />
+          ) : (
+            <img
+              key={index}
+              src={`/assets/ui/hud/glyphs/${character.toLowerCase()}.svg`}
+              alt=""
+              className="jose-status-hud__glyph"
+            />
+          ),
+        )}
+      </span>
+      {useText ? (
+        <span className="jose-status-hud__plain" aria-hidden="true">
+          {value}
+        </span>
+      ) : null}
+    </>
   );
 }
 
