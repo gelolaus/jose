@@ -11,7 +11,7 @@ import {
   Navigation,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { LevelNode } from "./level-node";
 
 /** Shared lane % — SVG spine and nodes use the exact same X values. */
@@ -66,6 +66,36 @@ function findCurrentNode(path: PathResponse) {
   return null;
 }
 
+/** The path scrolls inside `.jose-shell-main`. `window` does not scroll. */
+function pathScrollElement(from: HTMLElement | null): HTMLElement | null {
+  const scoped = from?.closest(".jose-shell-main");
+  if (scoped instanceof HTMLElement) return scoped;
+  const found = document.querySelector(".jose-shell-main");
+  return found instanceof HTMLElement ? found : null;
+}
+
+function readPathScroll(moduleId: string): number | null {
+  try {
+    const raw = sessionStorage.getItem(`${SCROLL_KEY_PREFIX}${moduleId}`);
+    if (raw == null || raw === "") return null;
+    const y = Number(raw);
+    return Number.isFinite(y) ? y : null;
+  } catch {
+    return null;
+  }
+}
+
+function centerNodeInRoot(root: HTMLElement, target: HTMLElement) {
+  const rootRect = root.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const next =
+    root.scrollTop +
+    (targetRect.top - rootRect.top) -
+    root.clientHeight / 2 +
+    targetRect.height / 2;
+  root.scrollTop = Math.max(0, next);
+}
+
 function initialCollapsed(path: PathResponse): Record<string, boolean> {
   const next: Record<string, boolean> = {};
   for (const section of path.sections) {
@@ -83,41 +113,49 @@ export function PathView({ path }: { path: PathResponse }) {
   );
   const [collapsed, setCollapsed] = useState(() => initialCollapsed(path));
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
-  const scrollRestored = useRef(false);
+  const viewRef = useRef<HTMLDivElement>(null);
   const currentNode = findCurrentNode(path);
+  const currentNodeId = currentNode?.node.id ?? null;
 
-  useEffect(() => {
-    if (scrollRestored.current) return;
-    try {
-      const raw = sessionStorage.getItem(`${SCROLL_KEY_PREFIX}${path.module.id}`);
-      if (raw) {
-        const y = Number(raw);
-        if (Number.isFinite(y)) {
-          window.requestAnimationFrame(() => window.scrollTo(0, y));
-        }
+  useLayoutEffect(() => {
+    const root = pathScrollElement(viewRef.current);
+    if (!root) return;
+    const saved = readPathScroll(path.module.id);
+    const nodeId = currentNodeId;
+    const apply = () => {
+      if (saved != null) {
+        root.scrollTop = saved;
+        return;
       }
-    } catch {
-      // ignore
-    }
-    scrollRestored.current = true;
-  }, [path.module.id]);
+      if (!nodeId) return;
+      const target = document.getElementById(`node-${nodeId}`);
+      if (target) centerNodeInRoot(root, target);
+    };
+    apply();
+    const frame = window.requestAnimationFrame(apply);
+    return () => window.cancelAnimationFrame(frame);
+  }, [path.module.id, currentNodeId]);
 
   useEffect(() => {
+    const root = pathScrollElement(viewRef.current);
+    if (!root) return;
     const onScroll = () => {
       try {
         sessionStorage.setItem(
           `${SCROLL_KEY_PREFIX}${path.module.id}`,
-          String(window.scrollY),
+          String(root.scrollTop),
         );
       } catch {
         // ignore
       }
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => root.removeEventListener("scroll", onScroll);
   }, [path.module.id]);
 
   useEffect(() => {
+    const root = pathScrollElement(viewRef.current);
+    if (!root) return;
     const observers: IntersectionObserver[] = [];
     for (const section of path.sections) {
       const el = sectionRefs.current[section.id];
@@ -130,7 +168,7 @@ export function PathView({ path }: { path: PathResponse }) {
             }
           }
         },
-        { root: null, rootMargin: "-30% 0px -45% 0px", threshold: 0.01 },
+        { root, rootMargin: "-30% 0px -45% 0px", threshold: 0.01 },
       );
       observer.observe(el);
       observers.push(observer);
@@ -166,7 +204,10 @@ export function PathView({ path }: { path: PathResponse }) {
   }
 
   return (
-    <div className="relative xl:grid xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
+    <div
+      ref={viewRef}
+      className="relative xl:grid xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start"
+    >
       <div className="min-w-0">
         <div className="sticky top-0 z-30 border-b border-black/10 bg-[var(--jose-paper)]/95 px-4 py-3 backdrop-blur sm:px-6 lg:px-8 xl:hidden">
           <div className="flex flex-wrap items-center gap-2">
@@ -195,7 +236,7 @@ export function PathView({ path }: { path: PathResponse }) {
             <button
               type="button"
               onClick={jumpToCurrent}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--jose-rule)] bg-white px-3 py-2 text-sm font-semibold text-[var(--jose-ink)]"
+              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[var(--jose-rule)] bg-white px-3 py-2 text-sm font-semibold text-[var(--jose-ink)]"
             >
               <Navigation className="size-4" strokeWidth={2.25} aria-hidden />
               Current
@@ -209,7 +250,7 @@ export function PathView({ path }: { path: PathResponse }) {
                 type="button"
                 aria-pressed={viewMode === "map"}
                 onClick={() => setMode("map")}
-                className={`rounded-lg p-2 ${
+                className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg p-2 ${
                   viewMode === "map"
                     ? "bg-[var(--jose-ink)] text-white"
                     : "text-[var(--jose-ink-muted)]"
@@ -222,7 +263,7 @@ export function PathView({ path }: { path: PathResponse }) {
                 type="button"
                 aria-pressed={viewMode === "list"}
                 onClick={() => setMode("list")}
-                className={`rounded-lg p-2 ${
+                className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg p-2 ${
                   viewMode === "list"
                     ? "bg-[var(--jose-ink)] text-white"
                     : "text-[var(--jose-ink-muted)]"

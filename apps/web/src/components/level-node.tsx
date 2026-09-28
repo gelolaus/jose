@@ -82,7 +82,7 @@ export function LevelNode({
           <NodeGlyph node={node} />
         </span>
       )}
-      <span className="absolute left-1/2 top-[calc(100%+0.65rem)] w-max max-w-[10.5rem] -translate-x-1/2 text-center text-base font-extrabold leading-snug path-node-label md:max-w-[13rem] md:text-lg">
+      <span className="absolute left-1/2 top-[calc(100%+0.65rem)] w-max -translate-x-1/2 text-center text-base font-extrabold leading-snug path-node-label md:max-w-[13rem] md:text-lg">
         {node.title}
       </span>
     </button>
