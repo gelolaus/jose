@@ -18,7 +18,7 @@ export function SignInRequired({
       </p>
       <p className="text-base font-semibold text-slate-600">{message}</p>
       <Link
-        href="/login"
+        href="/"
         className="rounded-full bg-[#1a2a5e] px-6 py-3 text-base font-extrabold text-white shadow-md"
       >
         School sign-in

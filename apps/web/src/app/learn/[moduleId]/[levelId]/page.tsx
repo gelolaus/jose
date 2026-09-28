@@ -5,7 +5,7 @@ import { AppShell } from "@/components/learning-shell";
 import { LessonPlayer } from "@/components/lesson-player";
 import { OutOfLives } from "@/components/out-of-lives";
 import { RecoveryState } from "@/components/recovery-state";
-import { SignInRequired } from "@/components/sign-in-required";
+import { redirectToLanding } from "@/lib/landing-gate";
 import { fetchPlayLevel } from "@/lib/server-api";
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
@@ -28,13 +28,7 @@ export default async function PlayLevelPage({ params }: Props) {
   const result = await fetchPlayLevel(levelId);
 
   if (!result.ok) {
-    if (result.status === 401) {
-      return (
-        <AppShell>
-          <SignInRequired />
-        </AppShell>
-      );
-    }
+    if (result.status === 401) redirectToLanding();
     if (result.code === HEARTS_EMPTY_CODE) {
       return (
         <AppShell>

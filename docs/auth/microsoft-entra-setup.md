@@ -130,7 +130,7 @@ npm run dev --workspace=@jose/api
 npm run dev --workspace=@jose/web
 ```
 
-Open `/login`, choose **Continue with Microsoft**, then pick a mock identity:
+Open `/` (or `/login`, which returns there), choose **Continue with Microsoft**, then pick a mock identity:
 
 - Staff APC → Jose session
 - Student APC → Jose session

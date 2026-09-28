@@ -65,7 +65,7 @@ export function BookmarksView() {
         <p className="mt-3 text-[var(--jose-text-muted)]">
           Sign in to save lessons and open them here.
         </p>
-        <Link href="/login" className="jose-button mt-6 inline-flex">
+        <Link href="/" className="jose-button mt-6 inline-flex">
           School sign-in
         </Link>
       </div>

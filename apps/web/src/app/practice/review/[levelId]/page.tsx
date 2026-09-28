@@ -1,6 +1,7 @@
 import { UnavailableState } from "@/app/learn/page";
 import { AppShell } from "@/components/learning-shell";
 import { PracticeReviewPlayer } from "@/components/practice-review-player";
+import { redirectToLanding } from "@/lib/landing-gate";
 import { fetchPracticePlayLevel } from "@/lib/server-api";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -20,6 +21,7 @@ export default async function PracticeReviewPage({ params }: Props) {
   const { levelId } = await params;
   const result = await fetchPracticePlayLevel(levelId);
   if (!result.ok) {
+    if (result.status === 401) redirectToLanding();
     if (result.status === 404) notFound();
     return (
       <AppShell>

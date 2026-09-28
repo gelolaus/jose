@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/learning-shell";
 import { ClassChallengesClient } from "@/components/class-challenges-client";
-import { SignInRequired } from "@/components/sign-in-required";
 import { RecoveryState } from "@/components/recovery-state";
+import { redirectToLanding } from "@/lib/landing-gate";
 import { ApiError } from "@/lib/path-api";
 import { fetchMyChallenges } from "@/lib/server-api";
 import type { StudentChallengeListItem } from "@jose/shared";
@@ -19,13 +19,7 @@ export default async function ClassChallengesPage() {
   try {
     items = await fetchMyChallenges();
   } catch (err) {
-    if (err instanceof ApiError && err.status === 401) {
-      return (
-        <AppShell>
-          <SignInRequired title="Sign in to see class challenges" />
-        </AppShell>
-      );
-    }
+    if (err instanceof ApiError && err.status === 401) redirectToLanding();
     error = err instanceof Error ? err.message : "Could not load challenges";
     if (err instanceof ApiError && err.status >= 500) {
       return (

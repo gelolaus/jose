@@ -753,6 +753,227 @@ html[data-theme="dark"] .jose-sidebar-nav-active {
   }
 }
 
+/* Public landing. The document itself does not scroll; this page does. */
+.jose-landing {
+  height: 100%;
+  height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(201, 168, 76, 0.28), transparent 36%),
+    radial-gradient(circle at 100% 0%, rgba(26, 42, 94, 0.12), transparent 32%),
+    var(--jose-paper);
+  color: var(--jose-ink);
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+}
+
+.jose-landing__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: max(0.65rem, env(safe-area-inset-top)) 1rem 0.65rem;
+  background: color-mix(in srgb, var(--jose-paper) 92%, transparent);
+  border-bottom: 1px solid var(--jose-rule);
+  backdrop-filter: blur(10px);
+}
+
+.jose-landing__bar .jose-title-img--login {
+  width: clamp(108px, 34vw, 180px);
+}
+
+.jose-landing__bar-signin {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: #1a1a3e;
+  color: #f5efe0;
+  font-size: 0.92rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.jose-landing__hero,
+.jose-landing__features,
+.jose-landing__books {
+  width: min(40rem, 100%);
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+.jose-landing__hero {
+  padding-top: 1.25rem;
+}
+
+.jose-landing__kicker {
+  margin: 0;
+  color: var(--jose-gold-deep);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.jose-landing h1 {
+  margin: 0.4rem 0 0;
+  font-size: clamp(1.85rem, 8vw, 3.2rem);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+}
+
+.jose-landing__lead {
+  margin: 0.75rem 0 0;
+  color: var(--jose-text-muted);
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.jose-landing__signin {
+  margin-top: 1.15rem;
+  padding: 1rem;
+  border: 1px solid var(--jose-rule);
+  border-radius: 1.25rem;
+  background: var(--jose-surface-elevated);
+  box-shadow: 0 10px 24px rgb(26 26 62 / 8%);
+}
+
+.jose-landing__signin h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.jose-landing__signin > p {
+  margin: 0.4rem 0 0.85rem;
+  color: var(--jose-text-muted);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.jose-landing__cta {
+  width: 100%;
+  margin-top: 0.75rem;
+  text-decoration: none;
+}
+
+.jose-landing__status,
+.jose-landing__hint,
+.jose-landing__meta {
+  margin: 0.75rem 0 0;
+  color: var(--jose-text-muted);
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.jose-landing__meta {
+  font-size: 0.78rem;
+}
+
+.jose-landing__features {
+  padding-top: 1.75rem;
+}
+
+.jose-landing__features h2 {
+  margin: 0 0 0.85rem;
+  font-size: 1.45rem;
+}
+
+.jose-landing__features ul {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.jose-landing__features li {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.85rem;
+  border: 1px solid var(--jose-rule);
+  border-radius: 1rem;
+  background: rgb(255 252 245 / 72%);
+}
+
+.jose-landing__feature-icon {
+  display: inline-flex;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.85rem;
+  background: #1a1a3e;
+  color: #f5efe0;
+}
+
+.jose-landing__feature-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.jose-landing__features h3 {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.jose-landing__features p {
+  margin: 0.25rem 0 0;
+  color: var(--jose-text-muted);
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.jose-landing__books {
+  padding-top: 1.25rem;
+}
+
+.jose-landing__books ul {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0 0 0.5rem;
+  list-style: none;
+}
+
+.jose-landing__books img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 470 / 610;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 6px rgb(32 19 10 / 24%));
+}
+
+@media (min-width: 768px) {
+  .jose-landing__hero,
+  .jose-landing__features,
+  .jose-landing__books {
+    padding-inline: 1.5rem;
+  }
+
+  .jose-landing__features ul {
+    grid-template-columns: 1fr;
+  }
+}
+
+html[data-theme="dark"] .jose-landing__features li {
+  background: var(--jose-surface-elevated);
+}
+
 /* School login / admission surfaces */
 .jose-login {
   position: relative;

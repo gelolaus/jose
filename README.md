@@ -25,8 +25,9 @@ environment values take precedence. `JOSE_DEMO_MODE=true` lets you
 browse as the shared demo learner before signing in; without it the learning routes ask for a
 sign-in, and without `JOSE_AUTH_MODE` there is no way to sign in at all.
 
-- Web: http://localhost:3000/learn  
-- Sign-in (mock or Microsoft): http://localhost:3000/login  
+- Web: http://localhost:3000/ — landing page with school sign-in when logged out; signed-in visitors go to Learn  
+- Learn: http://localhost:3000/learn  
+- Sign-in: on the landing page. http://localhost:3000/login forwards there (Microsoft denials included)  
 - API: http://localhost:3001/health  
 - Readiness: http://localhost:3001/ready  
 - Teacher studio: Profile → Teacher studio, or http://localhost:3000/teach  

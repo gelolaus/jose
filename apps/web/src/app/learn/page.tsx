@@ -3,7 +3,7 @@ import { ModuleGrid } from "@/components/module-grid";
 import { RecoveryState } from "@/components/recovery-state";
 import { StudentClassesPanel } from "@/components/student-classes-panel";
 import { TopBar } from "@/components/top-bar";
-import { SignInRequired } from "@/components/sign-in-required";
+import { redirectToLanding } from "@/lib/landing-gate";
 import { fetchModules, fetchMyAssignments, fetchMyClasses } from "@/lib/server-api";
 import type { StudentAssignment, StudentClassMembership } from "@jose/shared";
 import type { Metadata } from "next";
@@ -38,13 +38,7 @@ export default async function LearnPage() {
   const result = await fetchModules();
 
   if (!result.ok) {
-    if (result.status === 401) {
-      return (
-        <AppShell>
-          <SignInRequired />
-        </AppShell>
-      );
-    }
+    if (result.status === 401) redirectToLanding();
     return (
       <AppShell>
         <RecoveryState

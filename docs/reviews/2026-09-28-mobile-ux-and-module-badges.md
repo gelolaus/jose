@@ -4,6 +4,10 @@
 **Audience:** follow-up cloud agents (Grok 4.7 High Fast). Implement these batches. Do not restyle the pixel-art Jose look into a Duolingo clone.  
 **Priority:** student UI/UX first, mobile first (design and test at 360×740, then 320×700 and a desktop check). Backend work exists to make that UX true and permanent.
 
+## Landing page
+
+Signed-out visitors see `/`, not the learning shell. The page is mobile-first and includes **Continue with Microsoft** in the first screen (`#sign-in`). A signed-in session on `/` redirects to `/learn`. Microsoft success redirects to `/learn`. Denials redirect to `/?reason=…` so the message sits beside the button. `/login` only forwards to `/` and keeps older links working. Anonymous `/learn`, `/practice`, `/profile`, and `/bookmarks` requests redirect to `/`. Demo mode may still open Learn without an account, and the landing then offers **Browse the demo**.
+
 ## What is already good
 
 Keep this foundation. Do not replace it.
