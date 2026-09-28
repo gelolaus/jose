@@ -98,6 +98,7 @@ export default async function LearnPage() {
       <ModuleGrid
         modules={data.modules}
         continueLearning={data.continueLearning}
+        learner={data.learner}
       />
       {classesPanel}
     </AppShell>

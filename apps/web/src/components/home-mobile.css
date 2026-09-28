@@ -1,0 +1,151 @@
+/* Phone home layout. Wooden panels and book covers stay as they are in globals.css.
+   These rules only keep the header HUD on one row and make the hero usable at 360px and 320px. */
+
+@media (max-width: 639px) {
+  .home-hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .home-hero__action {
+    width: 100%;
+    align-self: stretch;
+    justify-content: center;
+  }
+}
+
+.home-hero__body {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.home-daily-goal {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.85rem;
+}
+
+.home-daily-goal__ring {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+}
+
+.home-daily-goal__track,
+.home-daily-goal__progress {
+  fill: none;
+  stroke-width: 3.5;
+}
+
+.home-daily-goal__track {
+  stroke: var(--jose-rule);
+}
+
+.home-daily-goal__progress {
+  stroke: var(--jose-gold-deep);
+  stroke-linecap: round;
+}
+
+.home-daily-goal__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.home-daily-goal__label {
+  color: var(--jose-text-muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.home-daily-goal__status {
+  color: var(--jose-ink);
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.home-module-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.35rem;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  background: #e8dcc0;
+  color: #1a1a3e;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+/* Glyph strings such as "120 XP" do not fit the right-hand plaque once the
+   header is forced onto three narrow columns. Text sits in that same blank. */
+.jose-status-hud__plain {
+  position: absolute;
+  top: 48%;
+  right: 16%;
+  left: 40%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: #412719;
+  font-family: var(--font-sans);
+  font-weight: 800;
+  font-size: 0.75rem;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  white-space: nowrap;
+  transform: translateY(-50%);
+}
+
+@media (max-width: 480px) {
+  .jose-topbar:has(.jose-status-hud--header) .jose-topbar__inner {
+    padding-inline: 0.35rem;
+  }
+
+  .jose-status-hud.jose-status-hud--header {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .jose-status-hud.jose-status-hud--header > .jose-status-hud__item:nth-child(1) {
+    grid-area: 1 / 1;
+  }
+
+  .jose-status-hud.jose-status-hud--header > .jose-status-hud__item:nth-child(2) {
+    grid-area: 1 / 2;
+  }
+
+  .jose-status-hud.jose-status-hud--header > .jose-status-hud__item:nth-child(3) {
+    grid-area: 1 / 3;
+  }
+
+  .jose-status-hud.jose-status-hud--header .jose-status-hud__item {
+    overflow: hidden;
+  }
+
+  .jose-status-hud.jose-status-hud--header .jose-status-hud__value--long {
+    display: none;
+  }
+
+  .jose-status-hud.jose-status-hud--header .jose-status-hud__plain {
+    display: flex;
+  }
+}
+
+@media (max-width: 360px) {
+  .jose-status-hud.jose-status-hud--header .jose-status-hud__plain {
+    right: 10%;
+    left: 38%;
+    font-size: 0.75rem;
+  }
+}

@@ -1,18 +1,25 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { ContinueLearningCard } from "@/components/continue-learning-card";
+import { ContinueLearningCard, StartHereHero, readDailyGoal } from "@/components/continue-learning-card";
 import { moduleBookImage } from "@/lib/ui-assets";
-import type { ContinueLearning, ModuleCard } from "@jose/shared";
+import type { ContinueLearning, Learner, ModuleCard } from "@jose/shared";
 import { ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
+import "./home-mobile.css";
+
+function badgeEarned(mod: ModuleCard) {
+  return (mod as ModuleCard & { badgeEarned?: boolean }).badgeEarned === true;
+}
 
 export function ModuleGrid({
   modules,
   continueLearning,
+  learner,
 }: {
   modules: ModuleCard[];
   continueLearning: ContinueLearning | null;
+  learner: Learner;
 }) {
   if (modules.length === 0) {
     return (
@@ -26,6 +33,9 @@ export function ModuleGrid({
       </div>
     );
   }
+
+  const dailyGoal = readDailyGoal(learner);
+  const firstModule = modules[0];
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-8 sm:py-10">
@@ -45,7 +55,11 @@ export function ModuleGrid({
           </p>
         </div>
       </header>
-      <ContinueLearningCard action={continueLearning} />
+      {continueLearning ? (
+        <ContinueLearningCard action={continueLearning} dailyGoal={dailyGoal} />
+      ) : firstModule ? (
+        <StartHereHero module={firstModule} dailyGoal={dailyGoal} />
+      ) : null}
       <div className="mb-5 flex items-center justify-between gap-3">
         <h2 className="text-2xl font-extrabold">Your learning path</h2>
         <Link
@@ -66,12 +80,13 @@ export function ModuleGrid({
             : 0;
           const completed =
             mod.totalCount > 0 && mod.completedCount >= mod.totalCount;
+          const earned = badgeEarned(mod);
           return (
             <li key={mod.id} className="module-wrapper">
               <Link
                 href={`/learn/${mod.id}`}
                 className="module-cover-link"
-                aria-label={`${mod.title}. ${completed ? "Completed" : `${mod.completedCount} of ${mod.totalCount} levels complete`}`}
+                aria-label={`${mod.title}. ${completed ? "Completed" : `${mod.completedCount} of ${mod.totalCount} levels complete`}${earned ? ". Badge" : ""}`}
               >
                 <img
                   src={moduleBookImage(index)}
@@ -85,6 +100,7 @@ export function ModuleGrid({
                 <span className="min-w-0 truncate">{mod.title}</span>
                 <span>{completed ? "Complete" : `${progress}%`}</span>
               </div>
+              {earned ? <span className="home-module-badge">Badge</span> : null}
               <div
                 role="progressbar"
                 aria-label={`${mod.title} progress`}
