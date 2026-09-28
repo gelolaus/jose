@@ -4,8 +4,15 @@ import { GameLabHub } from "@/components/game-lab";
 import type { PracticeItem, PracticeReviewResponse } from "@jose/shared";
 import { ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
+
+const REVIEW_PREVIEW_COUNT = 3;
 
 export function PracticeHub({ review }: { review: PracticeReviewResponse }) {
+  const [showAll, setShowAll] = useState(false);
+  const visibleItems = showAll ? review.items : review.items.slice(0, REVIEW_PREVIEW_COUNT);
+  const hasMore = review.items.length > REVIEW_PREVIEW_COUNT;
+
   return (
     <div className="jose-surface mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
       <div className="mb-8">
@@ -22,22 +29,23 @@ export function PracticeHub({ review }: { review: PracticeReviewResponse }) {
             {review.emptyMessage}
           </p>
         ) : (
-          <ul className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            {review.items.map((item) => (
-              <PracticeCard key={item.id} item={item} />
-            ))}
-          </ul>
+          <>
+            <ul className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+              {visibleItems.map((item) => (
+                <PracticeCard key={item.id} item={item} />
+              ))}
+            </ul>
+            {hasMore && !showAll ? (
+              <button
+                type="button"
+                className="jose-button jose-button--secondary mt-3 min-h-11 w-full"
+                onClick={() => setShowAll(true)}
+              >
+                See all
+              </button>
+            ) : null}
+          </>
         )}
-        <details className="mt-4 rounded-xl border border-[var(--jose-rule)] bg-[var(--jose-surface-elevated)]/80 px-4 py-3 text-sm text-[var(--jose-ink-muted)]">
-          <summary className="cursor-pointer font-semibold text-[var(--jose-ink)]">
-            Why these activities?
-          </summary>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
-            {review.rules.map((rule) => (
-              <li key={rule}>{rule}</li>
-            ))}
-          </ul>
-        </details>
       </section>
 
       <section className="border-t border-[var(--jose-rule)] pt-8">
@@ -52,16 +60,27 @@ export function PracticeHub({ review }: { review: PracticeReviewResponse }) {
         </p>
         <GameLabHub embedded />
       </section>
+
+      <details className="mt-8 rounded-xl border border-[var(--jose-rule)] bg-[var(--jose-surface-elevated)]/80 px-4 py-3 text-sm text-[var(--jose-ink-muted)]">
+        <summary className="cursor-pointer font-semibold text-[var(--jose-ink)]">
+          Why these activities?
+        </summary>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          {review.rules.map((rule) => (
+            <li key={rule}>{rule}</li>
+          ))}
+        </ul>
+      </details>
     </div>
   );
 }
 
 function PracticeCard({ item }: { item: PracticeItem }) {
   return (
-    <li>
+    <li className="min-w-0">
       <Link
         href={item.href}
-        className="flex h-full flex-col justify-between rounded-2xl border border-[var(--jose-rule)] bg-[var(--jose-surface-elevated)]/90 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        className="flex h-full min-h-11 w-full flex-col justify-between rounded-2xl border border-[var(--jose-rule)] bg-[var(--jose-surface-elevated)]/90 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
       >
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--jose-gold)]">
